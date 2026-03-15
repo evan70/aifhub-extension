@@ -41,7 +41,15 @@ Scans your project and creates `.ai-factory/DESCRIPTION.md` with:
 - Security-sensitive areas
 - Current maturity snapshot
 
-On first use in a project, the skill asks one question: what language to use in this project.
+On first use in a project, the skill asks two questions:
+
+1. What language to use in this project
+2. What to translate: `communication only`, `communication and artifacts`, or `artifacts only`
+
+The language list must always include:
+- `original (English)`
+- `russian`
+- a context-derived option when there is strong evidence for it
 
 It then stores that project preference in the project itself:
 - Prefer an existing `AGENTS.md`
@@ -52,11 +60,11 @@ In `AGENTS.md` or `CLAUDE.md`, the saved preference should live in a dedicated s
 
 ```md
 ## Interaction Preferences
-- Default reply language: Thai
-- Default artifact language: Thai
+- Preferred language: Thai
+- Translation scope: communication only
 ```
 
-Only these explicit markers count as saved localization memory. Tech-stack lines such as `Language: TypeScript` must not be treated as reply language. If the markers are absent, the skill must ask before analysis. The saved project language is reused in later sessions for both replies and generated artifacts by default. If the user explicitly wants different languages for communication and artifacts, the skill may store that split as a project-specific override.
+Only these explicit markers count as saved localization memory. Tech-stack lines such as `Language: TypeScript` must not be treated as reply language. If the markers are absent, the skill must ask before analysis. If the saved scope excludes artifacts, generated files stay in the original project language. If the scope includes artifacts, generated files use the preferred language.
 
 ```bash
 /aif-analyze russian
