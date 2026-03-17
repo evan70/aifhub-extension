@@ -1,0 +1,36 @@
+# Specs Catalog
+# Index of all finalized specifications
+
+# Individual specs
+specs:
+  # Example entry (remove after first real spec)
+  # - id: add-oauth
+  #   title: Add OAuth Authentication
+  #   completed: 2024-01-15
+  #   verdict: pass
+  #   files_changed: 12
+  #   tests_added: 15
+  #   tags: [auth, security]
+  #   issue: 42
+  #   pr: 43
+
+# Statistics
+stats:
+  total: 0
+  by_verdict:
+    pass: 0
+    pass-with-notes: 0
+  by_tag: {}
+
+# Schema reference
+_schema:
+  spec_entry:
+    id: "plan-id (slug format)"
+    title: "Human-readable title"
+    completed: "YYYY-MM-DD"
+    verdict: "pass | pass-with-notes"
+    files_changed: "number of files modified/created"
+    tests_added: "number of new tests"
+    tags: ["list", "of", "tags"]
+    issue: "issue number (optional)"
+    pr: "pull request number (optional)"
