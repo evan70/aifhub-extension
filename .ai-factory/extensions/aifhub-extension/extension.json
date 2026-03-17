@@ -1,10 +1,9 @@
 {
     "name": "aifhub-extension",
-    "version": "0.2.0",
-    "description": "Spec-driven workflow for AI Factory: analyze, plan, verify, and manage artifacts",
+    "version": "0.1.2",
+    "description": "Analyze-first workflow and enhanced roadmap for AI Factory",
     "skills": [
         "skills/aif-analyze",
-        "skills/aif-new",
         "skills/aif-roadmap-plus"
     ],
     "replaces": {

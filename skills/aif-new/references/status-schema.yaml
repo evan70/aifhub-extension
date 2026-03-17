@@ -1,0 +1,44 @@
+# Plan Status Schema
+# This file tracks the current state of the plan workflow
+
+plan_id: {{plan_id}}
+title: {{task_title}}
+created: {{created_date}}
+updated: {{updated_date}}
+
+# Workflow state: draft, exploring, planning, implementing, verifying, fixing, done
+status: draft
+
+# Progress tracking
+progress:
+  scope_total: 0
+  scope_completed: 0
+  tests_total: 0
+  tests_passed: 0
+
+# Workflow history
+history:
+  - timestamp: {{created_date}}
+    event: created
+    from: null
+    to: draft
+
+# Verification results
+verification:
+  last_run: null
+  verdict: null
+  findings:
+    blocking: 0
+    important: 0
+    optional: 0
+
+# Links
+links:
+  issue: null
+  pr: null
+  parent_plan: null
+  depends_on: []
+
+# Notes
+notes: |
+  Additional context or notes about this plan.

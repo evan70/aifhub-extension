@@ -1,0 +1,24 @@
+# AI Factory Configuration
+# This file persists project-level settings for AI agents
+
+# Localization settings
+language_mode: russian
+artifact_language: russian
+technical_terms_language: english
+
+# Agent profile (default, strict, creative, etc.)
+agent_profile: default
+
+# Workflow directories
+plans_dir: .ai-factory/plans
+specs_dir: .ai-factory/specs
+
+# Feature flags
+use_agents_md: true
+
+# Workflow settings
+workflow:
+  # Auto-create missing directories
+  auto_create_dirs: true
+  # Default plan id generation: sequential, timestamp, slug
+  plan_id_format: slug
