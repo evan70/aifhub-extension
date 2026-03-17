@@ -1,15 +1,3 @@
-# Ignore hidden directories (but allow .ai-factory and .github)
 /.*/
-!/.ai-factory/
-!/.github/
-
-# Ignore hidden files
 /.*
-
-# Allow specific hidden files
-!/.gitignore
-!/.ai-factory.json
-
-# Ignore root markdown files (except AGENTS.md)
 /*.md
-!/AGENTS.md
