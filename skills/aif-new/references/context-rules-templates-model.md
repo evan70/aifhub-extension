@@ -16,12 +16,14 @@ This document defines the artifact model for spec-driven workflow.
 
 | Artifact | Type | Purpose |
 |----------|------|---------|
-| `.ai-factory/config.yaml` | Context + Rules | Localization, workflow settings |
+| `.ai-factory/config.yaml` | Context + Rules | Localization, workflow settings, paths, rules refs |
 | `AGENTS.md` | Context + Rules | Project structure map, agent rules |
-| `.ai-factory/DESCRIPTION.md` | Context | Tech stack, modules, integrations |
-| `.ai-factory/ARCHITECTURE.md` | Context + Rules | Architecture decisions, patterns |
+| `.ai-factory/DESCRIPTION.md` | Context | Tech stack, modules, integrations (owned by core /aif) |
+| `.ai-factory/ARCHITECTURE.md` | Context + Rules | Architecture decisions, patterns (owned by core /aif-architecture) |
 | `.ai-factory/RULES.md` | Rules | Project conventions (optional) |
-| `.ai-factory/ROADMAP.md` | Context | Strategic milestones |
+| `.ai-factory/rules/base.md` | Rules | Project-wide conventions (required) |
+| `.ai-factory/rules/*.md` | Rules | Area-specific rules (optional, plan-driven) |
+| `.ai-factory/ROADMAP.md` | Context | Strategic milestones (owned by core /aif-roadmap) |
 
 ### Plan Level (Ephemeral)
 
@@ -63,12 +65,43 @@ Plan Level (Derived)
 
 | Skill | Reads | Writes |
 |-------|-------|--------|
-| `aif-analyze` | Project files | config.yaml, DESCRIPTION.md |
+| `aif-analyze` | Project files | config.yaml, rules/base.md |
 | `aif-explore` | Project + plan context | RESEARCH.md, explore.md |
-| `aif-new` | Project context + exploration | Plan folder artifacts |
-| `aif-implement` | Plan context + rules | Code files |
-| `aif-verify+` | Plan rules + verify.md | Verification results |
+| `aif-new` | Project context + exploration + rules | Plan folder artifacts, area rules (optional) |
+| `aif-implement` | Plan context + all rules (base + area) | Code files |
+| `aif-verify+` | Plan rules + verify.md + all rules | Verification results |
 | `aif-done` | Plan artifacts | specs/ folder |
+
+## Rules Architecture (Config)
+
+```
+.ai-factory/rules/
+├── base.md           ← Required. Created by aif-analyze.
+├── api.md            ← Optional. Created by aif-new when plan needs it.
+├── frontend.md       ← Optional. Created by aif-new when plan needs it.
+├── backend.md        ← Optional. Created by aif-new when plan needs it.
+├── database.md       ← Optional. Created by aif-new when plan needs it.
+├── logging.md        ← Optional. Created by aif-new when plan needs it.
+└── testing.md        ← Optional. Created by aif-new when plan needs it.
+```
+
+**config.yaml references:**
+```yaml
+rules:
+  base: .ai-factory/rules/base.md
+  api: .ai-factory/rules/api.md       # Only if exists
+  frontend: .ai-factory/rules/frontend.md  # Only if exists
+```
+
+**Ownership:**
+- `aif-analyze` creates `base.md` (required)
+- `aif-new` creates area rules (optional, plan-driven)
+- `aif-implement` and `aif-verify+` read only
+
+## Legacy Rules Compatibility
+
+- If `.ai-factory/RULES.md` exists, use it as additional project rules.
+- Prefer `config.rules.*` for modular rules, but do not ignore existing `RULES.md`.
 
 ## Template Resolution
 
@@ -95,7 +128,7 @@ skills/<name>/references/ ← Skill defaults (fallback)
 
 # Skill reads project context:
 project_context:
-  - .ai-factory/config.yaml     # language_mode: russian
+  - .ai-factory/config.yaml     # language.ui: russian
   - .ai-factory/DESCRIPTION.md  # React + TypeScript
   - AGENTS.md                   # Structure map
 

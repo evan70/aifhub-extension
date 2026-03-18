@@ -1,92 +1,146 @@
 ---
 name: aif-analyze
-description: Analyze the current repository and create or refresh `.ai-factory/DESCRIPTION.md` and `config.yaml` from code evidence. Use when project context is missing or the user asks for a repo overview.
+description: Bootstrap project context. Resolves localization and stack, creates/updates config.yaml and rules/base.md, then checks DESCRIPTION and guides core skill execution.
+version: 0.4.0
+author: ichi
 ---
 
 # AIF Analyze
 
-Analyze the current project and create or update `.ai-factory/DESCRIPTION.md` and `.ai-factory/config.yaml`.
+Bootstrap project context for AI Factory. This skill prepares configuration and rules, then checks core artifacts and guides the next core skills.
+
+## Ownership Boundary
+
+| Artifact | Owner | This Skill |
+|----------|-------|------------|
+| `config.yaml` | **aif-analyze** | Creates/updates |
+| `rules/base.md` | **aif-analyze** | Creates if missing |
+| `DESCRIPTION.md` | core `/aif` | Checks existence, suggests `/aif` if missing |
+| `ARCHITECTURE.md` | core `/aif-architecture` | Initiates based on workflow flag |
+| `ROADMAP.md` | core `/aif-roadmap` | Initiates based on workflow flag |
 
 ## Workflow
 
-1. **Resolve localization**
-   - This step is mandatory and must finish before any repository analysis.
-   - Treat the language as a project-level preference, not a user-level global setting.
-   - Read project memory in this order: `.ai-factory/config.yaml`, then `AGENTS.md`, then `CLAUDE.md`, then `.ai-factory/RULES.md`.
-   - Check config.yaml first for `language_mode` and `artifact_language` settings.
-   - If config.yaml exists with localization settings, use them without asking.
-   - Treat only explicit localization markers as saved memory.
-   - Valid memory in `AGENTS.md` or `CLAUDE.md` is a dedicated `## Interaction Preferences` section containing both `Preferred language:` and `Translation scope:` lines.
-   - Valid memory in `.ai-factory/RULES.md` is both exact bullets `- Preferred language: ...` and `- Translation scope: ...`.
-   - Never treat tech-stack fields such as `Language: TypeScript`, the current conversation language, or OS locale as a saved project language.
-   - If the explicit localization markers are missing or incomplete, asking is mandatory before repository inspection or artifact generation. Do not infer the answer.
-   - Ask question 1 exactly as the project language selector.
-   - The language options must always include `original (English)` and `russian`.
-   - Add one context-derived language option only when strong evidence exists, for example the dominant natural language of existing project docs or an explicit user request such as Thai.
-   - Ask question 2 exactly as the translation-scope selector with these options: `communication only`, `communication and artifacts`, `artifacts only`.
-   - Persist both answers back to the project by updating the existing memory file. If no memory file exists, prefer `AGENTS.md`, then `CLAUDE.md`, then create `.ai-factory/RULES.md`.
-   - If the translation scope excludes artifacts, keep generated artifacts in the original project language.
-   - If the translation scope includes artifacts, generate them in the preferred language.
-   - Keep file names, commands, and identifiers in English.
+### Step 1: Resolve Localization
 
-2. **Inspect the repository**
-   - Use [references/project-scan-checklist.md](references/project-scan-checklist.md) as the scan order.
-   - Read existing `.ai-factory/*` context files before writing new content.
-   - Prefer direct evidence from manifests, source layout, config files, and project docs.
+- This step is mandatory and must finish before any repository analysis.
+- Treat the language as a project-level preference, not a user-level global setting.
+- Read project memory in this order: `.ai-factory/config.yaml`, then `AGENTS.md`, then `CLAUDE.md`, then `.ai-factory/RULES.md`.
+- Check `config.language.ui` and `config.language.artifacts`
+- If config.yaml exists with localization settings, use them without asking.
+- Treat only explicit localization markers as saved memory.
+- Valid memory in `AGENTS.md` or `CLAUDE.md` is a dedicated `## Interaction Preferences` section containing both `Preferred language:` and `Translation scope:` lines.
+- Valid memory in `.ai-factory/RULES.md` is both exact bullets `- Preferred language: ...` and `- Translation scope: ...`.
+- Never treat tech-stack fields such as `Language: TypeScript`, the current conversation language, or OS locale as a saved project language.
+- If the explicit localization markers are missing or incomplete, asking is mandatory before repository inspection or artifact generation. Do not infer the answer.
+- Ask question 1 exactly as the project language selector.
+- The language options must always include `original (English)` and `russian`.
+- Add one context-derived language option only when strong evidence exists.
+- Ask question 2 exactly as the translation-scope selector with these options: `communication only`, `communication and artifacts`, `artifacts only`.
+- Persist answers to config.yaml (preferred) or bridge file if present.
+- If the translation scope excludes artifacts, keep generated artifacts in the original project language.
+- If the translation scope includes artifacts, generate them in the preferred language.
+- Keep file names, commands, and identifiers in English.
 
-3. **Create or update `.ai-factory/config.yaml`**
-   - If config.yaml is missing, create it with default structure.
-   - If config.yaml exists, preserve existing settings and update only if needed.
-   - Include localization settings from step 1.
-   - Include workflow directory paths (`plans_dir`, `specs_dir`).
-   - Use [references/config-template.yaml](references/config-template.yaml) as template.
-   - Ensure `plans_dir` and `specs_dir` directories exist.
+### Step 2: Inspect the Repository
 
-4. **Write `.ai-factory/DESCRIPTION.md`**
-   - Follow [references/description-template.md](references/description-template.md).
-   - Update the existing file in place when it already exists.
-   - Mark unknown or unsupported claims as unclear instead of guessing.
-   - Create or update only `.ai-factory/DESCRIPTION.md` as the analysis artifact.
-   - Do not create `.ai-factory/ROADMAP.md`.
-   - Do not generate skill recommendations.
-   - Do not install skills or suggest MCP setup as part of the artifact.
+- Use [references/project-scan-checklist.md](references/project-scan-checklist.md) as the scan order.
+- Read existing `.ai-factory/*` context files before writing new content.
+- Prefer direct evidence from manifests, source layout, config files, and project docs.
+- Note the tech stack for rules/base.md generation.
 
-5. **Finish with a short handoff**
-   - Use the saved scope plus preferred language for the reply.
-   - Mention created/updated files: `config.yaml` and `DESCRIPTION.md`.
-   - Suggest next steps: `aif-architecture`, `aif-roadmap`, or `aif-new` for starting work.
+### Step 3: Create or Update config.yaml
 
-## Config.yaml Structure
+- If config.yaml is missing, create it with v1 schema.
+- If config.yaml exists, preserve existing values and add missing fields.
+- Keep schema consistent with nested sections: `language`, `paths`, `rules`, `workflow`.
+
+Use [references/config-template.yaml](references/config-template.yaml) as reference.
+
+### Step 4: Create rules/base.md
+
+- Check if `.ai-factory/rules/base.md` exists.
+- **If missing**: Create rules directory and base.md.
+- Infer project-specific rules from codebase evidence:
+  - Primary language and style conventions
+  - Naming conventions (from existing code)
+  - Module boundaries (from project structure)
+  - Error handling patterns (from existing code)
+  - Testing requirements (from test files presence)
+- Use [references/rules-base-template.md](references/rules-base-template.md) as scaffold.
+- Fill placeholders with project-specific values, not generic advice.
+- Do NOT create optional area rules (api.md, frontend.md, etc.) — that's `aif-new` responsibility.
+- If `.ai-factory/RULES.md` exists, treat it as additional project-level rules (do not overwrite it).
+
+### Step 5: Ensure Directories Exist
+
+- Create directories from config paths if missing:
+  - `paths.plans` (typically `.ai-factory/plans`)
+  - `paths.specs` (typically `.ai-factory/specs`)
+  - `paths.rules` (typically `.ai-factory/rules`)
+
+### Step 6: Check DESCRIPTION and Guide Core Skills
+
+- Check if `.ai-factory/DESCRIPTION.md` exists.
+- If missing: do not generate DESCRIPTION content in this skill; suggest running `/aif`.
+- If DESCRIPTION exists and `workflow.analyze_updates_architecture: true`, suggest or initiate `/aif-architecture`.
+- If `workflow.architecture_updates_roadmap: true`, suggest or initiate `/aif-roadmap`.
+- If automatic invocation is not available in the current runtime, provide explicit next commands to the user in order.
+
+### Step 7: Finish with Guided Handoff
+
+- Use the saved scope plus preferred language for the reply.
+- Mention created/updated files: `config.yaml`, `rules/base.md`, and artifact status (`DESCRIPTION.md`, `ARCHITECTURE.md`, `ROADMAP.md`).
+- Report what was invoked automatically versus what remains as manual next command.
+- If DESCRIPTION is missing, first recommended command must be `/aif`.
+
+## Config v1 Schema
 
 ```yaml
-# AI Factory Configuration
-language_mode: russian          # Communication language
-artifact_language: russian      # Generated artifacts language
-technical_terms_language: english
-agent_profile: default
+language:
+  ui: russian                    # Communication language
+  artifacts: russian             # Generated artifacts language
+  technical_terms: english       # Technical terms (always english)
 
-plans_dir: .ai-factory/plans
-specs_dir: .ai-factory/specs
-
-use_agents_md: true
+paths:
+  description: .ai-factory/DESCRIPTION.md
+  architecture: .ai-factory/ARCHITECTURE.md
+  roadmap: .ai-factory/ROADMAP.md
+  research: .ai-factory/RESEARCH.md
+  plans: .ai-factory/plans
+  specs: .ai-factory/specs
+  rules: .ai-factory/rules
 
 workflow:
   auto_create_dirs: true
   plan_id_format: slug
+  analyze_updates_architecture: true
+  architecture_updates_roadmap: true
+  verify_mode: normal
+
+rules:
+  base: .ai-factory/rules/base.md
+  # area rules added by aif-new when needed
+
+agent_profile: default
 ```
 
 ## Rules
 
 - Use evidence over assumptions.
-- Create or update `config.yaml` before DESCRIPTION.md.
-- Ensure plan directories exist after creating config.yaml.
-- Do not add implementation tasks, architecture decisions, or skill-install advice.
-- Localization memory is valid only when both the language and translation scope markers are present.
+- Create/update `config.yaml` and `rules/base.md` first.
+- Never generate DESCRIPTION directly in this skill.
+- If DESCRIPTION is missing, suggest `/aif` first.
+- Follow workflow flags to suggest or initiate `/aif-architecture` and `/aif-roadmap`.
+- Create `rules/base.md` with project-specific rules, not generic advice.
+- Do NOT create optional area rules — that's `aif-new` responsibility.
+- Ensure all directories from config paths exist.
 - Keep the result concise and repository-specific.
 
-## Example requests
+## Example Requests
 
-- "Analyze this repo and create `.ai-factory/DESCRIPTION.md`."
-- "Refresh the project context before architecture work."
-- "Собери описание проекта по коду."
-- "Initialize AI Factory context for this project."
+- "Bootstrap AI Factory config for this project."
+- "Initialize project context and run required core skills."
+- "Настрой конфигурацию AI Factory."
+- "Create project rules."
+- "Initialize config.yaml and rules, then suggest core commands for DESCRIPTION/ARCHITECTURE/ROADMAP."

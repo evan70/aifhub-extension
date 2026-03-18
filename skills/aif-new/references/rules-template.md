@@ -1,20 +1,31 @@
 # Rules: {{plan_id}}
 
+## Inherited Project Rules
+
+- Base rules: `../../rules/base.md`
+- Area rules (if applicable): `../../rules/{{area}}.md`
+
+<!--
+List concrete inherited area rules when known, for example:
+- `../../rules/api.md`
+- `../../rules/frontend.md`
+-->
+
 ## Implementation Rules
 
-<!-- Правила, которые НЕОБХОДИМО соблюдать при реализации -->
+<!-- Rules that MUST be followed during implementation -->
 
 1. 
 
 ## Code Style
 
-<!-- Специфичные для этого плана правила стиля -->
+<!-- Plan-specific style rules -->
 
 -
 
 ## Testing Requirements
 
-<!-- Какие тесты нужны -->
+<!-- Required tests for this plan -->
 
 - [ ] Unit tests
 - [ ] Integration tests
@@ -23,7 +34,7 @@
 
 ## Documentation Requirements
 
-<!-- Какую документацию нужно обновить -->
+<!-- Documentation updates required by this plan -->
 
 - [ ] README
 - [ ] API docs
@@ -32,18 +43,18 @@
 
 ## Breaking Changes
 
-<!-- Есть ли breaking changes? Если да — описать миграцию -->
+<!-- Describe any breaking changes and migration path -->
 
 None
 
 ## Security Considerations
 
-<!-- Вопросы безопасности, если релевантно -->
+<!-- Security considerations, if relevant -->
 
 -
 
 ## Important Notes
 
-<!-- Любые важные замечания для реализатора -->
+<!-- Any important implementation notes -->
 
 -

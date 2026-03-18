@@ -15,8 +15,9 @@ Create a new plan folder under `.ai-factory/plans/<plan-id>/` with all required 
 ## Artifact Ownership
 
 - **Primary ownership:** `.ai-factory/plans/<plan-id>/` — all files inside the new plan folder.
-- **Read-only:** `.ai-factory/config.yaml`, `.ai-factory/DESCRIPTION.md`, `.ai-factory/ARCHITECTURE.md`, `AGENTS.md`, `.ai-factory/RESEARCH.md`.
-- **No writes to:** project source code, other plans, specs/, ROADMAP.md, RULES.md.
+- **Conditional ownership:** `.ai-factory/rules/<area>.md` (when user confirms area rules), `.ai-factory/config.yaml` (`rules.*` section only, when adding area rules).
+- **Read-only:** `.ai-factory/DESCRIPTION.md`, `.ai-factory/ARCHITECTURE.md`, `AGENTS.md`, `.ai-factory/RESEARCH.md`.
+- **No writes to:** project source code, other plans, specs/, ROADMAP.md.
 
 ---
 
@@ -37,11 +38,12 @@ This file contains project-specific rules accumulated by `/aif-evolve`. Treat th
 
 Read these files if present (do NOT fail if missing):
 
-- `.ai-factory/config.yaml` — localization, workflow settings, plan_id_format
+- `.ai-factory/config.yaml` — localization, workflow settings, plan_id_format, rules paths
 - `.ai-factory/DESCRIPTION.md` — tech stack, modules, integrations
 - `AGENTS.md` — project structure map
 - `.ai-factory/ARCHITECTURE.md` — architecture patterns, dependency rules
-- `.ai-factory/RULES.md` — project conventions (if any)
+- `.ai-factory/RULES.md` — project conventions (use if present)
+- `.ai-factory/rules/base.md` — project rules (path from config: `config.rules.base`)
 - `.ai-factory/RESEARCH.md` — persisted exploration notes
 
 If `.ai-factory/config.yaml` does not exist:
@@ -55,10 +57,30 @@ Options:
 
 ### 0.3 Resolve Localization
 
-- If `config.yaml` exists → use `language_mode` and `artifact_language`
-- If no config → fall back to `AGENTS.md` / `CLAUDE.md` / `.ai-factory/RULES.md` Interaction Preferences
+If config.yaml exists:
+- Use `config.language.ui` for communication
+- Use `config.language.artifacts` for generated artifacts
+- Use `config.language.technical_terms` for tech terms (default: english)
+
+**No config fallback**:
+- Fall back to `AGENTS.md` / `CLAUDE.md` / `.ai-factory/RULES.md` Interaction Preferences
 - If no localization found anywhere → ask before generating artifacts
-- **Keep file names, identifiers, and YAML keys in English always**
+
+**Always**: Keep file names, identifiers, and YAML keys in English
+
+### 0.4 Load Project Rules
+
+Read rules from config paths:
+- `config.rules.base` → `.ai-factory/rules/base.md` (required)
+- Any existing area rules referenced in `config.rules.*`
+- If `.ai-factory/RULES.md` exists, load it as additional project rules
+
+Rule precedence for plan generation:
+1. Plan-specific rules (`plans/<id>/rules.md` when editing existing plan)
+2. `.ai-factory/RULES.md` (if present)
+3. `config.rules.*` files (`base.md` + area rules)
+
+These rules apply to plan artifacts and will be inherited by the plan's `rules.md`.
 
 ---
 
@@ -103,6 +125,11 @@ Read `.ai-factory/RESEARCH.md` if it exists:
   - Constraints + Decisions → `rules.md`
   - Open questions → `task.md → Out of Scope` or `context.md → Known Constraints`
   - Success signals → `verify.md`
+ - Always copy RESEARCH into plan folder as `explore.md` when RESEARCH exists:
+   - Source: `.ai-factory/RESEARCH.md`
+   - Destination: `.ai-factory/plans/<plan-id>/explore.md`
+   - Preserve original content; do not truncate
+   - Keep `.ai-factory/RESEARCH.md` in place (copy, not move)
 
 ### 1.3 Clarify Scope
 
@@ -131,7 +158,7 @@ If the task mentions specific modules, files, or features:
 
 ## Step 2: Generate Plan ID
 
-Read format from `config.yaml → workflow.plan_id_format` (default: `slug`).
+Read format from `config.workflow.plan_id_format` (default: `slug`).
 
 | Format | Logic | Example |
 |--------|-------|---------|
@@ -162,7 +189,7 @@ Create these files using templates from `references/`:
 | `rules.md` | [rules-template.md](references/rules-template.md) | Yes |
 | `verify.md` | [verify-template.md](references/verify-template.md) | Yes |
 | `status.yaml` | [status-schema.yaml](references/status-schema.yaml) | Yes |
-| `explore.md` | [explore-template.md](references/explore-template.md) | Only if RESEARCH.md imported |
+| `explore.md` | Copy from `.ai-factory/RESEARCH.md` if exists, otherwise [explore-template.md](references/explore-template.md) | Yes if RESEARCH.md exists |
 | `constraints-*.md` | — | Only if specific constraints identified |
 
 ### Populating Artifacts
@@ -181,7 +208,9 @@ Create these files using templates from `references/`:
 - Integration points
 
 **rules.md** — Fill from exploration decisions + project rules:
-- Import project-level rules from RULES.md / ARCHITECTURE.md
+- Import project-level rules from `config.rules.base` and relevant `config.rules.*` area files
+- If `.ai-factory/RULES.md` exists, import relevant project conventions from it
+- Cross-check architectural constraints from ARCHITECTURE.md
 - Add plan-specific implementation rules
 - Testing requirements (what needs tests)
 - Documentation requirements
@@ -217,6 +246,7 @@ links:
 - Generate in `artifact_language` from config
 - Use evidence from codebase investigation, not assumptions
 - Cross-reference with ARCHITECTURE.md for file placement rules
+- All initial templates in `references/` are in English; translate generated artifact content to configured language when `artifact_language` is not English
 
 ---
 
@@ -236,7 +266,7 @@ Show the created plan:
 | rules.md | ✅ Ready | <N rules defined> |
 | verify.md | ✅ Ready | <N checkpoints> |
 | status.yaml | ✅ Draft | Plan initialized |
-| explore.md | ✅/— | Imported from RESEARCH.md / Not applicable |
+ | explore.md | ✅/— | Copied from RESEARCH.md / Not applicable |
 
 ### Next Steps
 
@@ -263,7 +293,7 @@ This skill follows the [context-rules-templates-model.md](references/context-rul
 
 | Level | Context | Rules |
 |-------|---------|-------|
-| **Project** | config.yaml, DESCRIPTION.md, AGENTS.md | ARCHITECTURE.md, RULES.md |
+| **Project** | config.yaml, DESCRIPTION.md, AGENTS.md | ARCHITECTURE.md, rules/base.md, rules/*.md |
 | **Plan** | task.md, context.md, explore.md | rules.md, verify.md, constraints-*.md |
 
 Plan artifacts **inherit** from project level. Plan rules can **add to** but not **replace** project rules.
@@ -281,6 +311,7 @@ Plan artifacts **inherit** from project level. Plan rules can **add to** but not
 - **Fill real data** where available, use `{{placeholder}}` only for unknowns
 - **Do not start implementation** — only create the plan structure
 - **Import exploration** from RESEARCH.md when available and relevant
+- **Copy RESEARCH.md to plan/explore.md** when RESEARCH exists
 - **Do not auto-capture** — always ask before importing exploration
 
 ## Anti-patterns
@@ -290,3 +321,58 @@ Plan artifacts **inherit** from project level. Plan rules can **add to** but not
 - ❌ Auto-importing RESEARCH.md without asking — user must confirm
 - ❌ Creating constraints-*.md files by default — only when specific constraints identified
 - ❌ Starting implementation — this skill only creates plan structure
+
+---
+
+## Step 5: Create Area Rules (If Needed)
+
+When the plan requires area-specific rules that don't exist in the project:
+
+### 5.1 Identify Needed Area Rules
+
+Based on plan scope, determine if area-specific rules would help:
+
+| Plan Touches | Consider Creating | Only If |
+|--------------|-------------------|---------|
+| API endpoints | `rules/api.md` | Not already exists |
+| Frontend components | `rules/frontend.md` | Not already exists |
+| Backend services | `rules/backend.md` | Not already exists |
+| Database schema/queries | `rules/database.md` | Not already exists |
+| Logging/observability | `rules/logging.md` | Not already exists |
+| Test suites | `rules/testing.md` | Not already exists |
+
+### 5.2 Ask Before Creating
+
+```
+AskUserQuestion: This plan touches {{area}}. Would you like to create area-specific rules?
+
+Creating `.ai-factory/rules/{{area}}.md` would help ensure consistent implementation across similar plans.
+
+Options:
+1. Yes — Create rules/{{area}}.md with project-specific conventions
+2. No — Use only base rules
+```
+
+### 5.3 Create Area Rules File
+
+If user confirms:
+1. Create `.ai-factory/rules/{{area}}.md` with area-specific conventions
+2. Infer conventions from existing code in that area
+3. Update `config.yaml` to reference new rules file:
+   ```yaml
+   rules:
+     base: .ai-factory/rules/base.md
+     {{area}}: .ai-factory/rules/{{area}}.md  # ← Add this line
+   ```
+
+### 5.4 Reference in Plan Rules
+
+Add reference to the plan's `rules.md`:
+```markdown
+## Inherited Rules
+
+- [Project Base Rules](../../rules/base.md)
+- [{{Area}} Rules](../../rules/{{area}}.md)  # If created
+```
+
+**Note:** Only create area rules when genuinely needed. Don't create empty or generic rule files.

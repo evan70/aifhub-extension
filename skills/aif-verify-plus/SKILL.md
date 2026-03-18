@@ -70,15 +70,31 @@ Read all artifacts from the plan folder:
 | `constraints-*.md` | Additional constraints | If present |
 | `explore.md` | Exploration context | If present |
 
-### 0.4 Load Project Context
+### 0.4 Load Project Rules
 
-- `.ai-factory/config.yaml` — localization for report output
+Read `.ai-factory/config.yaml`.
+Load `config.rules.base` → typically `.ai-factory/rules/base.md` (required).
+Load any area rules referenced in `config.rules.*`:
+- `config.rules.api` → `.ai-factory/rules/api.md`
+- `config.rules.frontend` → `.ai-factory/rules/frontend.md`
+- etc.
+If `.ai-factory/RULES.md` exists, load it as additional project rules.
+
+**Rule loading priority:**
+1. Plan rules (`plans/<id>/rules.md`) — highest priority
+2. `.ai-factory/RULES.md` (if present)
+3. Area rules from config (if plan touches that area)
+4. Base rules (`rules/base.md`) — always loaded
+5. Constraints files (`plans/<id>/constraints-*.md`)
+
+### 0.5 Load Project Context
+
+- `.ai-factory/config.yaml` — localization for report output, rules paths
 - `.ai-factory/DESCRIPTION.md` — tech stack for build/test detection
 - `.ai-factory/ARCHITECTURE.md` — architecture rules to check
 - `AGENTS.md` — project structure
-- `.ai-factory/RULES.md` — project conventions
 
-### 0.5 Gather Changed Files
+### 0.6 Gather Changed Files
 
 ```bash
 # Files changed since plan creation (if branch exists)
@@ -143,12 +159,19 @@ For each constraint file:
 - Verify implementation satisfies each constraint
 - Report violations
 
-### 2.3 Project Rules (from RULES.md, ARCHITECTURE.md)
+### 2.3 Project Rules (from rules/*.md via config)
 
-Check against project-level rules:
+Check against project-level rules loaded from config paths:
+- Base rules (`config.rules.base`) — always check
+- Area rules — check if plan touches that area
 - File placement matches ARCHITECTURE.md folder structure
 - Dependency rules respected (no layer violations)
 - Coding conventions followed
+
+**Rule application by verify_mode** (from `config.workflow.verify_mode`):
+- `strict`: All rule violations are blocking
+- `normal`: Critical violations are blocking, others are important
+- `lenient`: All violations are important (warnings only)
 
 ---
 

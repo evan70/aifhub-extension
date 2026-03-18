@@ -1,80 +1,19 @@
-# DESCRIPTION Template
+# DESCRIPTION Template (Deprecated in aif-analyze)
 
-Create `.ai-factory/DESCRIPTION.md` with this structure:
+This reference is kept for backward compatibility only.
 
-```markdown
-# Project: [Name]
+`aif-analyze` does NOT create or update `.ai-factory/DESCRIPTION.md`.
 
-## Overview
-[1-3 sentences: what this project does and why it exists]
+## Ownership
 
-## Product Type
-[CLI tool | Web Application | API Service | Library | Extension | Mobile App | ...]
+- `DESCRIPTION.md` is owned by core `/aif`
+- `aif-analyze` owns only `config.yaml` and `rules/base.md`
 
-## Current Stack
+## Current Behavior
 
-### Language
-- [Primary language and version if known]
+- If `.ai-factory/DESCRIPTION.md` is missing, `aif-analyze` must guide the user to run `/aif`
+- `aif-analyze` must not generate DESCRIPTION content from this template
 
-### Framework
-- [Framework name and version if known]
+## Note
 
-### Runtime
-- [Node.js | PHP | Python | Go | ...]
-
-### Database
-- [Database type if detected]
-
-### Key Dependencies
-- [List 3-7 most important dependencies]
-
-## Main Modules
-
-| Module | Path | Purpose |
-|--------|------|---------|
-| [module name] | [path] | [brief description] |
-
-## Key Integrations
-- [Integration 1]: [purpose]
-- [Integration 2]: [purpose]
-
-## Security-Sensitive Areas
-- [Area 1]: [why sensitive]
-- [Area 2]: [why sensitive]
-
-## Operational Notes
-- [Deployment notes, environment requirements, etc.]
-
-## Current Maturity Snapshot
-
-| Area | Status | Notes |
-|------|--------|-------|
-| Source Control | [done/partial/missing] | [evidence] |
-| Dependencies | [done/partial/missing] | [evidence] |
-| Testing | [done/partial/missing] | [evidence] |
-| CI/CD | [done/partial/missing] | [evidence] |
-| Documentation | [done/partial/missing] | [evidence] |
-
-## Known Gaps / Unclear Areas
-- [Gap 1]
-- [Gap 2]
-- [Unclear area 1]
-```
-
-## Include
-
-- Brief project purpose
-- Only detected stack details
-- Main modules from real paths
-- Detected integrations
-- Security-sensitive areas grounded in code or config
-- Evidence-based maturity assessment
-- Known gaps and unclear areas
-
-## Exclude
-
-- Skills to install
-- MCP server setup
-- Implementation plans
-- Roadmap milestones
-- Architecture decisions
+If project description generation is required, use core `/aif` workflow.
