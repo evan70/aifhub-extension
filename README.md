@@ -29,7 +29,10 @@ Then continue with:
 - status tracking in `status.yaml`
 - optional Claude subagent mode (with local fallback)
 
-`/aif-improve` remains a core `ai-factory` skill; this extension recommends using it before implementation.
+`/aif-improve` is also replaced by this extension with **Improve+** behavior:
+- plan-folder discovery via `.ai-factory/plans/<plan-id>/`
+- artifact refinement across `task.md`, `context.md`, `rules.md`, `verify.md`, and `status.yaml`
+- optional Claude `plan-polisher` mode (with local fallback)
 
 ## Documentation
 

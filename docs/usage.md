@@ -6,6 +6,7 @@
 |-------|----------|---------|
 | `/aif-analyze` | - | Analyze project context and bootstrap config/rules |
 | `/aif-new` | - | Create plan folder with structured artifacts |
+| `/aif-improve` | `/aif-improve` | Refine plan-folder artifacts with deeper analysis before implementation |
 | `/aif-implement` | `/aif-implement` | Execute plan-folder tasks with status.yaml tracking and optional subagent mode |
 | `/aif-verify` | `/aif-verify` | Enhanced verification with structured findings |
 | `/aif-fix` | - | Fix issues found by verify+ |
@@ -66,7 +67,10 @@ Creates plan artifacts in `.ai-factory/plans/<plan-id>/`.
 
 Refines the freshly created plan before execution.
 
-Note: `/aif-improve` is provided by core `ai-factory`, not by this extension.
+Improve+ supports:
+- `--list` to discover active plan folders
+- `@<path>` explicit plan selection
+- optional Claude `plan-polisher` mode with local fallback
 
 ### 4) Implement plan
 
@@ -129,6 +133,7 @@ aifhub-extension/
 `- skills/
    |- aif-analyze/
    |- aif-new/
+   |- aif-improve-plus/
    |- aif-implement-plus/
    |- aif-verify-plus/
    |- aif-fix/

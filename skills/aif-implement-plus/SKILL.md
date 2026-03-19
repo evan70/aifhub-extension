@@ -97,12 +97,16 @@ Read if present:
 - `.ai-factory/config.yaml`
 - `.ai-factory/rules/base.md`
 
-Read `.ai-factory/skill-context/aif-implement/SKILL.md` — MANDATORY if present.
+Read skill-context in this order:
+
+1. `.ai-factory/skill-context/aif-implement-plus/SKILL.md`
+2. `.ai-factory/skill-context/aif-implement/SKILL.md` (compatibility fallback)
 
 Skill-context rules are project overrides:
 - if conflict with this file -> skill-context wins
 - apply both when no conflict
 - enforce before finalizing task state updates
+- when both plus and legacy skill-context files exist, the plus-path wins
 
 Patch fallback (only when skill-context missing):
 - read up to 10 latest `.ai-factory/patches/*.md`

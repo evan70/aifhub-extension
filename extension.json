@@ -5,6 +5,7 @@
     "skills": [
         "skills/aif-analyze",
         "skills/aif-new",
+        "skills/aif-improve-plus",
         "skills/aif-implement-plus",
         "skills/aif-verify-plus",
         "skills/aif-fix",
@@ -12,6 +13,7 @@
         "skills/aif-roadmap-plus"
     ],
     "replaces": {
+        "skills/aif-improve-plus": "aif-improve",
         "skills/aif-implement-plus": "aif-implement",
         "skills/aif-roadmap-plus": "aif-roadmap",
         "skills/aif-verify-plus": "aif-verify"
