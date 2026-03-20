@@ -1,6 +1,7 @@
 ---
 name: aif-roadmap-plus
 description: Create or update `.ai-factory/ROADMAP.md` with an evidence-based maturity audit across project slices. Use for roadmap requests, progress reviews, or maturity checks.
+version: 0.7.0
 ---
 
 # AIF Roadmap Plus

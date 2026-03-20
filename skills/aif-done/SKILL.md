@@ -2,6 +2,7 @@
 name: aif-done
 description: Finalize a plan, mark it complete, and archive artifacts to specs/. Use after /aif-verify passes or when manually marking work as done.
 argument-hint: "[plan-id] [--summary] [--force]"
+version: 0.7.0
 ---
 
 # AIF Done — Finalize and Archive Plan
@@ -51,6 +52,10 @@ Read all artifacts from the plan folder:
 - `task.md`, `context.md`, `rules.md`, `verify.md`, `status.yaml`
 - `explore.md`, `constraints-*.md` (if present)
 - `fixes/*.md` (if present)
+
+For markdown plan artifacts:
+- inspect YAML frontmatter first for artifact identity and traceability
+- if frontmatter is missing, treat the file as a legacy artifact and continue with the existing body-first read path
 
 ### 0.4 Load Project Context
 
@@ -130,6 +135,7 @@ If `plans/<plan-id>/fixes/` exists:
 Create `spec.md` using [spec-template.md](references/spec-template.md):
 
 **Fill in from plan artifacts:**
+- **Metadata** — write YAML frontmatter using the shared artifact metadata contract for archived specs
 - **Summary** — from `task.md → Summary`
 - **Scope Delivered** — from `task.md → Scope → In Scope` (mark completed/deferred)
 - **Key Changes** — from `CHANGED_FILES` with change descriptions

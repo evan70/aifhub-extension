@@ -1,3 +1,14 @@
+---
+artifact_type: context
+plan_id: {{plan_id}}
+title: {{task_title}}
+artifact_status: draft
+owner: aif-new
+created_at: {{created_date}}
+updated_at: {{updated_date}}
+source_issue: {{issue_number_or_null}}
+---
+
 # Context: {{plan_id}}
 
 ## Current State

@@ -2,6 +2,7 @@
 name: aif-fix
 description: Fix issues found by /aif-verify. Reads verification findings, implements fixes for blocking and important issues, then suggests re-verification. Use when verification fails or user says "fix the issues".
 argument-hint: "[plan-id] [finding-ids...] [--all]"
+version: 0.7.0
 ---
 
 # AIF Fix — Fix Verification Findings
@@ -64,6 +65,10 @@ Read `status.yaml → verification`:
   → STOP.
 
 Read plan artifacts: `task.md`, `rules.md`, `constraints-*.md`, `verify.md`.
+
+For markdown plan artifacts:
+- inspect YAML frontmatter first for artifact identity and traceability
+- if frontmatter is missing, treat the file as a legacy artifact and continue with the existing body-first read path
 
 ### 0.4 Parse Finding IDs from Arguments
 
@@ -162,6 +167,18 @@ Also create a fix artifact in `plans/<plan-id>/fixes/`:
 Template:
 
 ```markdown
+---
+artifact_type: fix
+plan_id: <plan-id>
+title: "Fix <finding-id>"
+artifact_status: recorded
+owner: aif-fix
+created_at: <timestamp>
+updated_at: <timestamp>
+finding_id: <finding-id>
+source_issue: <status.yaml.links.issue|null>
+---
+
 # Fix <finding-id>
 
 ## Problem

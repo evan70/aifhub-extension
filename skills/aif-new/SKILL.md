@@ -2,6 +2,7 @@
 name: aif-new
 description: Create a new plan folder with structured artifacts (task, context, rules, verify, status). Use when starting a new feature, change, or improvement that requires structured planning.
 argument-hint: "[task description]"
+version: 0.7.0
 ---
 
 # AIF New — Create Plan Folder
@@ -81,6 +82,12 @@ Rule precedence for plan generation:
 
 These rules apply to plan artifacts and will be inherited by the plan's `rules.md`.
 
+Artifact metadata contract:
+- markdown plan artifacts use YAML frontmatter first
+- required keys: `artifact_type`, `plan_id`, `title`, `artifact_status`, `owner`, `created_at`, `updated_at`
+- optional traceability keys may include `source_issue`, `source_plan`, `source_artifact`
+- YAML-native artifacts such as `status.yaml` keep their existing format and are not wrapped
+
 ---
 
 ## Step 1: Gather Plan Input
@@ -130,11 +137,12 @@ Read `.ai-factory/RESEARCH.md` if it exists:
   - Constraints + Decisions → `rules.md`
   - Open questions → `task.md → Out of Scope` or `context.md → Known Constraints`
   - Success signals → `verify.md`
- - Always copy RESEARCH into plan folder as `explore.md` when RESEARCH exists:
+- Always normalize RESEARCH into a plan-local `explore.md` when RESEARCH exists:
    - Source: `.ai-factory/RESEARCH.md`
    - Destination: `.ai-factory/plans/<plan-id>/explore.md`
-   - Preserve original content; do not truncate
-   - Keep `.ai-factory/RESEARCH.md` in place (copy, not move)
+   - Preserve the original RESEARCH body below the frontmatter; do not truncate it
+   - Add YAML frontmatter for the plan-local artifact
+   - Keep `.ai-factory/RESEARCH.md` in place and unchanged (copy + normalize, not move)
 
 ### 1.3 Clarify Scope
 
@@ -194,12 +202,13 @@ Create these files using templates from `references/`:
 | `rules.md` | [rules-template.md](references/rules-template.md) | Yes |
 | `verify.md` | [verify-template.md](references/verify-template.md) | Yes |
 | `status.yaml` | [status-schema.yaml](references/status-schema.yaml) | Yes |
-| `explore.md` | Copy from `.ai-factory/RESEARCH.md` if exists, otherwise [explore-template.md](references/explore-template.md) | Yes if RESEARCH.md exists |
+| `explore.md` | Normalize from `.ai-factory/RESEARCH.md` if exists, otherwise [explore-template.md](references/explore-template.md) | Yes if RESEARCH.md exists |
 | `constraints-*.md` | — | Only if specific constraints identified |
 
 ### Populating Artifacts
 
 **task.md** — Fill from user input + exploration:
+- include YAML frontmatter with the shared artifact metadata keys
 - Summary: 1-2 sentence description
 - Motivation: why this matters
 - Scope In/Out: concrete checklist items
@@ -207,12 +216,14 @@ Create these files using templates from `references/`:
 - Dependencies and effort estimate
 
 **context.md** — Fill from codebase investigation:
+- include YAML frontmatter with the shared artifact metadata keys
 - Key files that will be changed (with paths)
 - Relevant patterns already in use
 - Known constraints from ARCHITECTURE.md
 - Integration points
 
 **rules.md** — Fill from exploration decisions + project rules:
+- include YAML frontmatter with the shared artifact metadata keys
 - Import project-level rules from `config.rules.base` and relevant `config.rules.*` area files
 - If `.ai-factory/RULES.md` exists, import relevant project conventions from it
 - Cross-check architectural constraints from ARCHITECTURE.md
@@ -221,6 +232,7 @@ Create these files using templates from `references/`:
 - Documentation requirements
 
 **verify.md** — Generate from task scope + rules:
+- include YAML frontmatter with the shared artifact metadata keys
 - One checkbox per In Scope item
 - One checkbox per acceptance criterion
 - Standard checks: build, tests, lint, docs
@@ -260,6 +272,9 @@ archived_to: null
 - Generate in `artifact_language` from config
 - Use evidence from codebase investigation, not assumptions
 - Cross-reference with ARCHITECTURE.md for file placement rules
+- For markdown plan artifacts, write YAML frontmatter first using the shared metadata contract
+- `artifact_status` for newly created plan artifacts should start as `draft`
+- Keep `status.yaml` YAML-native; do not wrap it or duplicate mutable workflow state into markdown frontmatter
 - All initial templates in `references/` are in English; translate generated artifact content to configured language when `artifact_language` is not English
 
 ---
@@ -329,7 +344,7 @@ Plan artifacts **inherit** from project level. Plan rules can **add to** but not
 - **Fill real data** where available, use `{{placeholder}}` only for unknowns
 - **Do not start implementation** — only create the plan structure
 - **Import exploration** from RESEARCH.md when available and relevant
-- **Copy RESEARCH.md to plan/explore.md** when RESEARCH exists
+- **Normalize RESEARCH.md into plan/explore.md** when RESEARCH exists
 - **Do not auto-capture** — always ask before importing exploration
 
 ## Anti-patterns
@@ -337,6 +352,7 @@ Plan artifacts **inherit** from project level. Plan rules can **add to** but not
 - ❌ Creating plan with all `{{placeholder}}` — investigate first, fill what you can
 - ❌ Skipping codebase investigation — always check relevant files
 - ❌ Auto-importing RESEARCH.md without asking — user must confirm
+- ❌ Copying RESEARCH.md verbatim into `explore.md` without adding plan-local metadata
 - ❌ Creating constraints-*.md files by default — only when specific constraints identified
 - ❌ Starting implementation — this skill only creates plan structure
 

@@ -2,6 +2,7 @@
 name: aif-improve-plus
 description: Refine plan-folder artifacts with deeper codebase analysis, status sync, and optional Claude plan-polisher delegation. Replaces /aif-improve.
 argument-hint: "[plan-id|@path|--list] [improvement prompt] [--local|--subagent]"
+version: 0.7.0
 ---
 
 # AIF Improve+ — Refine Plan Folder
@@ -151,6 +152,10 @@ Read all present artifacts from the plan folder:
 - `explore.md`
 - `constraints-*.md`
 
+For markdown plan artifacts:
+- inspect YAML frontmatter first for artifact identity/freshness checks
+- if frontmatter is missing, treat the file as a legacy artifact and fall back to the existing full-body read path
+
 Understand:
 - plan goal and motivation
 - In Scope / Out of Scope items
@@ -249,22 +254,26 @@ Apply improvements surgically.
 
 - add missing In Scope items and acceptance criteria
 - tighten vague wording with specific outcomes and file references when known
+- preserve and refresh YAML frontmatter (`updated_at`, traceability fields when needed)
 - preserve completed checkboxes
 - avoid rewriting the entire file unless the structure is badly degraded
 
 #### 4.2 Update `context.md`
 
 - add relevant files, patterns, constraints, and integration points discovered during analysis
+- preserve and refresh YAML frontmatter
 - keep content evidence-based, not speculative
 
 #### 4.3 Update `rules.md`
 
 - add or tighten implementation rules, testing expectations, and documentation requirements
+- preserve and refresh YAML frontmatter
 - keep inherited project rules intact
 
 #### 4.4 Update `verify.md`
 
 - align checklist entries with updated scope, rules, and acceptance criteria
+- preserve and refresh YAML frontmatter
 - keep Findings/Verdict sections intact
 
 #### 4.5 Sync `status.yaml`
@@ -347,8 +356,9 @@ Options:
 3. **Preserve completed work** — never delete completed checkboxes silently
 4. **Use evidence-based refinements** — every change must be justified by codebase analysis or user input
 5. **Keep artifacts synchronized** — `task.md`, `context.md`, `rules.md`, `verify.md`, and `status.yaml` must agree after refinement
-6. **No hard dependency on subagents** — local refinement must always work
+6. **Preserve markdown metadata blocks** — when frontmatter exists, keep it valid and refresh `updated_at` instead of stripping it
 7. **Do not gold-plate** — suggest only changes that matter to the plan quality or workflow consistency
+8. **No hard dependency on subagents** — local refinement must always work
 
 ## Anti-patterns
 
