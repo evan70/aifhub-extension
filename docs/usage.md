@@ -116,12 +116,10 @@ Use this as the recommended execution entrypoint after `/aif-improve`.
 
 `/aif-apply`:
 - resolves the target plan from `plan-id`, `@path`, branch match, or unfinished plan discovery
-- asks once for git strategy (`new`, `current`, `default`) and persists it in `status.yaml`
-- optionally delegates refinement/execution to Claude `plan-polisher`, `implementer`, or `implementer-isolation`
-- always runs implement -> quality checks -> verify -> fix -> re-verify until PASS or loop limit
-- falls back to local orchestration if Claude-only workers are unavailable or delegation fails
-
-Claude subagent integration is an optional Claude-only mode. The canonical workflow still works in local mode.
+- asks once for git strategy (`new`, `current`, `default`), persists it in `status.yaml`, and applies it locally before execution starts
+- runs `/aif-implement` as the owner of task execution, progress tracking, quality checks, and the verify/fix loop
+- re-reads `status.yaml -> verification.verdict` after `/aif-implement` and routes passing plans to `/aif-done`
+- stops on unresolved verification findings instead of starting a second verify/fix loop inside `aif-apply`
 
 ### 6) Direct implementation path (manual fallback)
 

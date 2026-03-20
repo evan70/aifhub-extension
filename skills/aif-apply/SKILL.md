@@ -1,28 +1,28 @@
 ---
 name: aif-apply
-description: Manual orchestration entrypoint for plan execution, git strategy selection, verify/fix loops, and final handoff with optional Claude subagent acceleration.
-argument-hint: "[plan-id|@path|status|--list] [--local|--subagent] [--git-new|--git-current|--git-default]"
-version: 0.7.0
+description: Manual orchestration entrypoint for plan execution, git strategy selection, and final handoff after local plan execution.
+argument-hint: "[plan-id|@path|status|--list] [--local] [--git-new|--git-current|--git-default]"
+version: 0.7.1
 author: AIFHub Extension
 ---
 
 # AIF Apply - Manual Workflow Orchestrator
 
-Run the full spec-driven execution cycle from an active plan folder. `aif-apply` is the manual control point between planning and finalization: it selects the active plan, resolves execution mode, runs implementation, then drives verify/fix until the plan is ready for `aif-done`.
+Run the full spec-driven execution cycle from an active plan folder. `aif-apply` is the manual control point between planning and finalization: it selects the active plan, resolves the git strategy, applies that strategy locally, runs implementation through `/aif-implement`, and hands off completed plans to `aif-done`.
 
 This skill is orchestration-first:
 
 - manual trigger only - never auto-runs on plan creation
 - plan-folder aware - works from `config.paths.plans/<plan-id>/` (normally `.ai-factory/plans/<plan-id>/`)
-- Claude-aware - can delegate to Claude subagents when available
-- fallback-safe - preserves the same external workflow in local mode
+- local-first - does not require Claude-only workers
+- thin wrapper - delegates task execution, progress tracking, and verify/fix loops to `/aif-implement`
 
 ---
 
 ## Artifact Ownership
 
 - **Primary ownership:** `plans/<plan-id>/status.yaml` for orchestration state and runtime settings.
-- **Delegates writes to:** source files via `aif-implement`, verification metadata via `aif-verify`, fix artifacts via `aif-fix`, archive artifacts via `aif-done`.
+- **Delegates writes to:** source files and plan progress via `aif-implement`, verification metadata via `aif-verify`, fix artifacts via `aif-fix`, archive artifacts via `aif-done`.
 - **Read-only:** `task.md`, `context.md`, `rules.md`, `verify.md`, project context files, and source code except through delegated implementation/fix steps.
 - **No writes to:** `specs/` directly, other plans, bridge files.
 
@@ -38,8 +38,7 @@ Parse `$ARGUMENTS` first:
 - `@<path>` -> explicit plan path override
 - `<plan-id>` -> explicit plan id override
 - `status` -> show orchestration status only
-- `--local` -> force local orchestration mode
-- `--subagent` -> prefer Claude subagent mode with local fallback
+- `--local` -> explicit compatibility flag for local orchestration
 
 ### Step 0.1: Load Project Context
 
@@ -84,7 +83,7 @@ Decision priority:
 - existing `status.yaml -> execution.git.strategy` -> reuse the saved plan choice when resuming
 - otherwise ask the user once before execution starts
 
-Save the decision by updating only `status.yaml -> execution.git`:
+Do not stop after persisting the choice. Apply the chosen strategy locally before `/aif-implement` starts, then update only `status.yaml -> execution.git`:
 
 ```yaml
 execution:
@@ -97,40 +96,43 @@ execution:
 
 Preserve any existing sibling fields under `execution` such as `mode`, `subagent`, `current_task`, `max_fix_loops`, and `quality_checks`.
 
+Apply the strategy deterministically:
+
+1. inspect the local git state and current branch
+2. resolve the repository default branch name when needed
+3. execute the chosen strategy before implementation:
+   - `new` -> create or switch to a local work branch for the plan; reuse `execution.git.work_branch` when resuming
+   - `current` -> stay on the current branch and record it as `work_branch`
+   - `default` -> switch to the local default branch only when explicitly selected
+4. record the actual `work_branch`, `base_branch`, and `resolved_at` values after the branch step succeeds
+
+Do not start `/aif-implement` while the local branch state and `execution.git` disagree.
+
 Safety rules:
 
 - never select the default branch implicitly
 - never push, pull, or rewrite remote state automatically
-- if branch creation or switching is unavailable, keep the chosen strategy recorded and continue only after confirming the local fallback path with the user
+- if branch creation or switching fails, stop and report the local git error instead of continuing with a stale branch context
 
 ### Step 0.4: Resolve Orchestration Mode
 
-Subagent mode is optional and Claude-only.
-
-Detect availability:
-
-- `.claude/agents/plan-polisher.md`
-- `.claude/agents/implementer.md`
-- `.claude/agents/implementer-isolation.md`
+`aif-apply` currently orchestrates only the local path.
 
 Mode rules:
 
-- `--local` -> force local mode
-- `--subagent` -> prefer delegated mode with local fallback
-- no explicit flag -> default to local unless Claude-only workers are available and the user chooses delegation
+- `--local` -> explicit compatibility flag; keep mode `local`
+- no explicit flag -> default to local
 
 Save the decision by updating only `status.yaml -> execution.mode`, `execution.subagent`, and `execution.mode_resolved_at`:
 
 ```yaml
 execution:
-  mode: local|subagent
-  subagent: plan-polisher|implementer|implementer-isolation|null
+  mode: local
+  subagent: null
   mode_resolved_at: <ISO timestamp>
 ```
 
 Do not replace the whole `execution` object here. Preserve `execution.git`, `execution.current_task`, `execution.max_fix_loops`, and `execution.quality_checks`.
-
-When both delegated phases are used, record `plan-polisher` during readiness work and then update `execution.subagent` to the selected `implementer*` worker for task execution.
 
 ### Step 1: Load Plan State
 
@@ -159,65 +161,38 @@ Before implementation starts:
 
 1. inspect `task.md`, `rules.md`, and `status.yaml`
 2. if the plan is not execution-ready, route to `/aif-improve`
-3. when subagent mode is active and `.claude/agents/plan-polisher.md` is available, delegate the plan review to `plan-polisher`
-4. require response contract from `plan-polisher`:
-   - recommended artifact edits
-   - rationale for each recommendation
-   - blockers or unanswered questions
-5. apply accepted artifact edits locally and record the delegation result in plan history
-
-If `plan-polisher` is unavailable or delegation fails, continue with the same refine gate locally.
+3. if the plan already records unresolved verification failures or missing scope data, stop and send the user back through `/aif-improve` before execution
 
 #### 2.2 Implementation Pass
 
-Choose the implementation worker:
+Run the pending scope through `/aif-implement`.
 
-- local mode -> run the pending scope through `/aif-implement`
-- subagent mode -> use `implementer-isolation` when plan constraints require isolation; otherwise use `implementer`
+`/aif-implement` owns:
 
-During execution:
+- task handoff and `execution.current_task`
+- `task.md` checkbox updates
+- `progress.scope_completed` synchronization
+- quality checks from `status.yaml -> execution.quality_checks`
+- the verify -> fix -> re-verify loop up to `execution.max_fix_loops`
 
-1. set `status.yaml -> execution.current_task` before each task handoff
-2. if in subagent mode, delegate the current task to `implementer` or `implementer-isolation`
-3. require response contract from the worker:
-   - changed files
-   - completed task reference
-   - blockers or follow-up actions
-4. verify delegated changes locally before marking the task complete or advancing the plan state
+`aif-apply` must not duplicate that loop after `/aif-implement` returns.
 
-If delegated execution fails or returns incomplete evidence:
+#### 2.3 Final Handoff
 
-- append a warning to `status.yaml -> history`
-- switch `execution.mode` to `local` while preserving `execution.git`
-- resume from the same task locally
+After `/aif-implement` finishes:
 
-#### 2.3 Deterministic Quality Gate
+1. re-read `status.yaml`
+2. inspect `verification.verdict`
+3. when the verdict is `pass` or `pass-with-notes`, route to `/aif-done`
+4. otherwise stop and report the remaining findings or loop-limit condition without starting a second verify/fix cycle
 
-After each implementation pass, always run this exact order:
+Preserve the saved git strategy and execution history for downstream archive/evolve steps.
 
-1. quality checks from `status.yaml -> execution.quality_checks`
-2. `/aif-verify`
-3. if verification fails, `/aif-fix`
-4. re-run `/aif-verify`
-5. repeat fix -> verify until `pass` / `pass-with-notes` or `execution.max_fix_loops` is reached
+### Step 3: Safety Rules
 
-Rules for the loop:
-
-- never skip re-verification after `/aif-fix`, even for small changes
-- keep `plans/<id>/fixes/` and `status.yaml -> fixes` synchronized on every fix iteration
-- stop and report unresolved findings when the loop limit is reached; do not force completion
-
-#### 2.4 Final Handoff
-
-- when verification passes, route to `/aif-done`
-- preserve the saved git strategy and execution history for downstream archive/evolve steps
-
-### Step 3: Fallback and Safety Rules
-
-- If delegated subagent execution fails at any stage, log the reason in `status.yaml` history and continue in local mode.
-- Never require Claude-only capabilities for the workflow to succeed.
 - Never mutate remote git state automatically.
 - Keep `aif-implement -> aif-verify -> aif-fix -> aif-done` usable as direct commands even when `aif-apply` is the recommended orchestrator.
+- Do not add a second verification loop around `/aif-implement`; that skill already owns the execution and repair cycle.
 
 ### Step 4: Status-Only Mode
 
@@ -249,15 +224,15 @@ When invoked with `--list`:
 - Use plan folders and `status.yaml`; do not fall back to legacy `PLAN.md` workflow as the canonical path.
 - Preserve compatibility with direct `/aif-implement`, `/aif-verify`, `/aif-fix`, and `/aif-done` usage.
 - Persist git strategy and mode decisions together in `status.yaml -> execution`.
-- Use `plan-polisher` only for delegated plan refinement and `implementer*` only for delegated task execution.
-- Claude subagents are optional acceleration only.
+- Execute the chosen git strategy before `/aif-implement`, not just in chat or metadata.
 - All runtime execution decisions must be persisted in `status.yaml`.
-- Prefer deterministic sequencing: implement -> quality checks -> verify -> fix -> re-verify.
+- Let `/aif-implement` remain the single owner of task progress updates and the verify/fix loop.
 
 ## Anti-patterns
 
 - ❌ Making `aif-apply` mandatory for all workflows
-- ❌ Hard-coupling the extension to Claude-only APIs
 - ❌ Skipping the git decision point or keeping it only in chat instead of `status.yaml`
+- ❌ Persisting a git strategy without actually switching or creating the local branch it describes
 - ❌ Writing source changes directly from orchestration when a delegated skill owns them
 - ❌ Updating plan state only in chat and not in `status.yaml`
+- ❌ Re-running verify/fix in `aif-apply` after `/aif-implement` already completed that loop

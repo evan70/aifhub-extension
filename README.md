@@ -30,9 +30,9 @@ Then continue with the recommended workflow:
 
 `/aif-apply` is the recommended manual orchestration step after planning:
 - resolves the active plan folder
-- persists the chosen git strategy in `status.yaml`
-- runs implement -> quality checks -> verify -> fix -> re-verify -> done
-- uses Claude `plan-polisher` / `implementer*` only as an optional mode with local fallback
+- persists the chosen git strategy in `status.yaml` and applies it locally before implementation starts
+- runs `/aif-implement` as the single owner of task execution, progress sync, and the verify/fix loop
+- routes passing plans to `/aif-done` after re-reading the resulting verification state
 
 If you want direct manual control instead, `/aif-implement`, `/aif-verify`, `/aif-fix`, and `/aif-done` remain available.
 
