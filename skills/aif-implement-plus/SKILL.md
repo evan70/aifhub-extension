@@ -2,6 +2,7 @@
 name: aif-implement-plus
 description: Execute plan-folder tasks with progress persistence, verify/fix loop, and optional Claude subagent delegation. Replaces /aif-implement.
 argument-hint: "[plan-id|@path|status|--list] [--from <n>] [--local|--subagent]"
+version: 0.7.0
 ---
 
 # AIF Implement+ — Execute Task Plan
@@ -182,7 +183,12 @@ Fallback rule:
 ### Step 1: Load Task State
 
 Task source of truth:
-- `task.md -> Scope -> In Scope` checkbox list
+- `task.md -> Scope -> In Scope` checkbox list in the markdown body
+
+For `task.md`:
+- read YAML frontmatter first when present to validate artifact identity
+- then parse/update the checkbox list from the body below the frontmatter
+- if frontmatter is missing, fall back to the legacy body-only parsing path
 
 Status source of truth:
 - `status.yaml -> progress` and `status.yaml -> execution`
@@ -224,6 +230,7 @@ For each pending task:
 4. mark task complete in `status.yaml`
    - clear or advance `execution.current_task`
 5. update `task.md` checkbox immediately (`- [ ]` -> `- [x]`)
+   - preserve any existing YAML frontmatter and do not rewrite metadata keys unintentionally
 6. sync `progress.scope_completed`
 7. refresh `updated` timestamp
 8. append history entry
@@ -354,6 +361,7 @@ Documentation policy is handled in `aif-done`.
 - mark in-progress before implementation
 - mark completed only after local verification
 - update `task.md` checkbox immediately after completion
+- preserve YAML frontmatter when `task.md` uses the metadata contract
 - keep `status.yaml` synchronized with actual state
 - follow architecture and project rules
 - preserve session continuity

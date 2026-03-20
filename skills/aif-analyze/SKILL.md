@@ -1,7 +1,7 @@
 ---
 name: aif-analyze
 description: Bootstrap project context. Resolves localization and stack, creates/updates config.yaml and rules/base.md, then checks DESCRIPTION and guides core skill execution.
-version: 0.4.0
+version: 0.7.0
 author: ichi
 ---
 

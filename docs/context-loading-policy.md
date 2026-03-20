@@ -39,6 +39,61 @@ Consumer skills must use:
 
 Optional area rules are loaded via `config.rules.*` when present.
 
+## Artifact Metadata Contract
+
+Extension-owned markdown workflow artifacts use YAML frontmatter as a cheap metadata layer.
+
+Required frontmatter fields:
+
+- `artifact_type`
+- `plan_id`
+- `title`
+- `artifact_status`
+- `owner`
+- `created_at`
+- `updated_at`
+
+When these metadata fields carry string values, producers should serialize them as quoted YAML scalars. In practice this matters for values such as `plan_id`, `title`, `source_plan`, and `source_artifact`, so sequential ids like `003` and titles containing `:` or `[]` remain parseable.
+
+Optional fields are allowed when the artifact needs traceability, for example:
+
+- `source_issue`
+- `source_plan`
+- `source_artifact`
+- `finding_id`
+
+This contract applies to markdown artifacts such as:
+
+- `task.md`
+- `context.md`
+- `rules.md`
+- `verify.md`
+- `explore.md`
+- `plans/<id>/fixes/*.md`
+- `spec.md`
+
+This contract does **not** apply to YAML-native workflow artifacts:
+
+- `status.yaml`
+- `specs/index.yaml`
+- schema files and other `.yaml` references
+
+## Artifact Loading Order
+
+For markdown workflow artifacts:
+
+1. read YAML frontmatter first
+2. use frontmatter for cheap routing, freshness, and identity checks
+3. read the markdown body only if the current step actually needs body sections
+
+If a markdown artifact has no frontmatter:
+
+- treat it as a legacy artifact
+- fall back to the existing full-body read path
+- do not require a migration before the workflow can continue
+
+Special case: when `aif-new` imports `.ai-factory/RESEARCH.md` into plan-local `explore.md`, it must preserve the imported body and add metadata only to the plan-local copy. The source `RESEARCH.md` stays unchanged.
+
 ## Fallback Behavior
 
 If `config.yaml` is missing/incomplete for the requested operation:

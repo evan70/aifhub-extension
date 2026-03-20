@@ -2,6 +2,7 @@
 name: aif-verify+
 description: Enhanced verification against task, rules, and constraints. Checks implementation completeness, produces structured findings, and routes workflow to aif-fix or aif-done. Use after aif-implement completes.
 argument-hint: "[plan-id] [--strict]"
+version: 0.7.0
 ---
 
 # AIF Verify+ — Enhanced Post-Implementation Verification
@@ -70,6 +71,10 @@ Read all artifacts from the plan folder:
 | `constraints-*.md` | Additional constraints | If present |
 | `explore.md` | Exploration context | If present |
 
+For markdown plan artifacts:
+- inspect YAML frontmatter first for artifact identity and freshness
+- if frontmatter is missing, treat the file as a legacy artifact and continue with the existing full-body read path
+
 ### 0.4 Load Project Rules
 
 Read `.ai-factory/config.yaml`.
@@ -112,14 +117,14 @@ Store as `CHANGED_FILES` for targeted checks.
 
 ## Step 1: Task Completeness Audit
 
-Go through **every item** in `task.md → Scope → In Scope`:
+Go through **every item** in `task.md → Scope → In Scope` (in the markdown body after frontmatter, if present):
 
 For each item:
 1. Use `Glob` and `Grep` to find implementation code
 2. Read the relevant files to confirm implementation is **complete** (not just started)
 3. Check that implementation matches the specification
 
-For each acceptance criterion in `task.md → Acceptance Criteria`:
+For each acceptance criterion in `task.md → Acceptance Criteria` (in the markdown body after frontmatter, if present):
 1. Verify the criterion is satisfied in code
 2. Check edge cases if mentioned
 
@@ -413,7 +418,7 @@ Strict mode recommended before merging to main or creating a PR.
 
 ## Rules
 
-- **Read plan artifacts before verification** — never verify blind
+- **Read plan artifacts before verification** — inspect metadata first, then body as needed
 - **Use verify.md checklist as primary guide** — it was designed for this plan
 - **Read-only for source code** — never modify implementation
 - **Produce structured findings** — every issue needs id, severity, description, fix suggestion
