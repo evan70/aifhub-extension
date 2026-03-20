@@ -71,6 +71,8 @@ Plan resolution priority:
 
 If no active plan exists, clearly report that there is nothing to execute and suggest `/aif-new`.
 
+Once the plan is resolved, keep the exact plan folder path fixed for the rest of the run. All downstream skill handoffs must pass `@<resolved-plan-path>` explicitly instead of relying on branch-based rediscovery after git strategy changes.
+
 ### Step 0.3: Resolve Git Strategy
 
 Resolve git context before the first implementation pass.
@@ -160,12 +162,13 @@ Use `status.yaml` as the runtime source of truth for:
 Before implementation starts:
 
 1. inspect `task.md`, `rules.md`, and `status.yaml`
-2. if the plan is not execution-ready, route to `/aif-improve`
-3. if the plan already records unresolved verification failures or missing scope data, stop and send the user back through `/aif-improve` before execution
+2. if the plan is not execution-ready or the scope metadata is incomplete, route to `/aif-improve @<resolved-plan-path>`
+3. if `status.yaml -> verification.verdict` is `fail`, route to `/aif-fix @<resolved-plan-path>` so the existing repair path can resume from the selected plan
+4. only continue to implementation when the plan is execution-ready and not already in a failed verification state
 
 #### 2.2 Implementation Pass
 
-Run the pending scope through `/aif-implement`.
+Run the pending scope through `/aif-implement @<resolved-plan-path>`.
 
 `/aif-implement` owns:
 
@@ -183,8 +186,9 @@ After `/aif-implement` finishes:
 
 1. re-read `status.yaml`
 2. inspect `verification.verdict`
-3. when the verdict is `pass` or `pass-with-notes`, route to `/aif-done`
-4. otherwise stop and report the remaining findings or loop-limit condition without starting a second verify/fix cycle
+3. when the verdict is `pass` or `pass-with-notes`, route to `/aif-done @<resolved-plan-path>`
+4. when the verdict is `fail`, route to `/aif-fix @<resolved-plan-path>` without starting a second verify/fix cycle in `aif-apply`
+5. otherwise stop and report the unexpected verification state clearly
 
 Preserve the saved git strategy and execution history for downstream archive/evolve steps.
 
@@ -227,6 +231,7 @@ When invoked with `--list`:
 - Execute the chosen git strategy before `/aif-implement`, not just in chat or metadata.
 - All runtime execution decisions must be persisted in `status.yaml`.
 - Let `/aif-implement` remain the single owner of task progress updates and the verify/fix loop.
+- Pass the resolved plan explicitly to downstream skills once Step 0.2 selects it.
 
 ## Anti-patterns
 

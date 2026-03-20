@@ -119,7 +119,7 @@ Use this as the recommended execution entrypoint after `/aif-improve`.
 - asks once for git strategy (`new`, `current`, `default`), persists it in `status.yaml`, and applies it locally before execution starts
 - runs `/aif-implement` as the owner of task execution, progress tracking, quality checks, and the verify/fix loop
 - re-reads `status.yaml -> verification.verdict` after `/aif-implement` and routes passing plans to `/aif-done`
-- stops on unresolved verification findings instead of starting a second verify/fix loop inside `aif-apply`
+- routes unresolved verification findings to `/aif-fix` instead of starting a second verify/fix loop inside `aif-apply`
 
 ### 6) Direct implementation path (manual fallback)
 
