@@ -2,7 +2,7 @@
 name: aif-explore
 description: Enter explore mode with config-first, plan-folder-aware context loading and RESEARCH-only persistence. Use when the user wants to investigate, compare options, or think through a change before planning or while a plan is active.
 argument-hint: "[topic|plan-id|@path]"
-version: 0.7.0
+version: 0.7.1
 ---
 
 # AIF Explore
@@ -26,7 +26,7 @@ When the user is ready to leave exploration:
 |----------|------|
 | `config.paths.research` (normally `.ai-factory/RESEARCH.md`) | **Only writable artifact in this skill** |
 | `config.yaml`, `DESCRIPTION.md`, `ARCHITECTURE.md`, `ROADMAP.md`, `RULES.md`, `rules/base.md` | Read-only project context |
-| `plans/<plan-id>/{task,context,rules,verify,status,explore}.md` | Read-only plan context |
+| `plans/<plan-id>/{task,context,rules,verify,explore}.md`, `plans/<plan-id>/status.yaml` | Read-only plan context |
 | Source files | Read-only |
 
 If a discovery should affect another artifact, capture it in `RESEARCH.md` and route follow-up to the owner command later.
