@@ -12,7 +12,7 @@ Verify implementation against plan artifacts (task, rules, constraints) and prod
 
 **This skill is read-only.** It inspects code but NEVER modifies implementation files. It updates only `status.yaml` and `verify.md` inside the plan folder.
 
-> **См. [Question Tool Reference](../shared/QUESTION-TOOL.md)** — форматы question/questionnaire для разных агентов.
+> **Reference:** [Question Tool](../shared/QUESTION-TOOL.md) — question/questionnaire formats for different agents
 
 ---
 
@@ -52,13 +52,13 @@ Treat skill-context rules as project-level overrides:
 If no plan found:
 ```
 question(questions: [{
-  header: "План",
-  question: "Папка плана не найдена. Что верифицировать?",
+  header: "Plan",
+  question: "Plan folder not found. What should I verify?",
   options: [
-    { label: "Выбрать план (Рекомендуется)", description: "Выбрать из .ai-factory/plans/" },
-    { label: "Branch diff", description: "Сравнить текущую ветку с main" },
-    { label: "Last commit", description: "Проверить последний коммит" },
-    { label: "Отмена", description: "Выйти" }
+    { label: "Select plan (Recommended)", description: "Choose from .ai-factory/plans/" },
+    { label: "Branch diff", description: "Compare current branch to main" },
+    { label: "Last commit", description: "Check most recent commit" },
+    { label: "Cancel", description: "Exit" }
   ]
 }])
 ```

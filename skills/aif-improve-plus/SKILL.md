@@ -6,7 +6,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(git *) question questionnaire
 version: 0.7.0
 ---
 
-> **См. [Question Tool Reference](../shared/QUESTION-TOOL.md)** — форматы question/questionnaire для разных агентов.
+> **Reference:** [Question Tool](../shared/QUESTION-TOOL.md) — question/questionnaire formats for different agents
 
 # AIF Improve+ — Refine Plan Folder
 

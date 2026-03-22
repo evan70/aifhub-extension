@@ -1,22 +1,22 @@
-# Question Tool — Взаимодействие с пользователем
+# Question Tool — User Interaction
 
-> Reference для всех скиллов проекта. Используйте форматы ниже для вопросов пользователю.
+> Reference for all project skills. Use the formats below for asking questions to users.
 
-## Форматы для разных агентов
+## Formats for Different Agents
 
-Разные агенты используют разные форматы для вопросов. Выбирайте подходящий для вашего агента.
+Different agents use different formats for questions. Choose the appropriate format for your agent.
 
 ---
 
-## Одиночный вопрос
+## Single Question
 
 ### pi
 ```
 question({
-  question: "Текст вопроса?",
+  question: "Question text?",
   options: [
-    { label: "Вариант 1 (Рекомендуется)", description: "Краткое описание" },
-    { label: "Вариант 2", description: "Краткое описание" }
+    { label: "Option 1 (Recommended)", description: "Brief description" },
+    { label: "Option 2", description: "Brief description" }
   ]
 })
 ```
@@ -25,11 +25,11 @@ question({
 ```
 question({
   questions: [{
-    header: "Тема",  // max 30 символов
-    question: "Текст вопроса?",
+    header: "Topic",  // max 30 characters
+    question: "Question text?",
     options: [
-      { label: "Вариант 1 (Рекомендуется)", description: "Краткое описание" },
-      { label: "Вариант 2", description: "Краткое описание" }
+      { label: "Option 1 (Recommended)", description: "Brief description" },
+      { label: "Option 2", description: "Brief description" }
     ]
   }]
 })
@@ -37,7 +37,7 @@ question({
 
 ---
 
-## Несколько вопросов
+## Multiple Questions
 
 ### pi
 ```
@@ -45,21 +45,21 @@ questionnaire({
   questions: [
     {
       id: "area",
-      label: "Область",      // для tab bar
-      prompt: "Какую область затрагивает?",
+      label: "Area",           // for tab bar
+      prompt: "Which area does this affect?",
       options: [
-        { value: "frontend", label: "Frontend", description: "UI компоненты" },
-        { value: "backend", label: "Backend", description: "API и сервисы" }
+        { value: "frontend", label: "Frontend", description: "UI components" },
+        { value: "backend", label: "Backend", description: "API and services" }
       ],
-      allowOther: true      // разрешить "Type something..."
+      allowOther: true         // allow "Type something..."
     },
     {
       id: "priority",
-      label: "Приоритет",
-      prompt: "Какой приоритет?",
+      label: "Priority",
+      prompt: "What is the priority?",
       options: [
-        { value: "high", label: "Высокий", description: "Срочно" },
-        { value: "low", label: "Низкий", description: "Не срочно" }
+        { value: "high", label: "High", description: "Urgent" },
+        { value: "low", label: "Low", description: "Not urgent" }
       ]
     }
   ]
@@ -71,19 +71,19 @@ questionnaire({
 question({
   questions: [
     {
-      header: "Область",
-      question: "Какую область затрагивает?",
+      header: "Area",
+      question: "Which area does this affect?",
       options: [
-        { label: "Frontend", description: "UI компоненты" },
-        { label: "Backend", description: "API и сервисы" }
+        { label: "Frontend", description: "UI components" },
+        { label: "Backend", description: "API and services" }
       ]
     },
     {
-      header: "Приоритет",
-      question: "Какой приоритет?",
+      header: "Priority",
+      question: "What is the priority?",
       options: [
-        { label: "Высокий", description: "Срочно" },
-        { label: "Низкий", description: "Не срочно" }
+        { label: "High", description: "Urgent" },
+        { label: "Low", description: "Not urgent" }
       ]
     }
   ]
@@ -92,103 +92,103 @@ question({
 
 ---
 
-## Параметры
+## Parameters
 
 ### question (pi)
 
-| Параметр | Тип | Обязательный | Описание |
-|----------|-----|--------------|----------|
-| `question` | string | ✅ | Текст вопроса |
-| `options` | array | ✅ | Массив вариантов (2-4 элемента) |
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `question` | string | ✅ | Question text |
+| `options` | array | ✅ | Array of options (2-4 items) |
 
 ### questionnaire (pi)
 
-| Параметр | Тип | Обязательный | Описание |
-|----------|-----|--------------|----------|
-| `questions` | array | ✅ | Массив вопросов |
-| `id` | string | ✅ | Идентификатор вопроса |
-| `label` | string | ✅ | Короткий label для tab bar |
-| `prompt` | string | ✅ | Полный текст вопроса |
-| `options` | array | ✅ | Массив вариантов |
-| `allowOther` | boolean | ❌ | Разрешить свой вариант |
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `questions` | array | ✅ | Array of questions |
+| `id` | string | ✅ | Question identifier |
+| `label` | string | ✅ | Short label for tab bar |
+| `prompt` | string | ✅ | Full question text |
+| `options` | array | ✅ | Array of options |
+| `allowOther` | boolean | ❌ | Allow custom input |
 
-### question (другие агенты)
+### question (other agents)
 
-| Параметр | Тип | Обязательный | Описание |
-|----------|-----|--------------|----------|
-| `questions` | array | ✅ | Массив вопросов (1-4 элемента) |
-| `header` | string | ❌ | Короткий заголовок (max 30) |
-| `question` | string | ✅ | Текст вопроса |
-| `options` | array | ✅ | Массив вариантов |
-| `multiple` | boolean | ❌ | Множественный выбор |
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `questions` | array | ✅ | Array of questions (1-4 items) |
+| `header` | string | ❌ | Short header (max 30) |
+| `question` | string | ✅ | Question text |
+| `options` | array | ✅ | Array of options |
+| `multiple` | boolean | ❌ | Multiple selection |
 
-### options (общие)
+### options (common)
 
-| Параметр | Тип | Обязательный | Описание |
-|----------|-----|--------------|----------|
-| `label` | string | ✅ | Название варианта |
-| `description` | string | ✅ | Краткое описание |
-| `value` | string | ❌ | Значение (только questionnaire) |
-
----
-
-## Правила
-
-1. **2-4 варианта** — не больше
-2. **Описание обязательно** — для каждого варианта
-3. **Рекомендуемый вариант** — помечать `(Рекомендуется)` или `(Recommended)`
-4. **Короткие заголовки** — `header`/`label` max 30 символов
-5. **Один вопрос** → `question`, **несколько** → `questionnaire` (pi) / `question` с массивом (другие)
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `label` | string | ✅ | Option name |
+| `description` | string | ✅ | Brief description |
+| `value` | string | ❌ | Value (questionnaire only) |
 
 ---
 
-## Примеры
+## Rules
 
-### Уточнение области
+1. **2-4 options** — no more
+2. **Description required** — for each option
+3. **Recommended option** — mark with `(Recommended)`
+4. **Short headers** — `header`/`label` max 30 characters
+5. **Single question** → `question`, **multiple** → `questionnaire` (pi) / `question` with array (others)
+
+---
+
+## Examples
+
+### Scope Clarification
 ```
 question({
-  question: "Какую область затрагивает изменение?",
+  question: "Which area does this change affect?",
   options: [
-    { label: "Frontend (Рекомендуется)", description: "UI компоненты, стили" },
-    { label: "Backend", description: "API, сервисы, база данных" },
-    { label: "Оба", description: "Full-stack изменения" }
+    { label: "Frontend (Recommended)", description: "UI components, styles" },
+    { label: "Backend", description: "API, services, database" },
+    { label: "Both", description: "Full-stack changes" }
   ]
 })
 ```
 
-### Подтверждение действия
+### Action Confirmation
 ```
 question({
-  question: "Применить изменения?",
+  question: "Apply changes?",
   options: [
-    { label: "Да, применить (Рекомендуется)", description: "Записать изменения в файлы" },
-    { label: "Нет, отмена", description: "Вернуться без изменений" }
+    { label: "Yes, apply (Recommended)", description: "Write changes to files" },
+    { label: "No, cancel", description: "Return without changes" }
   ]
 })
 ```
 
-### Выбор следующего шага
+### Next Step Selection
 ```
 question({
-  question: "Что делать дальше?",
+  question: "What to do next?",
   options: [
-    { label: "/aif-verify (Рекомендуется)", description: "Проверить реализацию" },
-    { label: "/aif-commit", description: "Закоммитить изменения" },
-    { label: "Продолжить", description: "Остаться в текущем контексте" }
+    { label: "/aif-verify (Recommended)", description: "Verify implementation" },
+    { label: "/aif-commit", description: "Commit changes" },
+    { label: "Continue", description: "Stay in current context" }
   ]
 })
 ```
 
-### Множественный выбор (другие агенты)
+### Multiple Selection (other agents)
 ```
 question({
   questions: [{
-    header: "Фичи",
-    question: "Какие фичи реализовать?",
+    header: "Features",
+    question: "Which features to implement?",
     options: [
-      { label: "Auth", description: "Аутентификация" },
-      { label: "Cache", description: "Кеширование" },
-      { label: "Logging", description: "Логирование" }
+      { label: "Auth", description: "Authentication" },
+      { label: "Cache", description: "Caching" },
+      { label: "Logging", description: "Logging" }
     ],
     multiple: true
   }]
@@ -197,30 +197,30 @@ question({
 
 ---
 
-## Отладка
+## Debugging
 
-Если инструмент не работает:
+If the tool doesn't work:
 
-1. Проверьте что extension установлен:
+1. Check that the extension is installed:
    - pi: `~/.pi/agent/extensions/question.ts`
    - pi: `~/.pi/agent/extensions/questionnaire.ts`
 
-2. Проверьте синтаксис:
-   - Все строки в кавычках
-   - Запятые между элементами массива
-   - Скобки закрыты
+2. Check syntax:
+   - All strings in quotes
+   - Commas between array elements
+   - Brackets closed
 
-3. Проверьте `allowed-tools` в скилле:
+3. Check `allowed-tools` in skill:
    ```
    allowed-tools: ... question questionnaire
    ```
 
 ---
 
-## Совместимость
+## Compatibility
 
-| Агент | question (простой) | questionnaire | question (массив) | multiple |
-|-------|-------------------|---------------|-------------------|----------|
+| Agent | question (simple) | questionnaire | question (array) | multiple |
+|-------|-------------------|---------------|------------------|----------|
 | pi | ✅ | ✅ | ❌ | ❌ |
 | Claude Code | ❌ | ❌ | ✅ | ✅ |
 | Kilo CLI | ❌ | ❌ | ✅ | ✅ |

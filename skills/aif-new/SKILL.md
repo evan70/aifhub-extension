@@ -8,7 +8,7 @@ version: 0.7.0
 
 # AIF New — Create Plan Folder
 
-> **См. [Вопросы пользователю](../shared/QUESTION-TOOL.md)** — форматы question/questionnaire для разных агентов
+> **Reference:** [Question Tool](../shared/QUESTION-TOOL.md) — question/questionnaire formats for different agents
 
 Create a new plan folder under `.ai-factory/plans/<plan-id>/` with all required artifacts for spec-driven workflow.
 
