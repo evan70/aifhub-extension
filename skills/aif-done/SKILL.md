@@ -10,7 +10,7 @@ version: 0.7.0
 
 Finalize a plan by marking it complete, archiving artifacts to `.ai-factory/specs/`, and optionally updating project context.
 
-> **See [Question Tool Reference](../shared/QUESTION-TOOL.md)** — question/questionnaire formats for different agents.
+> **Reference:** [Question Tool](../shared/QUESTION-TOOL.md) — question/questionnaire formats for different agents
 
 **This is a workflow terminus.** After `aif-done`, the plan is archived and the cycle is complete.
 

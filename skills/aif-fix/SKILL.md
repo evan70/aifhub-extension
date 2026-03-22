@@ -8,7 +8,7 @@ version: 0.7.0
 
 # AIF Fix — Fix Verification Findings
 
-> **See [Question Tool Reference](../shared/QUESTION-TOOL.md)** — question/questionnaire formats for different agents.
+> **Reference:** [Question Tool](../shared/QUESTION-TOOL.md) — question/questionnaire formats for different agents
 
 Fix issues identified by `/aif-verify`. Reads structured findings, implements corrections, and drives the fix → verify loop.
 
