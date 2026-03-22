@@ -10,7 +10,7 @@ version: 0.7.0
 
 Finalize a plan by marking it complete, archiving artifacts to `.ai-factory/specs/`, and optionally updating project context.
 
-> **См. [Question Tool Reference](../shared/QUESTION-TOOL.md)** — форматы question/questionnaire для разных агентов.
+> **See [Question Tool Reference](../shared/QUESTION-TOOL.md)** — question/questionnaire formats for different agents.
 
 **This is a workflow terminus.** After `aif-done`, the plan is archived and the cycle is complete.
 
@@ -86,12 +86,12 @@ Acceptable completion state:
 If NOT eligible:
 ```
 question(questions: [{
-  header: "Статус",
-  question: "Статус плана: \"{{current_status}}\" с вердиктом \"{{verdict}}\".\n\nПлан ещё не прошёл верификацию.",
+  header: "Status",
+  question: "Plan status: \"{{current_status}}\" with verdict \"{{verdict}}\".\n\nPlan has not passed verification yet.",
   options: [
-    { label: "Запустить верификацию (Рекомендуется)", description: "/aif-verify" },
-    { label: "Завершить принудительно (--force)", description: "Без верификации" },
-    { label: "Отмена", description: "Выйти" }
+    { label: "Run verification (Recommended)", description: "/aif-verify" },
+    { label: "Force finalize (--force)", description: "Without verification" },
+    { label: "Cancel", description: "Exit" }
   ]
 }])
 ```
@@ -158,11 +158,11 @@ Generate an extended summary including:
 
 ```
 question(questions: [{
-  header: "Уроки",
-  question: "Есть ли уроки, извлечённые из этого плана?",
+  header: "Lessons",
+  question: "Are there any lessons learned from this plan?",
   options: [
-    { label: "Да — Добав уроки", description: "У меня есть заметки" },
-    { label: "Пропустить", description: "В этот раз без уроков" }
+    { label: "Yes — Add lessons", description: "I have notes to capture" },
+    { label: "Skip", description: "No lessons this time" }
   ]
 }])
 ```
@@ -292,12 +292,12 @@ Ask:
 
 ```
 question(questions: [{
-  header: "Документация",
-  question: "Как задокументировать эту функцию?",
+  header: "Documentation",
+  question: "How should we document this feature?",
   options: [
-    { label: "Обновить существующие docs (Рекомендуется)", description: "/aif-docs" },
-    { label: "Создать страницу функции", description: "/aif-docs docs/<feature>.md" },
-    { label: "Пропустить", description: "Без документации сейчас" }
+    { label: "Update existing docs (Recommended)", description: "/aif-docs" },
+    { label: "Create feature page", description: "/aif-docs docs/<feature>.md" },
+    { label: "Skip", description: "No documentation now" }
   ]
 }])
 ```
@@ -314,11 +314,11 @@ If plan contains fix artifacts (`plans/<plan-id>/fixes/*.md`) or rich findings h
 
 ```
 question(questions: [{
-  header: "Эволюция",
-  question: "Запустить эволюцию из контекста этого плана?",
+  header: "Evolution",
+  question: "Run evolution from this plan context?",
   options: [
-    { label: "Да — /aif-evolve (Рекомендуется)", description: "Использовать plan/fixes как evidence" },
-    { label: "Нет — Пропустить", description: "Без эволюции" }
+    { label: "Yes — /aif-evolve (Recommended)", description: "Use plan/fixes as evidence" },
+    { label: "No — Skip", description: "Without evolution" }
   ]
 }])
 ```
@@ -331,11 +331,11 @@ When enabled, use the completed plan folder as the evidence base for evolution s
 
 ```
 question(questions: [{
-  header: "Очистка",
-  question: "План архивирован в .ai-factory/specs/<plan-id>/\n\nУдалить оригинальную папку плана?",
+  header: "Cleanup",
+  question: "Plan archived to .ai-factory/specs/<plan-id>/\n\nDelete original plan folder?",
   options: [
-    { label: "Удалить .ai-factory/plans/<plan-id>/ (Рекомендуется)", description: "Оставить только архив" },
-    { label: "Оставить обе копии", description: "Сохранить план и архив" }
+    { label: "Delete .ai-factory/plans/<plan-id>/ (Recommended)", description: "Keep archive only" },
+    { label: "Keep both copies", description: "Retain plan and archive" }
   ]
 }])
 ```
@@ -383,12 +383,12 @@ Ready to start a new plan? Run /aif-new
 
 ```
 question(questions: [{
-  header: "Контекст",
-  question: "Освободить контекст перед продолжением?",
+  header: "Context",
+  question: "Free up context before continuing?",
   options: [
-    { label: "/clear — Полный сброс (Рекомендуется)", description: "После завершения плана" },
-    { label: "/compact — Сжать историю", description: "Компактный режим" },
-    { label: "Продолжить как есть", description: "Без изменений" }
+    { label: "/clear — Full reset (Recommended)", description: "After plan completion" },
+    { label: "/compact — Compress history", description: "Compact mode" },
+    { label: "Continue as is", description: "No changes" }
   ]
 }])
 ```

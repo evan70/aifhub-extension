@@ -137,11 +137,11 @@ When `plan-polisher` is available and mode is not forced, ask:
 
 ```
 question(questions: [{
-  header: "Режим",
-  question: "Обнаружен Claude plan-polisher. Как should I refine this plan?",
+  header: "Mode",
+  question: "Claude plan-polisher detected. How should I refine this plan?",
   options: [
-    { label: "Subagent mode (Рекомендуется)", description: "Делегировать улучшение plan-polisher" },
-    { label: "Local mode", description: "Улучшать в текущем контексте" }
+    { label: "Subagent mode (Recommended)", description: "Delegate to plan-polisher" },
+    { label: "Local mode", description: "Execute in current context" }
   ]
 }])
 ```
@@ -346,12 +346,12 @@ Next step:
 
 ```
 question(questions: [{
-  header: "Контекст",
-  question: "Освободить контекст перед продолжением?",
+  header: "Context",
+  question: "Free up context before continuing?",
   options: [
-    { label: "/clear — Полный сброс (Рекомендуется)", description: "Очистить весь контекст" },
-    { label: "/compact — Сжать историю", description: "Компактный режим" },
-    { label: "Продолжить как есть", description: "Без изменений" }
+    { label: "/clear — Full reset (Recommended)", description: "Clear entire context" },
+    { label: "/compact — Compress history", description: "Compact mode" },
+    { label: "Continue as is", description: "No changes" }
   ]
 }])
 ```

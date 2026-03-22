@@ -8,6 +8,8 @@ version: 0.7.0
 
 # AIF Fix — Fix Verification Findings
 
+> **See [Question Tool Reference](../shared/QUESTION-TOOL.md)** — question/questionnaire formats for different agents.
+
 Fix issues identified by `/aif-verify`. Reads structured findings, implements corrections, and drives the fix → verify loop.
 
 **This skill modifies source code.** It reads verification findings and applies targeted fixes following plan rules.
@@ -99,13 +101,13 @@ Show the queue and confirm:
 
 ```
 question(questions: [{
-  header: "Очередь",
-  question: "Очередь исправлений готова. Как proceed?\n\nBlocking: {{blocking_count}} issues\nImportant: {{important_count}} issues",
+  header: "Queue",
+  question: "Fix queue ready. How should I proceed?\n\nBlocking: {{blocking_count}} issues\nImportant: {{important_count}} issues",
   options: [
-    { label: "Fix blocking + important (Рекомендуется)", description: "Исправить default scope" },
-    { label: "Только blocking", description: "Исправить только blocking issues" },
-    { label: "Выбрать вручную", description: "Указать конкрет findings" },
-    { label: "Отмена", description: "Исправлю самостоятельно" }
+    { label: "Fix blocking + important (Recommended)", description: "Address default scope" },
+    { label: "Blocking only", description: "Fix blocking issues only" },
+    { label: "Select manually", description: "Choose specific findings" },
+    { label: "Cancel", description: "I'll handle this manually" }
   ]
 }])
 ```
@@ -297,13 +299,13 @@ After all fixes applied:
 
 ```
 question(questions: [{
-  header: "Далее",
-  question: "Исправления применены. Что дальше?",
+  header: "Next",
+  question: "Fixes applied. What next?",
   options: [
-    { label: "Re-verify сейчас (Рекомендуется)", description: "/aif-verify для подтверждения" },
-    { label: "Закоммитить исправления", description: "/aif-commit" },
-    { label: "Продолжить с optional findings", description: "Исправить оставшиеся issues" },
-    { label: "Остановиться", description: "Проверю позже" }
+    { label: "Re-verify now (Recommended)", description: "/aif-verify to confirm fixes" },
+    { label: "Commit fixes", description: "/aif-commit" },
+    { label: "Continue with optional findings", description: "Address remaining issues" },
+    { label: "Stop for now", description: "Verify later" }
   ]
 }])
 ```
@@ -333,12 +335,12 @@ fixes:
 
 ```
 question(questions: [{
-  header: "Контекст",
-  question: "Освободить контекст перед продолжением?",
+  header: "Context",
+  question: "Free up context before continuing?",
   options: [
-    { label: "/clear — Полный сброс (Рекомендуется)", description: "После исправлений" },
-    { label: "/compact — Сжать историю", description: "Компактный режим" },
-    { label: "Продолжить как есть", description: "Без изменений" }
+    { label: "/clear — Full reset (Recommended)", description: "After fixes" },
+    { label: "/compact — Compress history", description: "Compact mode" },
+    { label: "Continue as is", description: "No changes" }
   ]
 }])
 ```

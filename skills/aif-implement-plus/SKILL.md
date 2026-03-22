@@ -165,11 +165,11 @@ When subagents are available and mode is not forced, ask:
 
 ```
 question(questions: [{
-  header: "Режим",
-  question: "Обнаружены Claude subagents. Как should I execute this plan?",
+  header: "Mode",
+  question: "Claude subagents detected. How should I execute this plan?",
   options: [
-    { label: "Subagent mode (Рекомендуется)", description: "Делегировать выполнение subagent" },
-    { label: "Local mode", description: "Выполнять в текущем контексте" }
+    { label: "Subagent mode (Recommended)", description: "Delegate to subagent" },
+    { label: "Local mode", description: "Execute in current context" }
   ]
 }])
 ```

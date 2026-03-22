@@ -52,11 +52,11 @@ Read these files if present (do NOT fail if missing):
 If `.ai-factory/config.yaml` does not exist:
 ```
 question(questions: [{
-  header: "Конфиг",
-  question: "Конфиг проекта не найден. Создать?",
+  header: "Config",
+  question: "Project config not found. Create it?",
   options: [
-    { label: "Да — запустить /aif-analyze (Рекомендуется)", description: "Инициализировать config.yaml" },
-    { label: "Продолжить без конфига", description: "Использовать defaults (english, slug)" }
+    { label: "Yes — run /aif-analyze (Recommended)", description: "Initialize config.yaml" },
+    { label: "Continue without config", description: "Use defaults (english, slug)" }
   ]
 }])
 ```
@@ -112,10 +112,10 @@ If `$ARGUMENTS` points to an existing local file path:
 If `$ARGUMENTS` is empty:
 ```
 question(questions: [{
-  header: "Задача",
-  question: "Что вы хотите запланировать?\n\nОпишите функцию, изменение или улучшение.",
+  header: "Task",
+  question: "What would you like to plan?\n\nDescribe the feature, change, or improvement.",
   options: [
-    { label: "Ввести описание", description: "Напишу задачу текстом" }
+    { label: "Enter description", description: "I'll type the task" }
   ]
 }])
 ```
@@ -130,12 +130,12 @@ Read the resolved research artifact if it exists:
 - If topic matches the task description (or is clearly related):
   ```
   question(questions: [{
-    header: "Исследование",
-    question: "Найдены заметки исследования в {{research_path}}.\n\nТема: {{research_topic}}\nЦель: {{research_goal}}\n\nИмпортировать в план?",
+    header: "Research",
+    question: "Found research notes at {{research_path}}.\n\nTopic: {{research_topic}}\nGoal: {{research_goal}}\n\nImport into plan?",
     options: [
-      { label: "Да — импортировать findings (Рекомендуется)", description: "Добавить в артефакты плана" },
-      { label: "Нет — начать заново", description: "Игнорировать исследование" },
-      { label: "Показать summary", description: "Показать сначала" }
+      { label: "Yes — import findings (Recommended)", description: "Add to plan artifacts" },
+      { label: "No — start fresh", description: "Ignore research" },
+      { label: "Show summary", description: "Show me first" }
     ]
   }])
   ```
@@ -159,35 +159,35 @@ If the task description is vague or broad, ask targeted questions:
 ```
 question(questions: [
   {
-    header: "Результат",
-    question: "Какой конкретный результат ожидаете?",
+    header: "Outcome",
+    question: "What specific outcome do you expect from this plan?",
     options: [
-      { label: "Опишу", description: "Укажу конкретный outcome" },
-      { label: "Пропустить", description: "Оставить как есть" }
+      { label: "Describe", description: "I'll specify concrete outcomes" },
+      { label: "Skip", description: "Leave as is" }
     ]
   },
   {
-    header: "Границы",
-    question: "Есть части, которые НЕ нужно трогать?",
+    header: "Boundaries",
+    question: "Are there parts we should NOT touch?",
     options: [
-      { label: "Да, есть исключения", description: "Укажу границы" },
-      { label: "Нет, всё открыто", description: "Без ограничений" }
+      { label: "Yes, have exclusions", description: "I'll specify boundaries" },
+      { label: "No, open", description: "No restrictions" }
     ]
   },
   {
-    header: "Ограничения",
-    question: "Есть жёсткие ограничения? (дедлайны, зависимости, совместимость)",
+    header: "Constraints",
+    question: "Are there hard constraints? (deadlines, dependencies, compatibility)",
     options: [
-      { label: "Да, укажу", description: "Опишу ограничения" },
-      { label: "Нет", description: "Без ограничений" }
+      { label: "Yes, will specify", description: "I'll specify constraints" },
+      { label: "No", description: "No constraints" }
     ]
   },
   {
-    header: "Связи",
-    question: "Связанный issue или PR?",
+    header: "Links",
+    question: "Related issue or PR?",
     options: [
-      { label: "Да, укажу номер", description: "Привязать к issue/PR" },
-      { label: "Нет", description: "Без связей" }
+      { label: "Yes, provide number", description: "Link to issue/PR" },
+      { label: "No", description: "No links" }
     ]
   }
 ])
@@ -349,14 +349,14 @@ Show the created plan:
 
 ```
 question(questions: [{
-  header: "Далее",
-  question: "Что хотите сделать дальше?",
+  header: "Next",
+  question: "What would you like to do next?",
   options: [
-    { label: "Проверить артефакты плана", description: "Открыть task.md" },
-    { label: "Исследовать глубже", description: "/aif-explore <plan-id>" },
-    { label: "Улучшить план (Рекомендуется)", description: "/aif-improve" },
-    { label: "Начать реализацию", description: "/aif-implement" },
-    { label: "Позже", description: "Проверю самостоятельно" }
+    { label: "Review plan artifacts", description: "Open task.md" },
+    { label: "Explore deeper", description: "/aif-explore <plan-id>" },
+    { label: "Improve plan (Recommended)", description: "/aif-improve" },
+    { label: "Start implementation", description: "/aif-implement" },
+    { label: "Later", description: "I'll review manually" }
   ]
 }])
 ```
@@ -424,11 +424,11 @@ Based on plan scope, determine if area-specific rules would help:
 
 ```
 question(questions: [{
-  header: "Правила области",
-  question: "План затрагивает {{area}}. Создать специфичные правила для области?\n\nСоздание .ai-factory/rules/{{area}}.md обеспечит консистентность реализации.",
+  header: "Area rules",
+  question: "Plan touches {{area}}. Create area-specific rules?\n\nCreating .ai-factory/rules/{{area}}.md will ensure consistency across similar plans.",
   options: [
-    { label: "Да — создать rules/{{area}}.md (Рекомендуется)", description: "Добавить конвенции для области" },
-    { label: "Нет — только base rules", description: "Использовать только базовые правила" }
+    { label: "Yes — create rules/{{area}}.md (Recommended)", description: "Add conventions for this area" },
+    { label: "No — base rules only", description: "Use only base rules" }
   ]
 }])
 ```

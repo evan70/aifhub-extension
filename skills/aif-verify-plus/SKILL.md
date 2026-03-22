@@ -347,19 +347,28 @@ Each finding MUST include:
 
 ### Route Workflow
 
+**On FAIL:**
 ```
 question(questions: [{
-  header: "Далее",
-  question: "Верификация завершена. Что дальше?",
+  header: "Next",
+  question: "Verification complete. What next?",
   options: [
-    # On FAIL:
-    { label: "/aif-fix — Исправить blocking + important (Рекомендуется)", description: "Автоматическое исправление" },
-    { label: "/aif-fix B001... — Только blocking", description: "Исправить только указанные" },
-    { label: "/aif-done --force — Завершить с замечаниями", description: "Принудительное завершение" }
-    # On PASS or PASS with notes:
-    { label: "/aif-done — Завершить (Рекомендуется)", description: "Архивировать план" },
-    { label: "/aif-fix — Исправить remaining notes", description: "Адресовать important/optional findings" },
-    { label: "/aif-security-checklist", description: "Проверка безопасности" },
+    { label: "/aif-fix — fix blocking + important (Recommended)", description: "Automatically fix blocking + important findings" },
+    { label: "/aif-fix B001...", description: "Fix only B001" },
+    { label: "/aif-done --force", description: "Force finalize without verification" }
+  ]
+}])
+```
+
+**on PASS or PASS with notes:**
+```
+question(questions: [{
+  header: "Next",
+  question: "Verification complete. What next?",
+  options: [
+    { label: "/aif-done — finalize (Recommended)", description: "Archive plan" },
+    { label: "/aif-fix — address remaining notes", description: "Fix remaining optional findings" },
+    { label: "/aif-security-checklist", description: "Run security audit" },
     { label: "/aif-review", description: "Code review" }
   ]
 }])
@@ -399,12 +408,12 @@ Update `plans/<plan-id>/verify.md` — fill in the Findings table and Verdict se
 
 ```
 question(questions: [{
-  header: "Контекст",
-  question: "Освободить контекст перед продолжением?",
+  header: "Context",
+  question: "Free up context before continuing?",
   options: [
-    { label: "/clear — Полный сброс (Рекомендуется)", description: "После heavy verification" },
-    { label: "/compact — Сжать историю", description: "Компактный режим" },
-    { label: "Продолжить как есть", description: "Без изменений" }
+    { label: "/clear — Full reset (Recommended)", description: "After heavy verification" },
+    { label: "/compact — Compress history", description: "Compact mode" },
+    { label: "Continue as is", description: "No changes" }
   ]
 }])
 ```
