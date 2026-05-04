@@ -73,6 +73,23 @@ Generated rules are derived guidance only. If generated rules conflict with cano
 
 Runner output from OpenSpec CLI commands is runtime guidance or evidence. It does not replace the canonical filesystem artifacts under `openspec/`.
 
+## Bug Fix Context
+
+OpenSpec-native bug fixes have two context shapes:
+
+- New bug reports are planning input.
+- Fresh bug reports must start with `/aif-plan full "fix <bug description>"`.
+- A planned bug fix reads base specs and writes a canonical OpenSpec change under `openspec/changes/<change-id>/`.
+- Bug fixes that change product or workflow behavior need delta specs.
+- Docs/tooling-only bug fixes may omit delta specs only when the proposal explains why no product or workflow behavior changes.
+- Missing OpenSpec CLI means degraded validation, not planning failure.
+- Post-verify fixes are execution input.
+- `/aif-fix` reads an existing active OpenSpec change and QA evidence or selected findings from `.ai-factory/qa/<change-id>/`.
+- `/aif-fix` writes fix traces under `.ai-factory/state/<change-id>/fixes/`.
+- `/aif-fix` must not create a canonical OpenSpec change, write QA verdicts, or archive.
+- `/aif-fix` must not create `.ai-factory/plans/<id>/`.
+- `/aif-fix` routes back to `/aif-verify <change-id>`.
+
 ## GitHub-Aware Roadmap Context
 
 `/aif-roadmap` may additionally read GitHub and git-tracker context when available:

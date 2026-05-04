@@ -49,6 +49,52 @@ The `aifhub-extension` package repository stays artifact-light: root `openspec/`
 
 AIFHub commands request OpenSpec validation, status, instructions, and archive through `scripts/openspec-runner.mjs` when the CLI is available. Users should keep using `/aif-*` commands; this extension does not install or rely on OpenSpec slash commands.
 
+## Bug Fix Workflows
+
+OpenSpec-native mode separates new bug reports from fixes for failed verification findings.
+
+### Workflow A: New Bug Report
+
+A new bug report starts as planned OpenSpec work:
+
+```text
+/aif-plan full "fix <bug description>"
+/aif-improve <change-id>
+/aif-mode sync --change <change-id>
+/aif-implement <change-id>
+/aif-rules-check                  # optional
+/aif-verify <change-id>
+/aif-done <change-id>
+/aif-mode sync
+/aif-commit
+```
+
+- A bug fix is still an OpenSpec change when it changes product or workflow behavior.
+- Create delta specs when behavior changes.
+- Docs/tooling-only bug fixes may omit delta specs only when the proposal explains why no product or workflow behavior changes.
+- Missing OpenSpec CLI means degraded validation, not planning failure.
+- No OpenSpec-native bug-fix path creates `.ai-factory/plans/<id>/`.
+
+### Workflow B: Fix After Failed Verification
+
+`/aif-fix` handles selected findings inside an existing active OpenSpec change:
+
+```text
+/aif-verify <change-id> -> fail
+/aif-fix <change-id>
+/aif-mode sync --change <change-id>     # optional if canonical artifacts changed
+/aif-rules-check                        # optional
+/aif-verify <change-id>
+```
+
+- `/aif-fix` requires existing QA evidence or selected findings.
+- `/aif-fix` does not create a new OpenSpec change.
+- `/aif-fix` writes fix traces under `.ai-factory/state/<change-id>/fixes/`.
+- `/aif-fix` does not write QA verdicts.
+- `/aif-fix` does not archive.
+- `/aif-fix` routes back to `/aif-verify <change-id>`.
+- No OpenSpec-native bug-fix path creates `.ai-factory/plans/<id>/`.
+
 ## Artifact Ownership
 
 | Path | Role |

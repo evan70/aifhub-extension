@@ -21,6 +21,14 @@ Use this mode when config declares `aifhub.artifactProtocol: openspec`.
 - Read canonical artifacts: `openspec/specs/**` plus `openspec/changes/<change-id>/proposal.md`, `design.md`, `tasks.md`, and `specs/**/spec.md`.
 - Read generated rules from `.ai-factory/rules/generated/` when present.
 - Allowed write scope: files already inside the selected finding's changed scope plus fix traces under `.ai-factory/state/<change-id>/`.
+- A new bug report is not a post-verify fix. If invoked with a bug description but no active OpenSpec change and no QA evidence, stop with: No active OpenSpec change or QA evidence was found for this bug fix. For a new bug report, create an OpenSpec change first: `/aif-plan full "fix <bug description>"`.
+- `/aif-fix` requires existing QA evidence or selected findings.
+- `/aif-fix` does not create a new OpenSpec change.
+- `/aif-fix` writes fix traces under `.ai-factory/state/<change-id>/fixes/`.
+- `/aif-fix` does not write QA verdicts.
+- `/aif-fix` does not archive.
+- `/aif-fix` routes back to `/aif-verify <change-id>`.
+- In OpenSpec-native mode, `/aif-fix` must not create `.ai-factory/plans/<id>/` or invent legacy fix artifacts.
 - Do not write QA verdicts, do not archive, and do not create legacy plan artifacts in OpenSpec-native mode.
 - Return finding IDs fixed, files modified, active OpenSpec change, canonical artifacts inspected, generated rules state, runtime state path, QA evidence path, remaining blockers, and the next re-verify command.
 

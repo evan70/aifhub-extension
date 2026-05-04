@@ -35,6 +35,12 @@ const IMPLEMENT_PROMPT_ASSETS = [
   'agent-files/claude/aifhub-implement-worker.md'
 ];
 
+const FIX_PROMPT_ASSETS = [
+  'injections/core/aif-fix-plan-folder.md',
+  'agent-files/codex/aifhub-fixer.toml',
+  'agent-files/claude/aifhub-fixer.md'
+];
+
 const PLANNING_RUNTIME_PROMPT_ASSETS = [
   'injections/core/aif-explore-plan-folder.md',
   'injections/core/aif-plan-plan-folder.md',
@@ -357,6 +363,31 @@ describe('OpenSpec-native prompt asset contract', () => {
         /never archive|does not archive|no archive/i,
         `${relativePath} should forbid archive from /aif-verify`
       );
+    }
+  });
+
+  it('requires fix prompts to route new bug reports to planned OpenSpec changes', async () => {
+    for (const relativePath of FIX_PROMPT_ASSETS) {
+      const asset = await readRepoFile(relativePath);
+      const openspec = extractMarkdownSection(asset, 'OpenSpec-native mode');
+
+      for (const expected of [
+        'A new bug report is not a post-verify fix.',
+        'No active OpenSpec change or QA evidence was found for this bug fix.',
+        '/aif-plan full "fix <bug description>"',
+        '`/aif-fix` requires existing QA evidence or selected findings.',
+        '`/aif-fix` does not create a new OpenSpec change.',
+        '`.ai-factory/state/<change-id>/fixes/`',
+        '`/aif-fix` does not write QA verdicts.',
+        '`/aif-fix` does not archive.',
+        '`/aif-fix` routes back to `/aif-verify <change-id>`.',
+        'must not create `.ai-factory/plans/<id>/`'
+      ]) {
+        assertIncludes(openspec, expected, `${relativePath} OpenSpec-native mode`);
+      }
+
+      assertNotIncludes(openspec, '.ai-factory/plans/<id>/status.yaml', `${relativePath} OpenSpec-native mode`);
+      assertNotIncludes(openspec, 'legacy `status.yaml` source of truth', `${relativePath} OpenSpec-native mode`);
     }
   });
 

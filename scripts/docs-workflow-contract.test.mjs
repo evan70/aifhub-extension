@@ -16,6 +16,10 @@ function assertIncludes(source, expected, label) {
   assert.ok(source.includes(expected), `${label} should include ${JSON.stringify(expected)}`);
 }
 
+function assertNotIncludes(source, unexpected, label) {
+  assert.ok(!source.includes(unexpected), `${label} should not include ${JSON.stringify(unexpected)}`);
+}
+
 function assertOrder(source, orderedFragments, label) {
   let cursor = -1;
 
@@ -110,5 +114,59 @@ describe('complete OpenSpec workflow documentation contract', () => {
       '/aif-commit',
       '/aif-evolve'
     ], 'docs/usage.md workflow');
+  });
+
+  it('documents planned bug fixes separately from post-verify fixes', async () => {
+    const readme = await readRepoFile('README.md');
+    const usage = await readRepoFile('docs/usage.md');
+    const contextPolicy = await readRepoFile('docs/context-loading-policy.md');
+    const readmeBugFixes = extractSection(readme, '## Bug Fix Workflows');
+    const usageBugFixes = extractSection(usage, '## Bug Fix Workflows');
+    const contextBugFixes = extractSection(contextPolicy, '## Bug Fix Context');
+
+    for (const [label, section] of [
+      ['README.md Bug Fix Workflows', readmeBugFixes],
+      ['docs/usage.md Bug Fix Workflows', usageBugFixes]
+    ]) {
+      for (const expected of [
+        '/aif-plan full "fix <bug description>"',
+        '/aif-improve <change-id>',
+        '/aif-mode sync --change <change-id>',
+        '/aif-implement <change-id>',
+        '/aif-rules-check',
+        '/aif-verify <change-id>',
+        '/aif-done <change-id>',
+        '/aif-mode sync',
+        '/aif-commit',
+        '/aif-verify <change-id> -> fail',
+        '/aif-fix <change-id>',
+        'A bug fix is still an OpenSpec change when it changes product or workflow behavior.',
+        'Create delta specs when behavior changes.',
+        'Docs/tooling-only bug fixes may omit delta specs only when the proposal explains why no product or workflow behavior changes.',
+        'Missing OpenSpec CLI means degraded validation, not planning failure.',
+        '`/aif-fix` requires existing QA evidence or selected findings.',
+        '`/aif-fix` does not create a new OpenSpec change.',
+        '`.ai-factory/state/<change-id>/fixes/`',
+        '`/aif-fix` does not write QA verdicts.',
+        '`/aif-fix` does not archive.',
+        '`/aif-fix` routes back to `/aif-verify <change-id>`.',
+        'No OpenSpec-native bug-fix path creates `.ai-factory/plans/<id>/`.'
+      ]) {
+        assertIncludes(section, expected, label);
+      }
+    }
+
+    for (const expected of [
+      'New bug reports are planning input.',
+      'Post-verify fixes are execution input.',
+      'Fresh bug reports must start with `/aif-plan full "fix <bug description>"`.',
+      '`/aif-fix` must not create a canonical OpenSpec change',
+      '`/aif-fix` must not create `.ai-factory/plans/<id>/`'
+    ]) {
+      assertIncludes(contextBugFixes, expected, 'docs/context-loading-policy.md Bug Fix Context');
+    }
+
+    assertNotIncludes(readmeBugFixes, '.ai-factory/plans/<id>/task.md', 'README.md Bug Fix Workflows');
+    assertNotIncludes(usageBugFixes, '.ai-factory/plans/<id>/task.md', 'docs/usage.md Bug Fix Workflows');
   });
 });
