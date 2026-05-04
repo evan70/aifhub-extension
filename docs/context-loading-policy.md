@@ -4,7 +4,9 @@
 
 This policy defines which artifacts AIFHub Extension commands load and which artifacts they may write.
 
-OpenSpec-native v1 has one core rule: canonical requirements and change intent live under `openspec/`; runtime state, QA evidence, and generated rules live under `.ai-factory/`.
+OpenSpec-native v1 has one core rule in user projects: canonical requirements and change intent live under `openspec/`; runtime state, QA evidence, and generated rules live under `.ai-factory/`.
+
+The extension package repository is intentionally artifact-light. Root `openspec/`, `.ai-factory/state/`, `.ai-factory/qa/`, `.ai-factory/plans/`, and `.ai-factory/rules/generated/` are user-project/runtime artifacts, not extension package content. Root `.ai-factory/rules/generated/` is derived and safe to regenerate. This repo may include OpenSpec examples only under fixture paths such as `test/fixtures/` or `scripts/fixtures/`, and extension behavior requirements are validated by prompt contracts and tests rather than committed root OpenSpec specs.
 
 OpenSpec CLI integration is a runner-backed adapter. Commands may request validation, status, instructions, and archive through `scripts/openspec-runner.mjs`, but they must not install or invoke OpenSpec slash-command skills.
 

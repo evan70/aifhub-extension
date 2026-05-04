@@ -8,4 +8,8 @@
 /*.md
 !/CHANGELOG.md
 node_modules/
-openspec/
+/openspec/
+/.ai-factory/state/
+/.ai-factory/qa/
+/.ai-factory/plans/
+/.ai-factory/rules/generated/

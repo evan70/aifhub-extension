@@ -43,7 +43,9 @@ finalization:
   /aif-evolve                                       # optional learning step
 ```
 
-OpenSpec-native mode uses OpenSpec artifacts as canonical planning/spec artifacts and AI Factory paths for runtime state, QA evidence, and generated rules.
+OpenSpec-native mode uses OpenSpec artifacts as canonical planning/spec artifacts and AI Factory paths for runtime state, QA evidence, and generated rules in user projects.
+
+The `aifhub-extension` package repository stays artifact-light: root `openspec/`, `.ai-factory/state/`, `.ai-factory/qa/`, `.ai-factory/plans/`, and `.ai-factory/rules/generated/` are not extension package source. Root `.ai-factory/rules/generated/` is derived in user projects and safe to regenerate. OpenSpec examples may be committed only under fixture paths such as `test/fixtures/` or `scripts/fixtures/`.
 
 AIFHub commands request OpenSpec validation, status, instructions, and archive through `scripts/openspec-runner.mjs` when the CLI is available. Users should keep using `/aif-*` commands; this extension does not install or rely on OpenSpec slash commands.
 
@@ -60,6 +62,8 @@ AIFHub commands request OpenSpec validation, status, instructions, and archive t
 | `.ai-factory/qa/<change-id>/` | Verification and finalization evidence |
 | `.ai-factory/rules/generated/` | Derived rules, safe to regenerate |
 | `.ai-factory/plans/` | Legacy AI Factory-only compatibility and migration input |
+
+Extension behavior requirements are validated by prompt contracts and tests, not by root project OpenSpec specs committed into this repository.
 
 ## Manifest Metadata
 

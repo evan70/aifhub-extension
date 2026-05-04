@@ -38,6 +38,8 @@ This is optional. The extension installer does not run it.
 
 OpenSpec skills and slash commands are not installed by this extension.
 
+This initialization is for user projects. The `aifhub-extension` package repository does not ship root `openspec/` or root `.ai-factory/rules/generated/` content; generated rules are derived in user projects and safe to regenerate. OpenSpec examples in this repo belong only under fixture paths, and extension behavior requirements are validated by prompt contracts and tests instead of committed root OpenSpec specs.
+
 ## OpenSpec-Native Config
 
 OpenSpec-native mode is selected through `.ai-factory/config.yaml`:

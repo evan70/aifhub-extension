@@ -90,7 +90,7 @@ Optional gates:
 
 ## Artifact Layout
 
-OpenSpec-native v1 uses this ownership model:
+OpenSpec-native v1 uses this ownership model in user projects:
 
 ```text
 openspec/
@@ -134,6 +134,8 @@ openspec/
 | `.ai-factory/qa` | Verification and finalization evidence |
 | `.ai-factory/rules/generated` | Derived rules, safe to regenerate |
 | `.ai-factory/plans` | Legacy compatibility and migration input only |
+
+The `aifhub-extension` package repository stays artifact-light. Root `openspec/`, `.ai-factory/state/`, `.ai-factory/qa/`, `.ai-factory/plans/`, and `.ai-factory/rules/generated/` are created in user projects and are not shipped as extension package content. Root `.ai-factory/rules/generated/` is derived and safe to regenerate. OpenSpec examples in this repo belong only under fixture paths such as `test/fixtures/` or `scripts/fixtures/`; extension behavior requirements are validated by prompt contracts and tests, not by committed root OpenSpec specs.
 
 ## Manifest And Metadata
 
