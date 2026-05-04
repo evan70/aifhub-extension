@@ -31,6 +31,27 @@ Use `buildFixContext(options)` from `scripts/openspec-execution-context.mjs` whe
 
 Use shared vocabulary consistently: `OpenSpec-native mode`, `canonical OpenSpec change`, `active change`, `change-id`, `base specs`, `delta specs`, `generated rules`, `runtime state`, `QA evidence`, and `legacy AI Factory-only mode`.
 
+Bug-fix routing:
+
+- A new bug report is not a post-verify fix.
+- If `/aif-fix` is invoked with a bug description but no active OpenSpec change and no QA evidence, stop and say:
+
+```text
+No active OpenSpec change or QA evidence was found for this bug fix.
+
+For a new bug report, create an OpenSpec change first:
+
+/aif-plan full "fix <bug description>"
+```
+
+- `/aif-fix` requires existing QA evidence or selected findings.
+- `/aif-fix` does not create a new OpenSpec change.
+- `/aif-fix` writes fix traces under `.ai-factory/state/<change-id>/fixes/`.
+- `/aif-fix` does not write QA verdicts.
+- `/aif-fix` does not archive.
+- `/aif-fix` routes back to `/aif-verify <change-id>`.
+- In OpenSpec-native mode, `/aif-fix` must not create `.ai-factory/plans/<id>/` or invent legacy fix artifacts.
+
 Resolve the active change using `scripts/active-change-resolver.mjs` when available:
 
 - Prefer an explicit `<change-id>` or `@openspec/changes/<change-id>` input when provided.
