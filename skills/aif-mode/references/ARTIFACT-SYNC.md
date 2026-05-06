@@ -7,13 +7,15 @@ OpenSpec sync performs these actions without changing mode:
 1. Ensure `openspec/config.yaml`, `openspec/specs/`, `openspec/changes/`, `.ai-factory/state/`, `.ai-factory/qa/`, and `.ai-factory/rules/generated/`.
 2. Resolve selected changes from `--change <id>`, `--all`, or active change resolution.
 3. Compile generated rules through `scripts/openspec-rules-compiler.mjs` when `aifhub.openspec.compileRulesOnSync` is not `false`.
-4. Validate selected changes and collect status through `scripts/openspec-runner.mjs` when `aifhub.openspec.validateOnSync` is not `false` and compatible CLI capabilities are available.
+4. Validate selected changes through `validateOpenSpecChange(changeId)` and collect status through `getOpenSpecStatus(changeId)` from `scripts/openspec-runner.mjs` when `aifhub.openspec.validateOnSync` is not `false` and compatible CLI capabilities are available.
 5. Detect legacy plans that may need migration.
 6. Write a sync report under `.ai-factory/state/mode-switches/`.
 
-When no active changes are selected, sync still refreshes `.ai-factory/rules/generated/openspec-base.md`, skips change-specific generated rules, skips change validation with `no-selected-changes`, writes a report, and returns OK.
+When no active changes are selected, base-only sync still refreshes `.ai-factory/rules/generated/openspec-base.md`, skips change-specific generated rules, skips change validation with `no-selected-changes`, writes a report, and returns OK.
 
 When `--all` selects active changes that have no `openspec/changes/<change-id>/specs/**/spec.md` delta specs, sync reports `no-delta-specs` warnings and skips validation/status for those changes. This keeps maintenance sync usable for old migrated or docs-only active changes while preserving stricter per-change verification in `/aif-verify <change-id>`.
+
+Missing or unsupported OpenSpec CLI is degraded sync validation/status, not a sync failure unless strict command context requires CLI-backed evidence.
 
 Generated rules are derived artifacts:
 

@@ -14,6 +14,7 @@ Use this mode when config declares aifhub.artifactProtocol: openspec.
 
 - Verify exactly one active OpenSpec change.
 - Before lint, tests, review, security, or rules checks, use scripts/openspec-verification-context.mjs and scripts/openspec-runner.mjs when available.
+- Request OpenSpec validation through validateOpenSpecChange(changeId) and status through getOpenSpecStatus(changeId) from scripts/openspec-runner.mjs.
 - Fail-fast OpenSpec validation before code checks: fail invalid OpenSpec artifacts before code checks and use shouldRunCodeVerification as the handoff signal.
 - Missing CLI remains degraded missing-CLI behavior unless strict config requireCliForVerify requires the CLI.
 - Read canonical artifacts: openspec/specs/** plus openspec/changes/<change-id>/proposal.md, design.md, tasks.md, and specs/**/spec.md.

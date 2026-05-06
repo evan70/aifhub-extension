@@ -35,7 +35,7 @@ openspec/changes/<change-id>/specs/**/spec.md
 
 ### Archive Policy
 
-OpenSpec-native `/aif-done` uses `scripts/openspec-done-finalizer.mjs`. Archive lifecycle mutation must happen through `archiveOpenSpecChange(changeId, options)` and never through custom folder movement or direct `openspec/specs` edits. Normal archive is `openspec archive <change-id> --yes`.
+OpenSpec-native `/aif-done` uses `scripts/openspec-done-finalizer.mjs`. Archive lifecycle mutation must happen through `archiveOpenSpecChange(changeId, options)` from `scripts/openspec-runner.mjs` and never through custom folder movement or direct `openspec/specs` edits. Normal archive is `openspec archive <change-id> --yes`.
 
 Normal archival corresponds to:
 
