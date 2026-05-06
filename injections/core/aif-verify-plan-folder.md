@@ -27,7 +27,7 @@ Before resolving verification scope, read `.ai-factory/config.yaml` when it exis
 
 When `.ai-factory/config.yaml` declares `aifhub.artifactProtocol: openspec`, `/aif-verify` verifies implementation against the active OpenSpec change.
 
-Before running lint, tests, code review, security review, or rules review, resolve the active change, ensure runtime layout, and use `scripts/openspec-verification-context.mjs` with `scripts/openspec-runner.mjs` when available. Fail invalid OpenSpec artifacts before code checks. Treat missing CLI as degraded missing-CLI behavior unless strict config (`aifhub.openspec.requireCliForVerify`) requires the CLI. Use `shouldRunCodeVerification` as the handoff signal: `false` blocks code checks and routes to `/aif-fix <change-id>`; `true` allows normal code verification to continue.
+Before running lint, tests, code review, security review, or rules review, resolve the active change, ensure runtime layout, and use `scripts/openspec-verification-context.mjs` with `scripts/openspec-runner.mjs` when available. Request validation through `validateOpenSpecChange(changeId)` and status through `getOpenSpecStatus(changeId)` from the shared runner. Fail invalid OpenSpec artifacts before code checks. Treat missing CLI as degraded missing-CLI behavior unless strict config (`aifhub.openspec.requireCliForVerify`) requires the CLI. Use `shouldRunCodeVerification` as the handoff signal: `false` blocks code checks and routes to `/aif-fix <change-id>`; `true` allows normal code verification to continue.
 
 Use shared vocabulary consistently: `OpenSpec-native mode`, `canonical OpenSpec change`, `active change`, `change-id`, `base specs`, `delta specs`, `generated rules`, `runtime state`, `QA evidence`, and `legacy AI Factory-only mode`.
 
