@@ -18,9 +18,10 @@ OpenSpec CLI features are reached through AIFHub wrappers and `scripts/openspec-
 2. [Usage](usage.md) for the full command flow, `/aif-mode` switching and sync, rules/review/security gates, verification/fix/finalization tail, commit/evolve handoff, OAuth example, troubleshooting, and smoke checks.
 3. [Context Loading Policy](context-loading-policy.md) for consumer context, GitHub-aware roadmap evidence, ownership boundaries, generated rules, quality gates, commit handoff, and legacy path rules.
 4. [OpenSpec Compatibility](openspec-compatibility.md) for optional CLI adapter support, artifact sync points, rules gate behavior, Node requirements, capability flags, and degraded mode.
-5. [Legacy Plan Migration](legacy-plan-migration.md) if existing `.ai-factory/plans` artifacts need to move into OpenSpec-native changes.
-6. [Active Change Resolver](active-change-resolver.md) for active change selection, runtime paths, current pointer behavior, and ambiguity diagnostics.
-7. [ADR 0001](adr/0001-openspec-native-artifact-protocol.md) for the v1 artifact ownership decision.
+5. [OpenSpec Artifact Validation](openspec-validation.md) for the AIFHub contract validator layered over OpenSpec CLI validation.
+6. [Legacy Plan Migration](legacy-plan-migration.md) if existing `.ai-factory/plans` artifacts need to move into OpenSpec-native changes.
+7. [Active Change Resolver](active-change-resolver.md) for active change selection, runtime paths, current pointer behavior, and ambiguity diagnostics.
+8. [ADR 0001](adr/0001-openspec-native-artifact-protocol.md) for the v1 artifact ownership decision.
 
 The remaining runtime-specific guides are supporting references:
 
@@ -37,6 +38,7 @@ The remaining runtime-specific guides are supporting references:
 | [Usage](usage.md) | Full OpenSpec-native command flow, gates, finalization tail, commit, and examples |
 | [Context Loading Policy](context-loading-policy.md) | Runtime context, GitHub-aware roadmap evidence, ownership, gates, commit handoff, and legacy boundaries |
 | [OpenSpec Compatibility](openspec-compatibility.md) | CLI adapter policy, sync points, rules gate, version support, and degraded mode |
+| [OpenSpec Artifact Validation](openspec-validation.md) | Read-only AIFHub contract validator for canonical artifacts, runtime evidence, QA, and generated rules |
 | [Legacy Plan Migration](legacy-plan-migration.md) | Explicit migration commands and artifact mapping |
 | [Active Change Resolver](active-change-resolver.md) | Active change selection and runtime paths |
 | [ADR 0001](adr/0001-openspec-native-artifact-protocol.md) | Canonical OpenSpec and AI Factory runtime state contract |
@@ -80,6 +82,7 @@ npm test
 - [Usage](usage.md)
 - [Context Loading Policy](context-loading-policy.md)
 - [OpenSpec Compatibility](openspec-compatibility.md)
+- [OpenSpec Artifact Validation](openspec-validation.md)
 - [Legacy Plan Migration](legacy-plan-migration.md)
 - [Active Change Resolver](active-change-resolver.md)
 - [ADR 0001](adr/0001-openspec-native-artifact-protocol.md)

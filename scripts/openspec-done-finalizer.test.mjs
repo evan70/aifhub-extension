@@ -529,6 +529,45 @@ describe('OpenSpec done finalizer API', () => {
     ]);
   });
 
+  it('refuses to archive when the OpenSpec artifact contract fails', async () => {
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir);
+    await createRuntimeEvidence(rootDir);
+    let archiveCalls = 0;
+
+    const result = await finalizeOpenSpecChange({
+      rootDir,
+      changeId: 'add-oauth',
+      detectOpenSpec: async () => availableCliDetection(),
+      readLatestVerificationEvidence: async () => verificationEvidence(),
+      validateOpenSpecArtifactContract: async () => ({
+        schema_version: 1,
+        validator: 'aifhub-openspec-artifact-contract',
+        change_id: 'add-oauth',
+        status: 'fail',
+        blocking: true,
+        checks: [
+          {
+            id: 'runtime-files-outside-change',
+            status: 'fail',
+            path: 'openspec/changes/add-oauth/openspec-validation.json',
+            message: 'Runtime evidence must stay outside canonical changes.'
+          }
+        ],
+        suggested_next: null
+      }),
+      archiveOpenSpecChange: async () => {
+        archiveCalls += 1;
+        return archiveResult();
+      }
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.archive.archived, false);
+    assert.equal(result.errors[0].code, 'artifact-contract-failed');
+    assert.equal(archiveCalls, 0);
+  });
+
   it('finalizes passing changes, writes done summaries, and stays out of canonical/legacy paths', async () => {
     const rootDir = await createTempRoot();
     await createOpenSpecChange(rootDir);

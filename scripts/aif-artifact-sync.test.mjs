@@ -651,6 +651,15 @@ describe('doctor', () => {
         validated.push(changeId);
         return { ok: true, stdout: '{"valid":true}', stderr: '', json: { valid: true } };
       },
+      validateOpenSpecArtifactContract: async (options) => ({
+        schema_version: 1,
+        validator: 'aifhub-openspec-artifact-contract',
+        change_id: options.changeId,
+        status: 'pass',
+        blocking: false,
+        checks: [],
+        suggested_next: null
+      }),
       getOpenSpecStatus: async () => ({
         ok: true,
         stdout: '{"ok":true}',

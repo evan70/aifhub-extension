@@ -1,4 +1,4 @@
-[Previous Page](openspec-compatibility.md) | [Back to Documentation](README.md) | [Next Page](active-change-resolver.md)
+[Previous Page](openspec-validation.md) | [Back to Documentation](README.md) | [Next Page](active-change-resolver.md)
 
 # Legacy Plan Migration
 

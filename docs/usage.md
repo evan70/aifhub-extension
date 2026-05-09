@@ -155,6 +155,8 @@ Use `--dry-run` for planned switching or sync writes. Use `--all` or `--change <
 
 `/aif-mode sync --all` is a maintenance sweep. It refreshes generated rules for active changes, validates only selected changes that contain `openspec/changes/<change-id>/specs/**/spec.md` delta specs, and reports selected no-delta changes as `no-delta-specs` warnings instead of failing solely because old or docs-only active changes have no delta specs. `/aif-verify <change-id>` remains the stricter verification gate for a specific change.
 
+`/aif-mode doctor --change <change-id>` includes the read-only AIFHub OpenSpec artifact contract check. It reports the full JSON result as `artifactContract` and treats missing verification evidence as a pre-archive readiness failure. See [OpenSpec Artifact Validation](openspec-validation.md).
+
 For CLI or IDE runtimes, planning commands may recommend an available planning mode for structured questions, but they must not fabricate unavailable tools or client actions. Codex mode switching remains a user action; see [Codex Plan Mode](codex-plan-mode.md).
 
 ### `/aif-analyze`
@@ -439,6 +441,7 @@ Reads:
 - `openspec/changes/<change-id>/**`
 - passing verification evidence from `.ai-factory/qa/<change-id>/`
 - the latest valid verify `aif-gate-result` block from `.ai-factory/qa/<change-id>/verify.md`
+- the read-only AIFHub OpenSpec artifact contract result
 - git working tree state
 
 Writes:
@@ -455,7 +458,7 @@ Does not write:
 - manual file moves from `openspec/changes` to archives
 - legacy `.ai-factory/specs` archives in OpenSpec-native mode
 
-Use `--skip-specs` for docs/tooling-only changes where no accepted spec update is expected. Archive-required finalization needs a compatible OpenSpec CLI when `aifhub.openspec.requireCliForDone` is true.
+Use `--skip-specs` for docs/tooling-only changes where no accepted spec update is expected. Archive-required finalization needs a compatible OpenSpec CLI when `aifhub.openspec.requireCliForDone` is true. `/aif-done` refuses archive when the artifact contract validator returns `fail`.
 
 Next steps after `/aif-done`:
 
@@ -647,6 +650,7 @@ See [Codex Plan Mode](codex-plan-mode.md) for question-format guidance.
 | Ambiguous active change | More than one active change can be selected. | Pass `<change-id>` explicitly or update `.ai-factory/state/current.yaml`. |
 | Missing generated rules | Derived rules are absent. | Regenerate `.ai-factory/rules/generated/*.md` from OpenSpec specs before relying on rules guidance. |
 | Stale generated rules | Generated rules do not match canonical OpenSpec artifacts. | Regenerate them; do not edit generated rules as source of truth. |
+| Artifact contract failure | Canonical OpenSpec artifacts, runtime state, QA evidence, or generated rules violate the AIFHub contract. | Fix the reported path or run the suggested command from `artifactContract.suggested_next`. |
 | Dirty working tree before `/aif-done` | Finalization cannot prove archive/summary scope safely. | Commit, stash, or use an explicit supported dirty-state override when available. |
 
 ## Release Smoke Checks
