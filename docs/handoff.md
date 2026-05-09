@@ -4,9 +4,10 @@
 
 ## Цель
 
-Этот документ разводит два слоя, которые легко смешать в обсуждении handoff:
+Этот документ разводит слои, которые легко смешать в обсуждении handoff:
 
-- канонический public CLI workflow
+- upstream/core execution workflow
+- AIFHub OpenSpec finalization tail
 - handoff stage vocabulary `Explore / New / Apply / Done`
 
 Названия стадий можно использовать как краткие названия этапов, но они не обязаны совпадать со slash commands.
@@ -28,18 +29,19 @@ Legacy slash aliases и handoff stage names — разные смысловые 
 
 `aifhub-rules-sidecar` remains AIFHub-specific and namespaced. It should not duplicate upstream `rules-sidecar` beyond the OpenSpec-native generated rules layer: it reads `.ai-factory/rules/generated/*`, follows the `aif-rules-check` verdict semantics, and returns a final `aif-gate-result` block with `"gate": "rules"`.
 
-`aif-verify` и `aif-fix` в этом split не оформляются как handoff prompt assets: они остаются частью `core` workflow, а `aifhub-verifier` и `aifhub-fixer` пока используют inline `developer_instructions`.
+`aif-verify` и `aif-fix` в этом split не оформляются как handoff prompt assets: они остаются частью `core` workflow, а `aifhub-verifier` и `aifhub-fixer` пока используют inline `developer_instructions`. Если позже понадобится отдельный Handoff binding для verify/fix, это должен быть новый scope поверх core workflow, а не неявное подключение существующих core overlays.
 
-До появления отдельного runtime binding `injections/core/` остаётся единственным active overlay-layer для canonical public workflow, а `injections/references/` — shared reference bucket для core overlays и будущих handoff stubs.
+До появления отдельного runtime binding `injections/core/` остаётся единственным active overlay-layer для public command workflow, а `injections/references/` — shared reference bucket для core overlays и будущих handoff stubs.
 
 ## Канонический Public Workflow
 
 ```text
-aif-explore -> aif-plan -> aif-improve -> aif-implement -> aif-verify
-                                                            \-> aif-fix -> aif-verify
+aif-explore -> aif-plan -> aif-improve -> aif-implement -> aif-verify -> aif-done
+                                                            \-> aif-fix -> aif-verify -> aif-done
 ```
 
 `/aif-analyze` остаётся bootstrap/setup step перед этим flow. Он готовит context и rules, но не является первым узлом canonical public command sequence.
+`/aif-done` — AIFHub OpenSpec finalization tail после passing verification. Он не заменяет `/aif-verify`, не является upstream legacy alias и не меняет upstream ownership verification loop.
 
 ## Названия стадий
 
@@ -48,7 +50,7 @@ aif-explore -> aif-plan -> aif-improve -> aif-implement -> aif-verify
 | `Explore` | Исследование и уточнение задачи перед планированием | `/aif-explore` при необходимости | Что stage name автоматически означает обязательную команду |
 | `New` | Создание новой full plan pair и старт нового scope | `/aif-plan full` | Что `New` означает legacy slash command `/aif-new` |
 | `Apply` | Применение утверждённого plan к execution workflow | `/aif-implement` | Что существует активный public wrapper `/aif-apply` |
-| `Done` | Verified end state плюс optional archive/summary/follow-up finalizer | `/aif-done` после passing `/aif-verify` | Что `/aif-done` — обязательный шаг upstream workflow или legacy alias public path |
+| `Done` | Verified end state плюс archive/summary/follow-up finalizer для AIFHub OpenSpec lifecycle | `/aif-done` после passing `/aif-verify` | Что `/aif-done` подменяет `/aif-verify`, является upstream legacy alias или автоматически запускается Handoff |
 
 ## `aif-apply`
 
@@ -66,7 +68,7 @@ aif-explore -> aif-plan -> aif-improve -> aif-implement -> aif-verify
 
 ## `aif-done`
 
-`/aif-done` — extension-owned explicit AIFHub/Handoff finalizer. Это не legacy alias и не часть canonical public CLI workflow. Работает **после** passing verification:
+`/aif-done` — extension-owned explicit AIFHub/Handoff finalizer. Это не upstream legacy alias и не replacement для `/aif-verify`; в AIFHub OpenSpec-native workflow он входит в finalization tail после passing verification:
 
 ```text
 /aif-implement -> /aif-verify -> /aif-done
@@ -84,13 +86,13 @@ fail -> /aif-fix -> /aif-verify -> /aif-done
 - Не дублирует `/aif-verify` verification logic.
 - Не auto-создаёт PR — только drafts для review.
 - Не выдумывает governance changes без evidence из плана и не обходит owning path для ROADMAP/RULES/ARCHITECTURE.
-- Не является обязательным шагом canonical upstream workflow.
+- Не является upstream replacement для `/aif-verify` и не восстанавливает legacy `/aif-done` alias semantics.
 
 ## Правила интерпретации
 
 - Если handoff говорит `New`, для новой работы используйте `/aif-plan full`.
 - Если handoff говорит `Apply`, ориентируйтесь на `/aif-implement`.
-- Если handoff говорит `Done`, доведите plan до verified state через `/aif-verify`, затем при необходимости запустите `/aif-done` для архивации, commit/PR summaries и evidence-driven final follow-ups.
+- Если handoff говорит `Done`, доведите plan до verified state через `/aif-verify`, затем запустите `/aif-done` для AIFHub OpenSpec archive/finalization, commit/PR summaries и evidence-driven final follow-ups.
 - Если handoff говорит `Explore / New / Apply / Done`, считайте это naming layer, а не списком обязательных slash commands.
 
 ## Stage Mapping (Future Handoff Orchestration)
@@ -112,7 +114,7 @@ fail -> /aif-fix -> /aif-verify -> /aif-done
                                                          fail -> /aif-fix -> /aif-verify --check-only
                                       /aif-review + /aif-security-checklist + /aif-rules-check (optional manual gates)
 any failed Review gate -> aggregated comment -> return to Implementing -> /aif-fix -> /aif-verify --check-only
-passing full /aif-verify -> optional /aif-done (archive, commit/PR drafts, governance/evolution follow-ups)
+passing full /aif-verify -> /aif-done (archive, commit/PR drafts, governance/evolution follow-ups)
 ```
 
 Все перечисленные команды работают в текущем CLI workflow через `injections/core/` overlays. `injections/handoff/` в этом scope покрывает только review/security/rules/done stubs и не вмешивается в implementing loop.
