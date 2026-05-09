@@ -9,6 +9,8 @@ describe('findArtifactBoundaryViolations', () => {
     const violations = findArtifactBoundaryViolations([
       'openspec/specs/foo/spec.md',
       '.ai-factory/rules/generated/openspec-base.md',
+      '.ai-factory/rules/generated/index.json',
+      '.ai-factory/rules/generated/openspec-rules-trace-add-oauth.json',
       '.ai-factory/state/foo/trace.md',
       '.ai-factory/qa/foo/verify.md',
       '.ai-factory/plans/foo/task.md'
@@ -17,6 +19,8 @@ describe('findArtifactBoundaryViolations', () => {
     assert.deepEqual(violations, [
       'openspec/specs/foo/spec.md',
       '.ai-factory/rules/generated/openspec-base.md',
+      '.ai-factory/rules/generated/index.json',
+      '.ai-factory/rules/generated/openspec-rules-trace-add-oauth.json',
       '.ai-factory/state/foo/trace.md',
       '.ai-factory/qa/foo/verify.md',
       '.ai-factory/plans/foo/task.md'
@@ -27,6 +31,8 @@ describe('findArtifactBoundaryViolations', () => {
     const violations = findArtifactBoundaryViolations([
       'test/fixtures/openspec-native/openspec/specs/foo/spec.md',
       'test/fixtures/generated-rules/openspec-base.md',
+      'test/fixtures/generated-rules/index.json',
+      'scripts/fixtures/generated-rules/openspec-rules-trace-add-oauth.json',
       'scripts/fixtures/openspec/specs/foo/spec.md'
     ]);
 

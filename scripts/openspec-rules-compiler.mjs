@@ -9,6 +9,8 @@ import { normalizeChangeId, resolveActiveChange } from './active-change-resolver
 
 const GENERATED_DIR = path.join('.ai-factory', 'rules', 'generated');
 const BASE_FILE = 'openspec-base.md';
+const INDEX_FILE = 'index.json';
+const TRACE_FILE_PREFIX = 'openspec-rules-trace-';
 const SECTION_ORDER = new Map([
   ['Requirements', 0],
   ['ADDED Requirements', 1],
@@ -178,7 +180,9 @@ export async function compileOpenSpecBaseRules(options = {}) {
   });
   const written = await writeGeneratedBaseRules(rendered, {
     ...options,
-    rootDir
+    rootDir,
+    generatedAt: resolveGeneratedAt(options),
+    indexBase: renderIndexBaseEntry(sortSources(collected.sources))
   });
 
   if (!written.ok) {
@@ -237,6 +241,7 @@ async function collectOpenSpecBaseRuleSources(options = {}) {
 export function renderGeneratedRules(sources, options = {}) {
   const normalized = normalizeChangeId(options.changeId);
   const changeId = normalized.ok ? normalized.changeId : options.changeId;
+  const generatedAt = resolveGeneratedAt(options);
   const sortedSources = sortSources(Array.from(sources ?? []));
   const baseSources = sortedSources.filter((source) => source.kind === 'base');
   const changeSources = sortedSources.filter((source) => source.kind === 'change');
@@ -261,26 +266,43 @@ export function renderGeneratedRules(sources, options = {}) {
     sources: sortedSources,
     emptyMessage: 'No OpenSpec requirements found.'
   });
+  const traceFileName = `${TRACE_FILE_PREFIX}${changeId}.json`;
+  const markdownFiles = [
+    {
+      kind: 'base',
+      fileName: BASE_FILE,
+      content: baseContent
+    },
+    {
+      kind: 'change',
+      fileName: `openspec-change-${changeId}.md`,
+      content: changeContent
+    },
+    {
+      kind: 'merged',
+      fileName: `openspec-merged-${changeId}.md`,
+      content: mergedContent
+    }
+  ];
+  const traceContent = renderTraceDocument(sortedSources, {
+    changeId,
+    generatedAt,
+    outputs: renderTraceOutputs(markdownFiles)
+  });
 
   return {
     ok: true,
     changeId,
+    generatedAt,
     warnings: [],
+    indexBase: renderIndexBaseEntry(baseSources),
+    indexEntry: renderIndexChangeEntry(changeId, traceFileName, generatedAt),
     files: [
+      ...markdownFiles,
       {
-        kind: 'base',
-        fileName: BASE_FILE,
-        content: baseContent
-      },
-      {
-        kind: 'change',
-        fileName: `openspec-change-${changeId}.md`,
-        content: changeContent
-      },
-      {
-        kind: 'merged',
-        fileName: `openspec-merged-${changeId}.md`,
-        content: mergedContent
+        kind: 'trace',
+        fileName: traceFileName,
+        content: traceContent
       }
     ]
   };
@@ -302,7 +324,8 @@ export async function writeGeneratedRules(changeId, rendered, options = {}) {
   const expectedNames = new Set([
     BASE_FILE,
     `openspec-change-${normalized.changeId}.md`,
-    `openspec-merged-${normalized.changeId}.md`
+    `openspec-merged-${normalized.changeId}.md`,
+    `${TRACE_FILE_PREFIX}${normalized.changeId}.json`
   ]);
   const renderedNames = renderedFiles.map((file) => file.fileName);
   const renderedNameSet = new Set(renderedNames);
@@ -318,13 +341,15 @@ export async function writeGeneratedRules(changeId, rendered, options = {}) {
       errors: [
         {
           code: 'invalid-rendered-files',
-          message: 'Rendered rules must contain exactly the base, change, and merged generated files.'
+          message: 'Rendered rules must contain exactly the base, change, merged, and trace generated files.'
         }
       ]
     });
   }
 
-  await mkdir(generatedDir, { recursive: true });
+  if (!options.dryRun) {
+    await mkdir(generatedDir, { recursive: true });
+  }
 
   for (const renderedFile of renderedFiles) {
     const targetPath = path.resolve(generatedDir, renderedFile.fileName);
@@ -342,18 +367,36 @@ export async function writeGeneratedRules(changeId, rendered, options = {}) {
       });
     }
 
-    await writeFile(targetPath, renderedFile.content, 'utf8');
-    files.push({
+    if (!options.dryRun) {
+      await writeFile(targetPath, renderedFile.content, 'utf8');
+    }
+    files.push(createGeneratedFileResult({
       kind: renderedFile.kind,
-      path: targetPath,
-      relativePath: toPosix(path.relative(rootDir, targetPath)),
-      written: true
-    });
+      rootDir,
+      targetPath,
+      written: !options.dryRun
+    }));
   }
+
+  const index = await writeGeneratedIndex({
+    rootDir,
+    generatedDir,
+    generatedAt: rendered?.generatedAt ?? resolveGeneratedAt(options),
+    base: rendered?.indexBase ?? renderIndexBaseEntry([]),
+    changeEntry: rendered?.indexEntry ?? renderIndexChangeEntry(
+      normalized.changeId,
+      `${TRACE_FILE_PREFIX}${normalized.changeId}.json`,
+      rendered?.generatedAt ?? resolveGeneratedAt(options)
+    ),
+    dryRun: Boolean(options.dryRun),
+    resetChanges: false
+  });
+  files.push(...index.files);
 
   return createWriteResult({
     ok: true,
-    files
+    files,
+    warnings: index.warnings
   });
 }
 
@@ -361,7 +404,6 @@ async function writeGeneratedBaseRules(content, options = {}) {
   const rootDir = path.resolve(options.rootDir ?? process.cwd());
   const generatedDir = path.resolve(rootDir, GENERATED_DIR);
   const targetPath = path.resolve(generatedDir, BASE_FILE);
-  const relativePath = toPosix(path.relative(rootDir, targetPath));
 
   if (!isWithinDirectory(targetPath, generatedDir)) {
     return createWriteResult({
@@ -378,30 +420,279 @@ async function writeGeneratedBaseRules(content, options = {}) {
     return createWriteResult({
       ok: true,
       files: [
-        {
+        createGeneratedFileResult({
           kind: 'base',
-          path: targetPath,
-          relativePath,
+          rootDir,
+          targetPath,
           written: false
-        }
+        }),
+        createGeneratedFileResult({
+          kind: 'index',
+          rootDir,
+          targetPath: path.resolve(generatedDir, INDEX_FILE),
+          written: false
+        })
       ]
     });
   }
 
   await mkdir(generatedDir, { recursive: true });
   await writeFile(targetPath, content, 'utf8');
+  const index = await writeGeneratedIndex({
+    rootDir,
+    generatedDir,
+    generatedAt: options.generatedAt ?? resolveGeneratedAt(options),
+    base: options.indexBase ?? renderIndexBaseEntry([]),
+    dryRun: false,
+    resetChanges: Boolean(options.resetIndexChanges)
+  });
 
   return createWriteResult({
     ok: true,
     files: [
-      {
+      createGeneratedFileResult({
         kind: 'base',
-        path: targetPath,
-        relativePath,
+        rootDir,
+        targetPath,
         written: true
-      }
-    ]
+      }),
+      ...index.files
+    ],
+    warnings: index.warnings
   });
+}
+
+async function writeGeneratedIndex({
+  rootDir,
+  generatedDir,
+  generatedAt,
+  base,
+  changeEntry = null,
+  dryRun = false,
+  resetChanges = false
+}) {
+  const targetPath = path.resolve(generatedDir, INDEX_FILE);
+
+  if (!isWithinDirectory(targetPath, generatedDir)) {
+    return createWriteResult({
+      errors: [
+        {
+          code: 'unsafe-generated-path',
+          message: `Generated output path escapes '${GENERATED_DIR}': ${INDEX_FILE}`
+        }
+      ]
+    });
+  }
+
+  const files = [
+    createGeneratedFileResult({
+      kind: 'index',
+      rootDir,
+      targetPath,
+      written: !dryRun
+    })
+  ];
+
+  if (dryRun) {
+    return createWriteResult({
+      ok: true,
+      files
+    });
+  }
+
+  const existing = resetChanges ? createEmptyGeneratedIndex(generatedAt) : await readGeneratedIndex(targetPath, generatedAt);
+  const changes = resetChanges
+    ? []
+    : Array.from(existing.changes ?? []).filter((entry) => entry?.change_id !== changeEntry?.change_id);
+
+  if (changeEntry !== null) {
+    changes.push(changeEntry);
+  }
+
+  const index = {
+    schema_version: 1,
+    generated_at: generatedAt,
+    base,
+    changes: changes
+      .filter((entry) => typeof entry?.change_id === 'string' && entry.change_id.length > 0)
+      .sort((left, right) => left.change_id.localeCompare(right.change_id))
+  };
+
+  await writeFile(targetPath, `${JSON.stringify(index, null, 2)}\n`, 'utf8');
+
+  return createWriteResult({
+    ok: true,
+    files
+  });
+}
+
+async function readGeneratedIndex(targetPath, generatedAt) {
+  try {
+    const parsed = JSON.parse(await readFile(targetPath, 'utf8'));
+
+    if (parsed?.schema_version !== 1 || !Array.isArray(parsed.changes)) {
+      return createEmptyGeneratedIndex(generatedAt);
+    }
+
+    return {
+      schema_version: 1,
+      generated_at: parsed.generated_at ?? generatedAt,
+      base: parsed.base ?? null,
+      changes: parsed.changes
+    };
+  } catch {
+    return createEmptyGeneratedIndex(generatedAt);
+  }
+}
+
+function createEmptyGeneratedIndex(generatedAt) {
+  return {
+    schema_version: 1,
+    generated_at: generatedAt,
+    base: null,
+    changes: []
+  };
+}
+
+function createGeneratedFileResult({ kind, rootDir, targetPath, written }) {
+  return {
+    kind,
+    path: targetPath,
+    relativePath: toPosix(path.relative(rootDir, targetPath)),
+    written
+  };
+}
+
+function renderTraceDocument(sources, { changeId, generatedAt, outputs = [] }) {
+  const inputs = renderTraceInputs(sources);
+  const rules = renderTraceRules(sources);
+
+  return `${JSON.stringify({
+    schema_version: 1,
+    validator: 'aifhub-generated-rules-trace',
+    change_id: changeId,
+    generated_at: generatedAt,
+    inputs,
+    outputs,
+    rules
+  }, null, 2)}\n`;
+}
+
+function renderTraceInputs(sources) {
+  return sortSources(sources).map((source) => ({
+    path: source.relativePath,
+    sha256: source.fingerprint,
+    kind: source.kind === 'base' ? 'base-spec' : 'delta-spec'
+  }));
+}
+
+function renderTraceRules(sources) {
+  return flattenRequirements(sources).map((requirement) => ({
+    id: createTraceRuleId(requirement),
+    severity: inferRuleSeverity(requirement),
+    source: {
+      path: requirement.relativePath,
+      requirement: requirement.title
+    },
+    rule_text: createRuleText(requirement)
+  }));
+}
+
+function renderTraceOutputs(files) {
+  return files.map((file) => ({
+    path: `${GENERATED_DIR.replaceAll(path.sep, '/')}/${file.fileName}`,
+    sha256: createFingerprint(file.content),
+    kind: `${file.kind}-rules`
+  }));
+}
+
+function createFingerprint(content) {
+  return `sha256:${createHash('sha256').update(content).digest('hex')}`;
+}
+
+function renderIndexBaseEntry(baseSources) {
+  return {
+    markdown: `${GENERATED_DIR.replaceAll(path.sep, '/')}/${BASE_FILE}`,
+    inputs: renderTraceInputs(baseSources)
+  };
+}
+
+function renderIndexChangeEntry(changeId, traceFileName, generatedAt) {
+  return {
+    change_id: changeId,
+    generated_at: generatedAt,
+    trace: `${GENERATED_DIR.replaceAll(path.sep, '/')}/${traceFileName}`,
+    markdown: {
+      base: `${GENERATED_DIR.replaceAll(path.sep, '/')}/${BASE_FILE}`,
+      change: `${GENERATED_DIR.replaceAll(path.sep, '/')}/openspec-change-${changeId}.md`,
+      merged: `${GENERATED_DIR.replaceAll(path.sep, '/')}/openspec-merged-${changeId}.md`
+    }
+  };
+}
+
+function createTraceRuleId(requirement) {
+  const prefix = requirement.kind === 'base' ? 'base' : 'delta';
+  const capability = slugify(requirement.capability || 'root');
+  const title = slugify(requirement.title || 'requirement');
+  const hash = createHash('sha256')
+    .update([
+      requirement.kind,
+      requirement.relativePath,
+      requirement.section,
+      requirement.title,
+      ...requirement.body,
+      ...requirement.scenarios.flatMap((scenario) => [scenario.title, ...scenario.steps])
+    ].join('\n'))
+    .digest('hex')
+    .slice(0, 8);
+  const stable = `${prefix}-${capability}-${title}`.replace(/-+/g, '-').replace(/^-|-$/g, '');
+
+  return `${stable.slice(0, 80).replace(/-$/g, '')}-${hash}`;
+}
+
+function inferRuleSeverity(requirement) {
+  const text = [
+    requirement.title,
+    ...requirement.body,
+    ...requirement.scenarios.flatMap((scenario) => [scenario.title, ...scenario.steps])
+  ].join('\n').toUpperCase();
+
+  if (/\b(MUST|MUST NOT|SHALL|REQUIRED)\b/.test(text)) {
+    return 'must';
+  }
+
+  if (/\b(SHOULD|RECOMMENDED)\b/.test(text)) {
+    return 'should';
+  }
+
+  if (/\b(MAY|OPTIONAL)\b/.test(text)) {
+    return 'may';
+  }
+
+  return 'should';
+}
+
+function createRuleText(requirement) {
+  const body = requirement.body.join(' ').trim();
+
+  if (body.length > 0) {
+    return body;
+  }
+
+  const scenarioSteps = requirement.scenarios.flatMap((scenario) => scenario.steps).join(' ').trim();
+
+  if (scenarioSteps.length > 0) {
+    return scenarioSteps;
+  }
+
+  return `Requirement "${requirement.title}" from ${requirement.relativePath}.`;
+}
+
+function slugify(value) {
+  return String(value ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '') || 'item';
 }
 
 export function parseSpecMarkdownFallback(markdown, options = {}) {
@@ -1043,6 +1334,17 @@ function normalizeDetectionWarnings(detection) {
       message: 'OpenSpec CLI is unavailable or unsupported; using filesystem fallback.'
     }
   ];
+}
+
+function resolveGeneratedAt(options = {}) {
+  if (typeof options.generatedAt === 'string' && options.generatedAt.trim().length > 0) {
+    return options.generatedAt;
+  }
+
+  const value = options.now ?? Date.now();
+  const date = value instanceof Date ? value : new Date(value);
+
+  return date.toISOString();
 }
 
 function createCompilerResult(overrides = {}) {

@@ -16,6 +16,7 @@ import {
 
 const MODE = 'openspec-native';
 const GENERATED_DIR = path.join('.ai-factory', 'rules', 'generated');
+const TRACE_FILE_PREFIX = 'openspec-rules-trace-';
 const INSTRUCTIONS_ARTIFACT = 'apply';
 const REQUIRED_CHANGE_ARTIFACTS = ['proposal.md', 'design.md', 'tasks.md'];
 
@@ -182,38 +183,60 @@ export async function collectGeneratedRules(changeId, options = {}) {
   const resolvedChangeId = normalized.changeId;
   const generatedDir = path.join(rootDir, GENERATED_DIR);
   const fingerprints = await collectCurrentSpecFingerprints(rootDir, resolvedChangeId);
+  const trace = await readGeneratedRulesTrace(rootDir, generatedDir, resolvedChangeId);
   const expected = [
     {
       kind: 'merged',
       fileName: `openspec-merged-${resolvedChangeId}.md`,
-      expectedFingerprints: new Map([...fingerprints.base, ...fingerprints.delta])
+      expectedFingerprints: new Map([...fingerprints.base, ...fingerprints.delta]),
+      traceInputKinds: ['base-spec', 'delta-spec'],
+      traceOutputKind: 'merged-rules'
     },
     {
       kind: 'change',
       fileName: `openspec-change-${resolvedChangeId}.md`,
-      expectedFingerprints: fingerprints.delta
+      expectedFingerprints: fingerprints.delta,
+      traceInputKinds: ['delta-spec'],
+      traceOutputKind: 'change-rules'
     },
     {
       kind: 'base',
       fileName: 'openspec-base.md',
-      expectedFingerprints: fingerprints.base
+      expectedFingerprints: fingerprints.base,
+      traceInputKinds: ['base-spec'],
+      traceOutputKind: 'base-rules'
     }
   ];
   const generatedRules = [];
   const warnings = [];
+  let generatedMarkdownExists = false;
 
   for (const expectedFile of expected) {
     const filePath = path.join(generatedDir, expectedFile.fileName);
     const item = await readOptionalTextFile(rootDir, filePath);
-    const stale = item.exists
+    generatedMarkdownExists ||= item.exists;
+    const traceStale = item.exists && trace.exists && trace.valid
+      ? determineTraceStaleness(trace.inputs, expectedFile.expectedFingerprints, expectedFile.traceInputKinds)
+      : null;
+    const traceOutputStale = item.exists && trace.exists && trace.valid
+      ? determineTraceOutputStaleness(trace.outputs, item, expectedFile.traceOutputKind)
+      : null;
+    const markdownStale = item.exists && !(trace.exists && trace.valid)
       ? determineStaleness(item.content, expectedFile.expectedFingerprints)
       : null;
+    const stale = trace.exists && trace.valid
+      ? combineTraceStaleness(traceStale, traceOutputStale)
+      : markdownStale;
 
     generatedRules.push({
       kind: expectedFile.kind,
       path: item.path,
       exists: item.exists,
       stale,
+      staleSource: trace.exists && trace.valid
+        ? traceOutputStale === null ? 'trace' : 'trace-output'
+        : 'markdown',
+      trace: summarizeGeneratedRulesTrace(trace, stale),
       content: item.content
     });
 
@@ -233,6 +256,21 @@ export async function collectGeneratedRules(changeId, options = {}) {
         path: item.path
       });
     }
+  }
+
+  if (generatedMarkdownExists && !trace.exists) {
+    warnings.push({
+      code: 'missing-generated-rules-trace',
+      message: `Generated OpenSpec rules trace is missing: ${trace.path}`,
+      path: trace.path
+    });
+  } else if (generatedMarkdownExists && trace.exists && !trace.valid) {
+    warnings.push({
+      code: 'invalid-generated-rules-trace',
+      message: `Generated OpenSpec rules trace is invalid: ${trace.path}`,
+      path: trace.path,
+      detail: trace.error
+    });
   }
 
   return {
@@ -602,6 +640,197 @@ function determineStaleness(content, expectedFingerprints) {
   }
 
   return false;
+}
+
+async function readGeneratedRulesTrace(rootDir, generatedDir, changeId) {
+  const filePath = path.join(generatedDir, `${TRACE_FILE_PREFIX}${changeId}.json`);
+  const item = await readOptionalTextFile(rootDir, filePath);
+
+  if (!item.exists) {
+    return {
+      path: item.path,
+      exists: false,
+      valid: false,
+      stale: null,
+      inputs: [],
+      outputs: [],
+      content: '',
+      error: null
+    };
+  }
+
+  try {
+    const parsed = JSON.parse(item.content);
+    const rawInputs = parsed?.inputs;
+    const inputs = Array.isArray(rawInputs)
+      ? rawInputs.map(normalizeTraceInput).filter(Boolean)
+      : [];
+    const rawOutputs = parsed?.outputs;
+    const outputs = rawOutputs === undefined
+      ? []
+      : Array.isArray(rawOutputs)
+        ? rawOutputs.map(normalizeTraceOutput).filter(Boolean)
+        : [];
+
+    if (
+      parsed?.schema_version !== 1
+      || !Array.isArray(rawInputs)
+      || inputs.length !== rawInputs.length
+      || rawOutputs !== undefined && (!Array.isArray(rawOutputs) || outputs.length !== rawOutputs.length)
+    ) {
+      return {
+        path: item.path,
+        exists: true,
+        valid: false,
+        stale: null,
+        inputs: [],
+        outputs: [],
+        content: item.content,
+        error: 'Trace JSON must have schema_version 1 and valid inputs/outputs.'
+      };
+    }
+
+    return {
+      path: item.path,
+      exists: true,
+      valid: true,
+      stale: null,
+      inputs,
+      outputs,
+      content: item.content,
+      error: null
+    };
+  } catch (err) {
+    return {
+      path: item.path,
+      exists: true,
+      valid: false,
+      stale: null,
+      inputs: [],
+      outputs: [],
+      content: item.content,
+      error: err?.message ?? 'Invalid JSON.'
+    };
+  }
+}
+
+function normalizeTraceInput(input) {
+  if (
+    input === null
+    || typeof input !== 'object'
+    || typeof input.path !== 'string'
+    || typeof input.sha256 !== 'string'
+    || typeof input.kind !== 'string'
+  ) {
+    return null;
+  }
+
+  const sha256 = input.sha256.startsWith('sha256:')
+    ? input.sha256
+    : `sha256:${input.sha256}`;
+
+  return {
+    path: toPosix(input.path),
+    sha256,
+    kind: input.kind
+  };
+}
+
+function normalizeTraceOutput(output) {
+  if (
+    output === null
+    || typeof output !== 'object'
+    || typeof output.path !== 'string'
+    || typeof output.sha256 !== 'string'
+    || typeof output.kind !== 'string'
+  ) {
+    return null;
+  }
+
+  const sha256 = output.sha256.startsWith('sha256:')
+    ? output.sha256
+    : `sha256:${output.sha256}`;
+
+  return {
+    path: toPosix(output.path),
+    sha256,
+    kind: output.kind
+  };
+}
+
+function combineTraceStaleness(inputStale, outputStale) {
+  if (inputStale === true || outputStale === true) {
+    return true;
+  }
+
+  if (inputStale === false && (outputStale === false || outputStale === null)) {
+    return false;
+  }
+
+  return inputStale ?? outputStale;
+}
+
+function determineTraceStaleness(inputs, expectedFingerprints, traceInputKinds) {
+  const allowedKinds = new Set(traceInputKinds);
+  const actualFingerprints = new Map(
+    inputs
+      .filter((input) => allowedKinds.has(input.kind))
+      .map((input) => [input.path, input.sha256])
+  );
+
+  if (actualFingerprints.size === 0 && expectedFingerprints.size === 0) {
+    return false;
+  }
+
+  if (actualFingerprints.size === 0) {
+    return true;
+  }
+
+  if (actualFingerprints.size !== expectedFingerprints.size) {
+    return true;
+  }
+
+  for (const [relativePath, fingerprint] of expectedFingerprints) {
+    if (actualFingerprints.get(relativePath) !== fingerprint) {
+      return true;
+    }
+  }
+
+  for (const relativePath of actualFingerprints.keys()) {
+    if (!expectedFingerprints.has(relativePath)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function determineTraceOutputStaleness(outputs, generatedRule, traceOutputKind) {
+  if (!Array.isArray(outputs) || outputs.length === 0) {
+    return null;
+  }
+
+  const output = outputs.find((item) =>
+    item.path === generatedRule.path
+    || item.kind === traceOutputKind
+  );
+
+  if (output === undefined) {
+    return null;
+  }
+
+  return output.sha256 !== createFingerprint(generatedRule.content);
+}
+
+function summarizeGeneratedRulesTrace(trace, stale) {
+  return {
+    path: trace.path,
+    exists: trace.exists,
+    valid: trace.valid,
+    stale,
+    outputs: trace.outputs.length,
+    error: trace.error
+  };
 }
 
 function parseSourceFingerprints(content) {

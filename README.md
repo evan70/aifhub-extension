@@ -170,6 +170,8 @@ openspec/
       openspec-base.md
       openspec-change-<change-id>.md
       openspec-merged-<change-id>.md
+      openspec-rules-trace-<change-id>.json
+      index.json
 ```
 
 | Path | Ownership |

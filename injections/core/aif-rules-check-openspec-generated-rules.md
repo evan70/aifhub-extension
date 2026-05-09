@@ -39,7 +39,22 @@ Load rules in this priority order:
 
 OpenSpec-native mode does not require plan-local `rules.md`. Ignore plan-local `rules.md` unless the run is explicitly in Legacy AI Factory-only mode.
 
-If generated rules are missing or stale, return `WARN`, report which generated rules are present, missing, or stale, and ask the caller to regenerate rules through the compiler-owning workflow: `/aif-mode sync --change <change-id>`, then rerun `/aif-rules-check`. This gate must not regenerate or edit generated rules.
+Load generated trace metadata when present:
+
+- `.ai-factory/rules/generated/openspec-rules-trace-<change-id>.json`
+- `.ai-factory/rules/generated/index.json`
+
+Use trace metadata only as provenance for generated rules. Generated markdown remains the readable rule guidance; canonical OpenSpec artifacts remain the source of truth.
+
+Generated-rule `FAIL` findings require trace-backed source evidence:
+
+- cite `source.path`
+- cite `source.requirement`
+- keep the cited source aligned with `.ai-factory/rules/generated/openspec-rules-trace-<change-id>.json`
+
+If generated rules or generated trace metadata are missing, stale, or invalid, return `WARN`, report which generated rules and trace files are present, missing, stale, or invalid, and ask the caller to regenerate rules through the compiler-owning workflow: `/aif-mode sync --change <change-id>`, then rerun `/aif-rules-check`. This gate must not regenerate or edit generated rules.
+
+When generated trace metadata is missing or invalid, possible generated-rule findings are capped at `WARN`. Do not return final `status: "fail"` solely for a generated-rule finding unless that finding includes trace-backed `source.path` and `source.requirement`.
 
 Runtime state and QA evidence are external context only:
 

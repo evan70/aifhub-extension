@@ -10,15 +10,16 @@ import {
 } from './active-change-resolver.mjs';
 import {
   compileOpenSpecBaseRules,
-  collectOpenSpecRuleSources,
-  compileOpenSpecRules,
-  renderGeneratedRules
+  compileOpenSpecRules
 } from './openspec-rules-compiler.mjs';
 import {
   detectOpenSpec as defaultDetectOpenSpec,
   getOpenSpecStatus as defaultGetOpenSpecStatus,
   validateOpenSpecChange as defaultValidateOpenSpecChange
 } from './openspec-runner.mjs';
+import {
+  collectGeneratedRules as collectGeneratedRuleContext
+} from './openspec-execution-context.mjs';
 import {
   discoverLegacyPlans,
   migrateAllLegacyPlans
@@ -81,15 +82,18 @@ export async function getModeStatus(options = {}) {
   const detection = await detectOpenSpecCapability(rootDir, options);
   const openSpecChanges = await listOpenSpecChanges({ rootDir });
   const legacy = await discoverLegacyPlans({ rootDir });
-  const generatedRules = await inspectGeneratedRules({
-    ...options,
-    rootDir,
-    changeIds: selectRuleInspectionChanges(openSpecChanges)
-  });
   const activeChange = await inspectActiveChange({
     ...options,
     rootDir,
     changeId: options.changeId
+  });
+  const generatedRuleChangeIds = options.changeId !== undefined && activeChange.state === 'resolved'
+    ? [activeChange.changeId]
+    : selectRuleInspectionChanges(openSpecChanges);
+  const generatedRules = await inspectGeneratedRules({
+    ...options,
+    rootDir,
+    changeIds: generatedRuleChangeIds
   });
 
   return {
@@ -398,6 +402,8 @@ export async function doctorAifMode(options = {}) {
 
   if (status.generatedRules.state === 'ok') {
     diagnostics.push(pass('generated-rules', 'Generated rules are present and current.'));
+  } else if (status.generatedRules.state === 'warn') {
+    diagnostics.push(warn('generated-rules-warning', 'Generated rules have trace warnings.'));
   } else if (status.generatedRules.state === 'stale') {
     diagnostics.push(warn('generated-rules-stale', 'Generated rules are stale.'));
   } else {
@@ -667,11 +673,12 @@ export async function listOpenSpecChanges(options = {}) {
 export async function inspectGeneratedRules(options = {}) {
   const rootDir = resolveRootDir(options);
   const changeIds = Array.from(options.changeIds ?? []).map((item) => typeof item === 'string' ? item : item.id);
-  const expected = new Set(['openspec-base.md']);
+  const expected = new Set(['index.json', 'openspec-base.md']);
 
   for (const changeId of changeIds) {
     expected.add(`openspec-change-${changeId}.md`);
     expected.add(`openspec-merged-${changeId}.md`);
+    expected.add(`openspec-rules-trace-${changeId}.json`);
   }
 
   const missing = [];
@@ -692,7 +699,7 @@ export async function inspectGeneratedRules(options = {}) {
       continue;
     }
 
-    const collected = await collectOpenSpecRuleSources(normalized.changeId, {
+    const collected = await collectGeneratedRuleContext(normalized.changeId, {
       ...options,
       rootDir
     });
@@ -703,27 +710,29 @@ export async function inspectGeneratedRules(options = {}) {
       continue;
     }
 
-    const rendered = renderGeneratedRules(collected.sources, { changeId: normalized.changeId });
-    for (const file of rendered.files) {
-      const target = path.join(rootDir, '.ai-factory', 'rules', 'generated', file.fileName);
-      try {
-        const current = await readFile(target, 'utf8');
-        if (current !== file.content) {
-          stale.push(file.fileName);
-        }
-      } catch {
-        // Already reported as missing.
+    for (const rule of collected.generatedRules ?? []) {
+      const fileName = path.basename(rule.path);
+
+      if (!rule.exists) {
+        missing.push(fileName);
+      } else if (rule.stale === true) {
+        // Includes source-hash drift and generated markdown output hash drift.
+        stale.push(fileName);
       }
     }
   }
 
-  const state = stale.length > 0 ? 'stale' : missing.length > 0 ? 'missing' : 'ok';
+  const warningOnly = warnings.some((warning) =>
+    warning.code === 'missing-generated-rules-trace'
+    || warning.code === 'invalid-generated-rules-trace'
+  );
+  const state = stale.length > 0 ? 'stale' : missing.length > 0 ? 'missing' : warningOnly ? 'warn' : 'ok';
 
   return {
     ok: errors.length === 0,
     state,
     expected: [...expected].sort((left, right) => left.localeCompare(right)),
-    missing: missing.sort((left, right) => left.localeCompare(right)),
+    missing: [...new Set(missing)].sort((left, right) => left.localeCompare(right)),
     stale: [...new Set(stale)].sort((left, right) => left.localeCompare(right)),
     warnings: dedupeDiagnostics(warnings),
     errors
@@ -737,7 +746,12 @@ async function syncGeneratedRules(options = {}) {
   const results = [];
 
   if (changeIds.length === 0) {
-    const result = await compileOpenSpecBaseRules({ ...options, rootDir, dryRun });
+    const result = await compileOpenSpecBaseRules({
+      ...options,
+      rootDir,
+      dryRun,
+      resetIndexChanges: true
+    });
 
     return {
       ok: result.ok,
@@ -758,36 +772,7 @@ async function syncGeneratedRules(options = {}) {
   }
 
   for (const changeId of changeIds) {
-    if (dryRun) {
-      const collected = await collectOpenSpecRuleSources(changeId, { ...options, rootDir });
-      if (!collected.ok) {
-        results.push({
-          ok: false,
-          changeId,
-          files: [],
-          warnings: collected.warnings,
-          errors: collected.errors
-        });
-        continue;
-      }
-
-      const rendered = renderGeneratedRules(collected.sources, { changeId });
-      results.push({
-        ok: true,
-        dryRun: true,
-        changeId,
-        files: rendered.files.map((file) => ({
-          kind: file.kind,
-          relativePath: `.ai-factory/rules/generated/${file.fileName}`,
-          written: false
-        })),
-        warnings: collected.warnings,
-        errors: []
-      });
-      continue;
-    }
-
-    results.push(await compileOpenSpecRules(changeId, { ...options, rootDir }));
+    results.push(await compileOpenSpecRules(changeId, { ...options, rootDir, dryRun }));
   }
 
   return {
