@@ -26,6 +26,9 @@ import {
 import {
   getLatestGateResult
 } from './aif-gate-result.mjs';
+import {
+  validateOpenSpecArtifactContract as defaultValidateOpenSpecArtifactContract
+} from './openspec-artifact-validator.mjs';
 
 export const MODES = {
   openspec: 'openspec',
@@ -361,6 +364,7 @@ export async function doctorAifMode(options = {}) {
   const status = await getModeStatus({ ...options, rootDir });
   const openspecSettings = getOpenSpecSettings(status.config);
   const diagnostics = [];
+  let artifactContract = null;
 
   diagnostics.push(status.configExists && status.configMarker !== null
     ? pass('config-marker', `Config marker is ${status.configMarker}.`)
@@ -409,6 +413,14 @@ export async function doctorAifMode(options = {}) {
 
   if (status.mode === MODES.openspec && status.activeChange.state === 'resolved') {
     diagnostics.push(await inspectVerifyGateDiagnostic(rootDir, status));
+    const validateOpenSpecArtifactContract = options.validateOpenSpecArtifactContract ?? defaultValidateOpenSpecArtifactContract;
+    artifactContract = await validateOpenSpecArtifactContract({
+      ...options,
+      rootDir,
+      changeId: status.activeChange.changeId,
+      requireVerificationEvidence: true
+    });
+    diagnostics.push(renderArtifactContractDiagnostic(artifactContract));
   }
 
   if (status.mode === MODES.openspec && status.openspecCli.canValidate && status.activeChange.state === 'resolved') {
@@ -438,6 +450,7 @@ export async function doctorAifMode(options = {}) {
     ok: errors.length === 0,
     mode: status.mode,
     status,
+    artifactContract,
     diagnostics,
     warnings,
     errors
@@ -1842,6 +1855,32 @@ function warn(code, message) {
 
 function fail(code, message) {
   return { level: 'fail', code, message };
+}
+
+function renderArtifactContractDiagnostic(result) {
+  if (!result) {
+    return warn('aifhub-artifact-contract', 'AIFHub OpenSpec artifact contract validation did not run.');
+  }
+
+  const failed = (result.checks ?? []).filter((check) => check.status === 'fail');
+  const warned = (result.checks ?? []).filter((check) => check.status === 'warn');
+
+  if (result.status === 'pass') {
+    return pass('aifhub-artifact-contract', 'AIFHub OpenSpec artifact contract passes.');
+  }
+
+  if (result.status === 'warn') {
+    return warn(
+      'aifhub-artifact-contract',
+      `AIFHub OpenSpec artifact contract has ${warned.length} warning(s).`
+    );
+  }
+
+  const first = failed[0];
+  return fail(
+    'aifhub-artifact-contract',
+    `AIFHub OpenSpec artifact contract failed${first ? `: ${first.id}` : ''}.`
+  );
 }
 
 function createSkippedResult(reason) {

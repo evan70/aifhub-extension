@@ -25,6 +25,9 @@ import {
 import {
   getLatestGateResult
 } from './aif-gate-result.mjs';
+import {
+  validateOpenSpecArtifactContract as defaultValidateOpenSpecArtifactContract
+} from './openspec-artifact-validator.mjs';
 
 const execFileAsync = promisify(execFile);
 const MODE = 'openspec-native';
@@ -192,6 +195,13 @@ export async function buildDoneContext(options = {}) {
     rootDir,
     qaPath: layout.qaPath
   });
+  const validateOpenSpecArtifactContract = options.validateOpenSpecArtifactContract ?? defaultValidateOpenSpecArtifactContract;
+  const artifactContract = await validateOpenSpecArtifactContract({
+    ...options,
+    rootDir,
+    changeId: resolverResult.changeId,
+    requireVerificationEvidence: true
+  });
   const runtimeTraces = await collectRuntimeTraces(rootDir, layout.statePath);
   const openspec = await detectOpenSpecCapability(options, rootDir);
   const warnings = dedupeDiagnostics([
@@ -199,6 +209,7 @@ export async function buildDoneContext(options = {}) {
     ...canonical.warnings,
     ...generatedRules.warnings,
     ...verification.warnings,
+    ...artifactContractWarnings(artifactContract),
     ...runtimeTraces.warnings,
     ...openspec.warnings
   ]);
@@ -206,6 +217,7 @@ export async function buildDoneContext(options = {}) {
     ...canonical.errors,
     ...generatedRules.errors,
     ...verification.errors,
+    ...artifactContractErrors(artifactContract),
     ...runtimeTraces.errors,
     ...openspec.errors
   ];
@@ -225,6 +237,7 @@ export async function buildDoneContext(options = {}) {
     canonicalArtifacts: canonical.canonicalArtifacts,
     runtimeTraces: runtimeTraces.runtimeTraces,
     generatedRules: generatedRules.generatedRules,
+    artifactContract,
     warnings,
     errors
   };
@@ -359,6 +372,34 @@ export async function assertVerificationPassed(changeId, options = {}) {
     warnings: evidence.warnings ?? [],
     errors: []
   };
+}
+
+function artifactContractWarnings(result) {
+  if (!result || result.status !== 'warn') {
+    return [];
+  }
+
+  return (result.checks ?? [])
+    .filter((check) => check.status === 'warn')
+    .map((check) => ({
+      code: `artifact-contract-${check.id}`,
+      message: check.message,
+      path: check.path ?? undefined
+    }));
+}
+
+function artifactContractErrors(result) {
+  if (!result || result.status !== 'fail') {
+    return [];
+  }
+
+  return [
+    {
+      code: 'artifact-contract-failed',
+      message: 'Refusing to archive because AIFHub OpenSpec artifact contract validation failed.',
+      checks: (result.checks ?? []).filter((check) => check.status === 'fail')
+    }
+  ];
 }
 
 export async function archiveChangeWithOpenSpec(changeId, options = {}) {

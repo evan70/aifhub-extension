@@ -142,6 +142,49 @@ describe('runModeCommand', () => {
     assert.equal(parsed.mode, 'ai-factory');
     assert.equal(parsed.config.raw, undefined);
   });
+
+  it('includes the OpenSpec artifact contract result in doctor JSON output', async () => {
+    const rootDir = await createTempRoot();
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: openspec',
+      '  openspec:',
+      '    requireCliForDone: false',
+      'paths:',
+      '  plans: openspec/changes',
+      '  specs: openspec/specs',
+      '  state: .ai-factory/state',
+      '  qa: .ai-factory/qa',
+      '  generated_rules: .ai-factory/rules/generated',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'openspec/changes/add-oauth/proposal.md', '# Proposal\n');
+    await writeFixture(rootDir, 'openspec/config.yaml', 'mode: openspec\n');
+    await writeFixture(rootDir, 'openspec/specs/.gitkeep', '');
+    await writeFixture(rootDir, '.ai-factory/state/.gitkeep', '');
+    await writeFixture(rootDir, '.ai-factory/qa/.gitkeep', '');
+    await writeFixture(rootDir, '.ai-factory/rules/generated/.gitkeep', '');
+
+    const result = await runModeCommand(['doctor', '--change', 'add-oauth', '--json'], {
+      rootDir,
+      detectOpenSpec: async () => missingCliDetection(),
+      validateOpenSpecArtifactContract: async (options) => ({
+        schema_version: 1,
+        validator: 'aifhub-openspec-artifact-contract',
+        change_id: options.changeId,
+        status: 'pass',
+        blocking: false,
+        checks: [],
+        suggested_next: null
+      })
+    });
+    const parsed = JSON.parse(result.stdout);
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(parsed.artifactContract.validator, 'aifhub-openspec-artifact-contract');
+    assert.equal(parsed.artifactContract.change_id, 'add-oauth');
+    assert.ok(parsed.diagnostics.some((diagnostic) => diagnostic.code === 'aifhub-artifact-contract'));
+  });
 });
 
 describe('extension manifest', () => {

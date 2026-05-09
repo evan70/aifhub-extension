@@ -1,4 +1,4 @@
-[Previous Page](context-loading-policy.md) | [Back to Documentation](README.md) | [Next Page](legacy-plan-migration.md)
+[Previous Page](context-loading-policy.md) | [Back to Documentation](README.md) | [Next Page](openspec-validation.md)
 
 # OpenSpec Compatibility
 
@@ -81,9 +81,9 @@ paths:
 | `/aif-implement` | `openspec instructions apply --change <id>` when `useInstructionsApply` is enabled and CLI is available |
 | `/aif-verify` | `openspec validate`, optional `openspec status` evidence, and final `aif-gate-result` with `"gate": "verify"` |
 | `/aif-rules-check` | Upstream rules gate plus AIFHub generated-rules overlay for OpenSpec specs/deltas |
-| `/aif-done` | `openspec archive <change> --yes` when archive is required |
+| `/aif-done` | AIFHub artifact contract check, then `openspec archive <change> --yes` when archive is required |
 | `/aif-mode sync` | generated-rule compile plus validate/status according to sync flags |
-| `/aif-mode doctor` | CLI, Node, active change, generated rules, latest verify gate, and archive readiness diagnostics |
+| `/aif-mode doctor` | CLI, Node, active change, generated rules, latest verify gate, AIFHub artifact contract, and archive readiness diagnostics |
 
 Do not route users to OpenSpec slash commands such as `/opsx:propose`, `/opsx:apply`, or `/opsx:archive`.
 
@@ -223,9 +223,12 @@ openspec archive <change-id> --yes --no-color
 
 `/aif-done --skip-specs` may add `--skip-specs` for docs/tooling-only changes.
 
+AIFHub artifact contract validation is a separate read-only layer over the CLI adapter. It checks workflow ownership, runtime evidence placement, generated-rule freshness, and pre-archive verification evidence. See [OpenSpec Artifact Validation](openspec-validation.md).
+
 ## See Also
 
 - [Usage](usage.md)
 - [Context Loading Policy](context-loading-policy.md)
+- [OpenSpec Artifact Validation](openspec-validation.md)
 - [Active Change Resolver](active-change-resolver.md)
 - [ADR 0001](adr/0001-openspec-native-artifact-protocol.md)
