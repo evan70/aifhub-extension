@@ -402,7 +402,7 @@ export function parseCoverageMatrixArgs(argv = []) {
     const normalized = normalizeChangeId(result.changeId);
     if (!normalized.ok) {
       result.ok = false;
-      result.errors.push(...normalized.errors);
+      result.errors.push(...normalizeChangeIdMessages(normalized));
     } else {
       result.changeId = normalized.changeId;
     }
@@ -440,7 +440,7 @@ async function resolveCoverageChange(rootDir, options) {
     const normalized = normalizeChangeId(options.changeId);
     return normalized.ok
       ? { ok: true, changeId: normalized.changeId, source: 'explicit', errors: [] }
-      : { ok: false, changeId: null, source: 'explicit', errors: normalized.errors };
+      : { ok: false, changeId: null, source: 'explicit', errors: normalizeChangeIdMessages(normalized) };
   }
 
   const resolver = options.resolveActiveChange ?? defaultResolveActiveChange;
@@ -512,9 +512,19 @@ function resolveRootDir(rootDir) {
 function normalizeCoverageChangeId(changeId) {
   const normalized = normalizeChangeId(changeId);
   if (!normalized.ok) {
-    throw new Error(normalized.errors.join('; '));
+    throw new Error(normalizeChangeIdMessages(normalized).join('; '));
   }
   return normalized;
+}
+
+function normalizeChangeIdMessages(normalized) {
+  const errors = Array.isArray(normalized?.errors)
+    ? normalized.errors
+    : normalized?.error
+      ? [normalized.error]
+      : [];
+  const messages = errors.map((error) => error?.message ?? String(error)).filter(Boolean);
+  return messages.length > 0 ? messages : ['Invalid OpenSpec change id.'];
 }
 
 function emptyCoverageMatrix(changeId, policy, status, blocking, warnings, errors) {

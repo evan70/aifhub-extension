@@ -283,6 +283,10 @@ describe('OpenSpec coverage matrix', () => {
     const invalid = parseCoverageMatrixArgs(['--policy', 'hard']);
     assert.equal(invalid.ok, false);
     assert.match(invalid.errors[0], /Unsupported coverage policy/);
+
+    const invalidChange = parseCoverageMatrixArgs(['--change', '../bad']);
+    assert.equal(invalidChange.ok, false);
+    assert.match(invalidChange.errors[0], /Invalid OpenSpec change id/);
   });
 
   it('runs the CLI with deterministic JSON output and exit codes', async () => {
@@ -340,6 +344,35 @@ describe('OpenSpec coverage matrix', () => {
 
     assert.equal(invalid.result, 2);
     assert.equal(JSON.parse(invalid.stdout).ok, false);
+
+    const invalidChange = await captureStdout(() => runCoverageMatrixCommand([
+      '--change',
+      '../bad',
+      '--json'
+    ], {
+      rootDir: failRoot
+    }));
+
+    assert.equal(invalidChange.result, 2);
+    assert.match(JSON.parse(invalidChange.stdout).errors[0], /Invalid OpenSpec change id/);
+  });
+
+  it('rejects invalid change ids with meaningful helper errors', async () => {
+    const rootDir = await createTempRoot();
+
+    await assert.rejects(
+      () => readOpenSpecCoverageMatrix('../bad', { rootDir }),
+      /Invalid OpenSpec change id/
+    );
+    await assert.rejects(
+      () => writeOpenSpecCoverageMatrix('../bad', {
+        schema_version: 1,
+        change_id: '../bad',
+        requirements: [],
+        summary: { covered: 0, partial: 0, missing: 0, not_applicable: 0 }
+      }, { rootDir }),
+      /Invalid OpenSpec change id/
+    );
   });
 
   it('persists exact source fingerprints in coverage.json', async () => {
