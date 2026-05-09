@@ -7,6 +7,7 @@ import path from 'node:path';
 
 import {
   archiveChangeWithOpenSpec,
+  assertCoverageAcceptable,
   assertVerificationPassed,
   buildDoneContext,
   detectWorkingTreeState,
@@ -180,6 +181,46 @@ function verificationEvidence(overrides = {}) {
   };
 }
 
+function coverageMatrix(overrides = {}) {
+  return {
+    schema_version: 1,
+    change_id: overrides.changeId ?? 'add-oauth',
+    status: overrides.status ?? 'pass',
+    blocking: overrides.status === 'fail',
+    policy: {
+      mode: overrides.policy ?? 'strict',
+      missing_requirement: overrides.policy === 'normal' ? 'warn' : 'fail'
+    },
+    requirements: overrides.requirements ?? [],
+    summary: overrides.summary ?? {
+      covered: 0,
+      partial: 0,
+      missing: 0,
+      not_applicable: 0
+    },
+    sources: overrides.sources ?? [],
+    stale: false,
+    diagnostics: overrides.diagnostics ?? [],
+    warnings: [],
+    errors: []
+  };
+}
+
+function coverageEvidence(overrides = {}) {
+  return {
+    ok: overrides.ok ?? true,
+    exists: overrides.exists ?? true,
+    stale: overrides.stale ?? false,
+    changeId: overrides.changeId ?? 'add-oauth',
+    coveragePath: overrides.coveragePath ?? null,
+    relativePath: overrides.relativePath ?? '.ai-factory/qa/add-oauth/coverage.json',
+    coverage: overrides.coverage ?? coverageMatrix(overrides),
+    diagnostics: overrides.diagnostics ?? [],
+    warnings: overrides.warnings ?? [],
+    errors: overrides.errors ?? []
+  };
+}
+
 afterEach(async () => {
   await Promise.all(tempRoots.splice(0).map((rootDir) => rm(rootDir, {
     recursive: true,
@@ -192,6 +233,7 @@ describe('OpenSpec done finalizer API', () => {
     for (const fn of [
       finalizeOpenSpecChange,
       buildDoneContext,
+      assertCoverageAcceptable,
       assertVerificationPassed,
       archiveChangeWithOpenSpec,
       writeDoneSummary,
@@ -211,7 +253,8 @@ describe('OpenSpec done finalizer API', () => {
       rootDir,
       changeId: 'add-oauth',
       detectOpenSpec: async () => availableCliDetection(),
-      readLatestVerificationEvidence: async () => verificationEvidence()
+      readLatestVerificationEvidence: async () => verificationEvidence(),
+      readOpenSpecCoverageMatrix: async () => coverageEvidence()
     });
 
     assert.equal(context.ok, true);
@@ -267,6 +310,7 @@ describe('OpenSpec done finalizer API', () => {
       })),
       ''
     ].join('\n'));
+    await writeFixture(rootDir, 'custom-qa/add-oauth/coverage.json', JSON.stringify(coverageMatrix(), null, 2));
 
     const context = await buildDoneContext({
       rootDir,
@@ -390,6 +434,51 @@ describe('OpenSpec done finalizer API', () => {
     });
     assert.equal(failedGate.ok, false);
     assert.equal(failedGate.errors[0].code, 'verification-gate-failed');
+  });
+
+  it('requires current coverage evidence before finalization', async () => {
+    const missing = await assertCoverageAcceptable('add-oauth', {
+      readOpenSpecCoverageMatrix: async () => coverageEvidence({
+        ok: false,
+        exists: false,
+        coverage: null,
+        warnings: ['missing']
+      })
+    });
+    assert.equal(missing.ok, false);
+    assert.equal(missing.errors[0].code, 'coverage-evidence-missing');
+
+    const stale = await assertCoverageAcceptable('add-oauth', {
+      readOpenSpecCoverageMatrix: async () => coverageEvidence({
+        stale: true,
+        warnings: ['stale']
+      })
+    });
+    assert.equal(stale.ok, false);
+    assert.equal(stale.errors[0].code, 'coverage-evidence-stale');
+
+    const failed = await assertCoverageAcceptable('add-oauth', {
+      readOpenSpecCoverageMatrix: async () => coverageEvidence({
+        coverage: coverageMatrix({
+          status: 'fail',
+          summary: { covered: 0, partial: 0, missing: 1, not_applicable: 0 }
+        })
+      })
+    });
+    assert.equal(failed.ok, false);
+    assert.equal(failed.errors[0].code, 'coverage-policy-failed');
+
+    const warned = await assertCoverageAcceptable('add-oauth', {
+      readOpenSpecCoverageMatrix: async () => coverageEvidence({
+        coverage: coverageMatrix({
+          status: 'warn',
+          policy: 'normal',
+          summary: { covered: 0, partial: 0, missing: 1, not_applicable: 0 }
+        })
+      })
+    });
+    assert.equal(warned.ok, true);
+    assert.equal(warned.warnings[0].code, 'coverage-policy-warn');
   });
 
   it('detects dirty working tree state and records it only when explicit', async () => {
@@ -540,6 +629,7 @@ describe('OpenSpec done finalizer API', () => {
       changeId: 'add-oauth',
       detectOpenSpec: async () => availableCliDetection(),
       readLatestVerificationEvidence: async () => verificationEvidence(),
+      readOpenSpecCoverageMatrix: async () => coverageEvidence(),
       validateOpenSpecArtifactContract: async () => ({
         schema_version: 1,
         validator: 'aifhub-openspec-artifact-contract',
@@ -580,6 +670,7 @@ describe('OpenSpec done finalizer API', () => {
       getOpenSpecStatus: async () => statusResult(),
       gitStatus: async () => ({ exitCode: 0, stdout: '', stderr: '' }),
       readLatestVerificationEvidence: async () => verificationEvidence(),
+      readOpenSpecCoverageMatrix: async () => coverageEvidence(),
       archiveOpenSpecChange: async () => archiveResult()
     });
 
@@ -587,6 +678,7 @@ describe('OpenSpec done finalizer API', () => {
     assert.equal(result.archive.archived, true);
     assert.match(result.commitMessage, /^feat: finalize add-oauth$/);
     assert.match(result.prSummary, /## OpenSpec/);
+    assert.match(result.prSummary, /Coverage matrix: PASS/);
     assert.match(summarizeDoneResult(result), /Finalization status: PASS/);
 
     const donePath = path.join(rootDir, '.ai-factory', 'qa', 'add-oauth', 'done.md');
@@ -594,6 +686,7 @@ describe('OpenSpec done finalizer API', () => {
     assert.equal(await pathExists(donePath), true, 'done.md should be written under QA path');
     assert.equal(await pathExists(finalSummaryPath), true, 'final-summary.md should be written under state path');
     assert.match(await readFile(donePath, 'utf8'), /# Done: add-oauth/);
+    assert.match(await readFile(donePath, 'utf8'), /Coverage matrix: PASS/);
     assert.match(await readFile(donePath, 'utf8'), /Archived: yes/);
     assert.match(await readFile(finalSummaryPath, 'utf8'), /## Suggested PR summary/);
     assert.equal(await pathExists(path.join(rootDir, 'openspec', 'changes', 'add-oauth', 'done.md')), false);
@@ -611,6 +704,7 @@ describe('OpenSpec done finalizer API', () => {
       detectOpenSpec: async () => availableCliDetection(),
       gitStatus: async () => ({ exitCode: 0, stdout: ' M README.md\n', stderr: '' }),
       readLatestVerificationEvidence: async () => verificationEvidence(),
+      readOpenSpecCoverageMatrix: async () => coverageEvidence(),
       archiveOpenSpecChange: async () => archiveResult()
     });
 

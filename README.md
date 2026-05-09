@@ -160,6 +160,7 @@ openspec/
   qa/
     <change-id>/
       verify.md
+      coverage.json
       openspec-validation.json
       openspec-status.json
       openspec-archive.json
@@ -259,6 +260,7 @@ Switching to AI Factory-only mode updates the legacy path profile and preserves 
 | Invalid delta spec | Fix `openspec/changes/<change-id>/specs/**/spec.md`, then rerun `/aif-verify <change-id>`. |
 | Ambiguous active change | Pass an explicit `<change-id>` or update `.ai-factory/state/current.yaml`. |
 | Missing or stale generated rules | Regenerate derived rules from OpenSpec specs before relying on rules guidance. |
+| Missing or stale coverage | Rerun `/aif-verify <change-id>` to refresh `.ai-factory/qa/<change-id>/coverage.json` before `/aif-done`. |
 | Dirty working tree before `/aif-done` | Commit, stash, or explicitly allow the dirty state only when the finalizer supports that path. |
 
 ## Documentation
@@ -270,6 +272,7 @@ Switching to AI Factory-only mode updates the legacy path profile and preserves 
 | [Context Loading Policy](docs/context-loading-policy.md) | Consumer context, GitHub-aware roadmap evidence, ownership, and legacy boundaries |
 | [OpenSpec Compatibility](docs/openspec-compatibility.md) | Optional CLI adapter policy and capability flags |
 | [OpenSpec Artifact Validation](docs/openspec-validation.md) | Read-only AIFHub contract validator for OpenSpec-native artifacts |
+| [OpenSpec Coverage Matrix](docs/spec-coverage.md) | Requirement-to-code coverage artifact and verify/done policy |
 | [Legacy Plan Migration](docs/legacy-plan-migration.md) | Explicit migration from legacy plans to OpenSpec-native changes |
 | [Active Change Resolver](docs/active-change-resolver.md) | Active change selection and runtime paths |
 | [ADR 0001](docs/adr/0001-openspec-native-artifact-protocol.md) | v1 artifact ownership decision |

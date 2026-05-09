@@ -28,6 +28,10 @@ import {
 import {
   validateOpenSpecArtifactContract as defaultValidateOpenSpecArtifactContract
 } from './openspec-artifact-validator.mjs';
+import {
+  readOpenSpecCoverageMatrix,
+  summarizeOpenSpecCoverage
+} from './openspec-coverage-matrix.mjs';
 
 const execFileAsync = promisify(execFile);
 const MODE = 'openspec-native';
@@ -195,6 +199,11 @@ export async function buildDoneContext(options = {}) {
     rootDir,
     qaPath: layout.qaPath
   });
+  const coverage = await assertCoverageAcceptable(resolverResult.changeId, {
+    ...options,
+    rootDir,
+    qaPath: layout.qaPath
+  });
   const validateOpenSpecArtifactContract = options.validateOpenSpecArtifactContract ?? defaultValidateOpenSpecArtifactContract;
   const artifactContract = await validateOpenSpecArtifactContract({
     ...options,
@@ -209,6 +218,7 @@ export async function buildDoneContext(options = {}) {
     ...canonical.warnings,
     ...generatedRules.warnings,
     ...verification.warnings,
+    ...coverage.warnings,
     ...artifactContractWarnings(artifactContract),
     ...runtimeTraces.warnings,
     ...openspec.warnings
@@ -217,6 +227,7 @@ export async function buildDoneContext(options = {}) {
     ...canonical.errors,
     ...generatedRules.errors,
     ...verification.errors,
+    ...coverage.errors,
     ...artifactContractErrors(artifactContract),
     ...runtimeTraces.errors,
     ...openspec.errors
@@ -233,6 +244,7 @@ export async function buildDoneContext(options = {}) {
       qa: layout.qaPath
     },
     verification: verification.verification,
+    coverage: coverage.coverage,
     openspec: openspec.openspec,
     canonicalArtifacts: canonical.canonicalArtifacts,
     runtimeTraces: runtimeTraces.runtimeTraces,
@@ -371,6 +383,90 @@ export async function assertVerificationPassed(changeId, options = {}) {
     verification: normalizeVerificationSummary(evidence, true),
     warnings: evidence.warnings ?? [],
     errors: []
+  };
+}
+
+export async function assertCoverageAcceptable(changeId, options = {}) {
+  const rootDir = resolveRootDir(options);
+  const normalized = normalizeChangeId(changeId);
+
+  if (!normalized.ok) {
+    return createCoverageFailure({
+      changeId: null,
+      code: normalized.error.code,
+      message: normalized.error.message,
+      coverage: null
+    });
+  }
+
+  const readCoverage = options.readOpenSpecCoverageMatrix ?? readOpenSpecCoverageMatrix;
+  const coverage = await readCoverage(normalized.changeId, {
+    ...options,
+    rootDir
+  });
+
+  if (!coverage?.exists) {
+    return createCoverageFailure({
+      changeId: normalized.changeId,
+      code: 'coverage-evidence-missing',
+      message: `Run /aif-verify ${normalized.changeId} before /aif-done so coverage.json is generated.`,
+      coverage
+    });
+  }
+
+  if (!coverage.ok) {
+    return createCoverageFailure({
+      changeId: normalized.changeId,
+      code: 'coverage-evidence-invalid',
+      message: 'Refusing to archive because coverage evidence is invalid.',
+      coverage
+    });
+  }
+
+  if (coverage.stale) {
+    return createCoverageFailure({
+      changeId: normalized.changeId,
+      code: 'coverage-evidence-stale',
+      message: 'Refusing to archive because coverage evidence is stale. Rerun /aif-verify.',
+      coverage
+    });
+  }
+
+  if (coverage.coverage?.status === 'fail') {
+    return createCoverageFailure({
+      changeId: normalized.changeId,
+      code: 'coverage-policy-failed',
+      message: 'Refusing to archive because OpenSpec coverage policy failed.',
+      coverage
+    });
+  }
+
+  return {
+    ok: true,
+    changeId: normalized.changeId,
+    coverage: coverage.coverage,
+    warnings: coverage.coverage?.status === 'warn'
+      ? [{
+        code: 'coverage-policy-warn',
+        message: 'OpenSpec coverage completed with warnings accepted by policy.'
+      }]
+      : [],
+    errors: []
+  };
+}
+
+function createCoverageFailure({ changeId, code, message, coverage }) {
+  return {
+    ok: false,
+    changeId,
+    coverage: coverage?.coverage ?? null,
+    warnings: coverage?.warnings ?? [],
+    errors: [
+      {
+        code,
+        message
+      }
+    ]
   };
 }
 
@@ -1096,6 +1192,7 @@ function createContextFailure({ changeId, source, candidates = [], warnings = []
         content: ''
       }
     },
+    coverage: null,
     openspec: {
       available: false,
       canArchive: false,
@@ -1129,6 +1226,7 @@ function createCommitMessage(changeId) {
 function createPrSummary({ changeId, context, archive }) {
   const validationState = summarizeValidationState(context?.verification?.validation);
   const codeState = summarizeCodeState(context?.verification?.verify?.content);
+  const coverageState = context?.coverage?.status ? context.coverage.status.toUpperCase() : 'UNKNOWN';
   return [
     '## Summary',
     '',
@@ -1146,9 +1244,11 @@ function createPrSummary({ changeId, context, archive }) {
     '- /aif-verify: PASS',
     `- OpenSpec validation: ${validationState}`,
     `- Code verification: ${codeState}`,
+    `- Coverage matrix: ${coverageState}`,
     '',
     '## Artifacts',
     '',
+    `- .ai-factory/qa/${changeId}/coverage.json`,
     `- .ai-factory/qa/${changeId}/done.md`,
     `- .ai-factory/qa/${changeId}/openspec-archive.json`,
     `- .ai-factory/state/${changeId}/final-summary.md`,
@@ -1162,7 +1262,7 @@ function renderDoneMarkdown(changeId, summary) {
   const verificationGate = context?.verification?.passed ? 'PASS' : 'FAIL';
   const finalizationStatus = summary.status ?? (summary.ok ? 'PASS' : 'FAIL');
   const canonicalPaths = collectCanonicalArtifactPaths(context.canonicalArtifacts);
-  const qaEvidencePaths = collectQaEvidencePaths(changeId, context.verification);
+  const qaEvidencePaths = collectQaEvidencePaths(changeId, context.verification, context.coverage);
   const runtimeTracePaths = Array.isArray(context.runtimeTraces)
     ? context.runtimeTraces.map((trace) => trace.path)
     : [];
@@ -1182,6 +1282,10 @@ function renderDoneMarkdown(changeId, summary) {
     '',
     `Archived: ${archive.archived ? 'yes' : 'no'}`,
     `Skip specs: ${archive.skipSpecs ? 'yes' : 'no'}`,
+    '',
+    '## Coverage matrix',
+    '',
+    ...summarizeOpenSpecCoverage(context.coverage).split('\n'),
     '',
     '## Canonical artifacts finalized',
     '',
@@ -1241,9 +1345,10 @@ function collectCanonicalArtifactPaths(canonicalArtifacts = {}) {
   return paths;
 }
 
-function collectQaEvidencePaths(changeId, verification) {
+function collectQaEvidencePaths(changeId, verification, coverage) {
   const paths = [
     verification?.verify?.path,
+    coverage ? `.ai-factory/qa/${changeId}/coverage.json` : null,
     `.ai-factory/qa/${changeId}/${ARCHIVE_JSON}`,
     `.ai-factory/qa/${changeId}/${DONE_MARKDOWN}`
   ].filter(Boolean);

@@ -22,6 +22,12 @@ import {
   getLatestGateResult,
   renderGateResultBlock
 } from './aif-gate-result.mjs';
+import {
+  buildOpenSpecCoverageMatrix,
+  readOpenSpecCoverageMatrix,
+  summarizeOpenSpecCoverage,
+  writeOpenSpecCoverageMatrix
+} from './openspec-coverage-matrix.mjs';
 
 const MODE = 'openspec-native';
 const DEFAULT_QA_DIR = path.join('.ai-factory', 'qa');
@@ -130,7 +136,8 @@ export async function runOpenSpecVerification(changeId, options = {}) {
   }, {
     ...options,
     rootDir,
-    qaPath: layout.qaPath
+    qaPath: layout.qaPath,
+    statePath: layout.statePath
   });
 
   return {
@@ -187,6 +194,22 @@ export async function writeVerificationEvidence(changeId, evidence, options = {}
     files.push(toPosix(path.relative(rootDir, path.join(qaPath, STATUS_FILE))));
   }
 
+  const coverage = evidence.coverage ?? await buildOpenSpecCoverageMatrix({
+    ...options,
+    rootDir,
+    changeId: normalized.changeId,
+    qaPath,
+    generatedRules: evidence.generatedRules ?? [],
+    skipVerifyEvidence: true,
+    policy: evidence.policy ?? options.policy
+  });
+  const coverageEvidence = await writeOpenSpecCoverageMatrix(normalized.changeId, coverage, {
+    ...options,
+    rootDir,
+    qaPath
+  });
+  files.push(coverageEvidence.relativePath);
+
   const summary = summarizeOpenSpecValidation({
     ok: Array.isArray(evidence.errors) ? evidence.errors.length === 0 : validation.ok,
     changeId: normalized.changeId,
@@ -196,10 +219,14 @@ export async function writeVerificationEvidence(changeId, evidence, options = {}
       status
     },
     generatedRules: evidence.generatedRules ?? [],
+    coverage,
     warnings: evidence.warnings ?? [],
     errors: evidence.errors ?? []
   });
-  const gateResult = evidence.gateResult ?? createVerifyGateResult(normalized.changeId, evidence);
+  const gateResult = evidence.gateResult ?? createVerifyGateResult(normalized.changeId, {
+    ...evidence,
+    coverage
+  });
   await writeFile(path.join(qaPath, VERIFY_FILE), `${summary}\n\n${renderGateResultBlock(gateResult)}\n`, 'utf8');
   files.push(toPosix(path.relative(rootDir, path.join(qaPath, VERIFY_FILE))));
 
@@ -248,6 +275,11 @@ export async function readLatestVerificationEvidence(changeId, options = {}) {
   const gateResult = verifyContent.exists
     ? getLatestGateResult(verifyContent.value, { gate: 'verify' })
     : null;
+  const coverage = await readOpenSpecCoverageMatrix(normalized.changeId, {
+    ...options,
+    rootDir,
+    qaPath
+  });
 
   return {
     ok: validation.exists,
@@ -260,6 +292,7 @@ export async function readLatestVerificationEvidence(changeId, options = {}) {
       content: verifyContent.value
     },
     gateResult,
+    coverage,
     warnings: validation.exists ? [] : [
       {
         code: 'verification-evidence-missing',
@@ -274,12 +307,22 @@ function createVerifyGateResult(changeId, evidence) {
   const errors = Array.isArray(evidence.errors) ? evidence.errors : [];
   const warnings = Array.isArray(evidence.warnings) ? evidence.warnings : [];
   const shouldRunCodeVerification = evidence.shouldRunCodeVerification !== false;
-  const failed = errors.length > 0 || !shouldRunCodeVerification;
-  const diagnostics = failed ? errors : warnings;
+  const coverage = evidence.coverage ?? null;
+  const coverageErrors = coverage?.status === 'fail'
+    ? coverageDiagnostics(coverage, 'error')
+    : [];
+  const coverageWarnings = coverage?.status === 'warn'
+    ? coverageDiagnostics(coverage, 'warning')
+    : [];
+  const failed = errors.length > 0 || coverageErrors.length > 0 || !shouldRunCodeVerification;
+  const diagnostics = failed
+    ? [...errors, ...coverageErrors]
+    : [...warnings, ...coverageWarnings];
+  const status = failed ? 'fail' : diagnostics.length > 0 ? 'warn' : 'pass';
 
   return createGateResult({
     gate: 'verify',
-    status: failed ? 'fail' : 'warn',
+    status,
     blockers: diagnostics.map((item, index) => ({
       id: item.code ?? `verify-${index + 1}`,
       severity: failed ? 'error' : 'warning',
@@ -294,6 +337,28 @@ function createVerifyGateResult(changeId, evidence) {
       }
       : null
   });
+}
+
+function coverageDiagnostics(coverage, severity) {
+  const diagnostics = Array.isArray(coverage?.diagnostics) ? coverage.diagnostics : [];
+  const matching = diagnostics
+    .filter((diagnostic) => severity === 'error'
+      ? diagnostic.severity === 'error'
+      : diagnostic.severity !== 'error')
+    .map((diagnostic) => ({
+      code: diagnostic.code,
+      message: diagnostic.message,
+      path: '.ai-factory/qa'
+    }));
+
+  if (matching.length > 0) {
+    return matching;
+  }
+
+  return [{
+    code: `coverage-${coverage?.status ?? 'unknown'}`,
+    message: `OpenSpec coverage matrix status is ${coverage?.status ?? 'unknown'}.`
+  }];
 }
 
 export function summarizeOpenSpecValidation(result, options = {}) {
@@ -319,6 +384,10 @@ export function summarizeOpenSpecValidation(result, options = {}) {
     '## Generated rules',
     '',
     ...renderGeneratedRulesSummary(result?.generatedRules),
+    '',
+    '## Coverage',
+    '',
+    ...summarizeOpenSpecCoverage(result?.coverage).split('\n'),
     '',
     '## Diagnostics',
     '',
