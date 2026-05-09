@@ -27,7 +27,7 @@ Generated rules are derived artifacts:
 .ai-factory/rules/generated/index.json
 ```
 
-They may be overwritten by sync, but canonical OpenSpec artifacts must remain unchanged. Missing or invalid generated trace metadata is warning-only for rules gates; rerun `/aif-mode sync --change <change-id>` to refresh it.
+They may be overwritten by sync, but canonical OpenSpec artifacts must remain unchanged. Trace metadata records source input hashes and generated markdown output hashes, so status/doctor can detect both stale specs and manual edits to generated rule text. Missing or invalid generated trace metadata is warning-only for rules gates; rerun `/aif-mode sync --change <change-id>` to refresh it.
 
 OpenSpec CLI use is adapter-only. Do not call OpenSpec slash commands or install OpenSpec command layers; `/aif-mode` stays the orchestration surface.
 

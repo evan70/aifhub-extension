@@ -170,6 +170,67 @@ describe('mode status', () => {
     assert.ok(status.generatedRules.warnings.some((warning) => warning.code === 'missing-generated-rules-trace'));
   });
 
+  it('reports generated rules stale when traced markdown output is edited', async () => {
+    const rootDir = await createTempRoot();
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: openspec',
+      'paths:',
+      '  plans: openspec/changes',
+      '  specs: openspec/specs',
+      '  state: .ai-factory/state',
+      '  qa: .ai-factory/qa',
+      '  generated_rules: .ai-factory/rules/generated',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'openspec/config.yaml', 'project: test\n');
+    await writeFixture(rootDir, 'openspec/specs/auth/spec.md', [
+      '# Auth',
+      '',
+      '## Requirements',
+      '',
+      '### Requirement: Existing Auth',
+      '',
+      'The system MUST preserve existing authentication.',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'openspec/changes/add-oauth/proposal.md', '# Proposal\n');
+    await writeFixture(rootDir, 'openspec/changes/add-oauth/design.md', '# Design\n');
+    await writeFixture(rootDir, 'openspec/changes/add-oauth/tasks.md', '# Tasks\n');
+    await writeFixture(rootDir, 'openspec/changes/add-oauth/specs/auth/spec.md', [
+      '# Auth Delta',
+      '',
+      '## ADDED Requirements',
+      '',
+      '### Requirement: OAuth Login',
+      '',
+      'The system MUST support OAuth login.',
+      ''
+    ].join('\n'));
+    const sync = await syncOpenSpecArtifacts({
+      rootDir,
+      changeId: 'add-oauth',
+      detectOpenSpec: async () => missingCliDetection(),
+      getCurrentBranch: async () => 'feat/add-oauth',
+      timestamp: '2026-04-29T01-00-00-000Z'
+    });
+    assert.equal(sync.ok, true);
+    const mergedPath = '.ai-factory/rules/generated/openspec-merged-add-oauth.md';
+    const merged = await readFixture(rootDir, mergedPath);
+    await writeFixture(rootDir, mergedPath, `${merged}\nManual edit.\n`);
+
+    const status = await getModeStatus({
+      rootDir,
+      changeId: 'add-oauth',
+      detectOpenSpec: async () => missingCliDetection(),
+      getCurrentBranch: async () => 'feat/add-oauth'
+    });
+
+    assert.equal(status.generatedRules.state, 'stale');
+    assert.deepEqual(status.generatedRules.stale, ['openspec-merged-add-oauth.md']);
+    assert.ok(status.generatedRules.warnings.some((warning) => warning.code === 'stale-generated-rules'));
+  });
+
   it('limits generated-rule status inspection to an explicit change when provided', async () => {
     const rootDir = await createTempRoot();
     await writeFixture(rootDir, '.ai-factory/config.yaml', [

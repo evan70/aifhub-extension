@@ -267,9 +267,27 @@ export function renderGeneratedRules(sources, options = {}) {
     emptyMessage: 'No OpenSpec requirements found.'
   });
   const traceFileName = `${TRACE_FILE_PREFIX}${changeId}.json`;
+  const markdownFiles = [
+    {
+      kind: 'base',
+      fileName: BASE_FILE,
+      content: baseContent
+    },
+    {
+      kind: 'change',
+      fileName: `openspec-change-${changeId}.md`,
+      content: changeContent
+    },
+    {
+      kind: 'merged',
+      fileName: `openspec-merged-${changeId}.md`,
+      content: mergedContent
+    }
+  ];
   const traceContent = renderTraceDocument(sortedSources, {
     changeId,
-    generatedAt
+    generatedAt,
+    outputs: renderTraceOutputs(markdownFiles)
   });
 
   return {
@@ -280,21 +298,7 @@ export function renderGeneratedRules(sources, options = {}) {
     indexBase: renderIndexBaseEntry(baseSources),
     indexEntry: renderIndexChangeEntry(changeId, traceFileName, generatedAt),
     files: [
-      {
-        kind: 'base',
-        fileName: BASE_FILE,
-        content: baseContent
-      },
-      {
-        kind: 'change',
-        fileName: `openspec-change-${changeId}.md`,
-        content: changeContent
-      },
-      {
-        kind: 'merged',
-        fileName: `openspec-merged-${changeId}.md`,
-        content: mergedContent
-      },
+      ...markdownFiles,
       {
         kind: 'trace',
         fileName: traceFileName,
@@ -440,7 +444,7 @@ async function writeGeneratedBaseRules(content, options = {}) {
     generatedAt: options.generatedAt ?? resolveGeneratedAt(options),
     base: options.indexBase ?? renderIndexBaseEntry([]),
     dryRun: false,
-    resetChanges: true
+    resetChanges: Boolean(options.resetIndexChanges)
   });
 
   return createWriteResult({
@@ -559,7 +563,7 @@ function createGeneratedFileResult({ kind, rootDir, targetPath, written }) {
   };
 }
 
-function renderTraceDocument(sources, { changeId, generatedAt }) {
+function renderTraceDocument(sources, { changeId, generatedAt, outputs = [] }) {
   const inputs = renderTraceInputs(sources);
   const rules = renderTraceRules(sources);
 
@@ -569,6 +573,7 @@ function renderTraceDocument(sources, { changeId, generatedAt }) {
     change_id: changeId,
     generated_at: generatedAt,
     inputs,
+    outputs,
     rules
   }, null, 2)}\n`;
 }
@@ -591,6 +596,18 @@ function renderTraceRules(sources) {
     },
     rule_text: createRuleText(requirement)
   }));
+}
+
+function renderTraceOutputs(files) {
+  return files.map((file) => ({
+    path: `${GENERATED_DIR.replaceAll(path.sep, '/')}/${file.fileName}`,
+    sha256: createFingerprint(file.content),
+    kind: `${file.kind}-rules`
+  }));
+}
+
+function createFingerprint(content) {
+  return `sha256:${createHash('sha256').update(content).digest('hex')}`;
 }
 
 function renderIndexBaseEntry(baseSources) {

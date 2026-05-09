@@ -67,7 +67,7 @@ async function createGeneratedRules(rootDir, changeId = 'add-oauth', options = {
 async function createGeneratedRulesTrace(rootDir, changeId = 'add-oauth', options = {}) {
   const baseFingerprint = options.baseFingerprint ?? fingerprint(baseAuthSpec);
   const changeFingerprint = options.changeFingerprint ?? fingerprint(deltaAuthSpec);
-  await writeFixture(rootDir, `.ai-factory/rules/generated/openspec-rules-trace-${changeId}.json`, `${JSON.stringify({
+  const trace = {
     schema_version: 1,
     validator: 'aifhub-generated-rules-trace',
     change_id: changeId,
@@ -85,7 +85,32 @@ async function createGeneratedRulesTrace(rootDir, changeId = 'add-oauth', option
       }
     ],
     rules: []
-  }, null, 2)}\n`);
+  };
+
+  if (options.includeOutputs) {
+    const baseRules = await readFile(path.join(rootDir, '.ai-factory', 'rules', 'generated', 'openspec-base.md'), 'utf8');
+    const changeRules = await readFile(path.join(rootDir, '.ai-factory', 'rules', 'generated', `openspec-change-${changeId}.md`), 'utf8');
+    const mergedRules = await readFile(path.join(rootDir, '.ai-factory', 'rules', 'generated', `openspec-merged-${changeId}.md`), 'utf8');
+    trace.outputs = [
+      {
+        path: '.ai-factory/rules/generated/openspec-base.md',
+        sha256: fingerprint(baseRules),
+        kind: 'base-rules'
+      },
+      {
+        path: `.ai-factory/rules/generated/openspec-change-${changeId}.md`,
+        sha256: fingerprint(changeRules),
+        kind: 'change-rules'
+      },
+      {
+        path: `.ai-factory/rules/generated/openspec-merged-${changeId}.md`,
+        sha256: fingerprint(mergedRules),
+        kind: 'merged-rules'
+      }
+    ];
+  }
+
+  await writeFixture(rootDir, `.ai-factory/rules/generated/openspec-rules-trace-${changeId}.json`, `${JSON.stringify(trace, null, 2)}\n`);
 }
 
 async function pathExists(targetPath) {
@@ -300,6 +325,36 @@ describe('OpenSpec execution context API', () => {
     assert.equal(result.generatedRules.every((item) => item.staleSource === 'trace'), true);
     assert.equal(result.generatedRules.every((item) => item.trace.exists && item.trace.valid), true);
     assert.equal(result.warnings.some((warning) => warning.code === 'stale-generated-rules'), false);
+  });
+
+  it('detects generated markdown output drift when trace output hashes are present', async () => {
+    const { collectGeneratedRules } = await loadExecutionContext();
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir, 'add-oauth');
+    await createGeneratedRules(rootDir, 'add-oauth', {
+      baseFingerprint: fingerprint(baseAuthSpec),
+      changeFingerprint: fingerprint(deltaAuthSpec)
+    });
+    await createGeneratedRulesTrace(rootDir, 'add-oauth', { includeOutputs: true });
+    await writeFixture(rootDir, '.ai-factory/rules/generated/openspec-merged-add-oauth.md', [
+      generatedRulesContent({
+        title: 'Merged OpenSpec Rules',
+        fingerprints: [
+          `${fingerprint(baseAuthSpec)} openspec/specs/auth/spec.md`,
+          `${fingerprint(deltaAuthSpec)} openspec/changes/add-oauth/specs/auth/spec.md`
+        ]
+      }),
+      'Manual edit that should be detected.'
+    ].join('\n'));
+
+    const result = await collectGeneratedRules('add-oauth', { rootDir });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.generatedRules.find((item) => item.kind === 'base').stale, false);
+    assert.equal(result.generatedRules.find((item) => item.kind === 'change').stale, false);
+    assert.equal(result.generatedRules.find((item) => item.kind === 'merged').stale, true);
+    assert.equal(result.generatedRules.find((item) => item.kind === 'merged').staleSource, 'trace-output');
+    assert.ok(result.warnings.some((warning) => warning.code === 'stale-generated-rules'));
   });
 
   it('warns when trace is missing while preserving markdown fingerprint fallback', async () => {

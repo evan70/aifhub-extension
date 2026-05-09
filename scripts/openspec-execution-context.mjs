@@ -189,19 +189,22 @@ export async function collectGeneratedRules(changeId, options = {}) {
       kind: 'merged',
       fileName: `openspec-merged-${resolvedChangeId}.md`,
       expectedFingerprints: new Map([...fingerprints.base, ...fingerprints.delta]),
-      traceInputKinds: ['base-spec', 'delta-spec']
+      traceInputKinds: ['base-spec', 'delta-spec'],
+      traceOutputKind: 'merged-rules'
     },
     {
       kind: 'change',
       fileName: `openspec-change-${resolvedChangeId}.md`,
       expectedFingerprints: fingerprints.delta,
-      traceInputKinds: ['delta-spec']
+      traceInputKinds: ['delta-spec'],
+      traceOutputKind: 'change-rules'
     },
     {
       kind: 'base',
       fileName: 'openspec-base.md',
       expectedFingerprints: fingerprints.base,
-      traceInputKinds: ['base-spec']
+      traceInputKinds: ['base-spec'],
+      traceOutputKind: 'base-rules'
     }
   ];
   const generatedRules = [];
@@ -215,18 +218,25 @@ export async function collectGeneratedRules(changeId, options = {}) {
     const traceStale = item.exists && trace.exists && trace.valid
       ? determineTraceStaleness(trace.inputs, expectedFile.expectedFingerprints, expectedFile.traceInputKinds)
       : null;
+    const traceOutputStale = item.exists && trace.exists && trace.valid
+      ? determineTraceOutputStaleness(trace.outputs, item, expectedFile.traceOutputKind)
+      : null;
     const markdownStale = item.exists && !(trace.exists && trace.valid)
       ? determineStaleness(item.content, expectedFile.expectedFingerprints)
       : null;
-    const stale = trace.exists && trace.valid ? traceStale : markdownStale;
+    const stale = trace.exists && trace.valid
+      ? combineTraceStaleness(traceStale, traceOutputStale)
+      : markdownStale;
 
     generatedRules.push({
       kind: expectedFile.kind,
       path: item.path,
       exists: item.exists,
       stale,
-      staleSource: trace.exists && trace.valid ? 'trace' : 'markdown',
-      trace: summarizeGeneratedRulesTrace(trace, traceStale),
+      staleSource: trace.exists && trace.valid
+        ? traceOutputStale === null ? 'trace' : 'trace-output'
+        : 'markdown',
+      trace: summarizeGeneratedRulesTrace(trace, stale),
       content: item.content
     });
 
@@ -643,6 +653,7 @@ async function readGeneratedRulesTrace(rootDir, generatedDir, changeId) {
       valid: false,
       stale: null,
       inputs: [],
+      outputs: [],
       content: '',
       error: null
     };
@@ -654,16 +665,28 @@ async function readGeneratedRulesTrace(rootDir, generatedDir, changeId) {
     const inputs = Array.isArray(rawInputs)
       ? rawInputs.map(normalizeTraceInput).filter(Boolean)
       : [];
+    const rawOutputs = parsed?.outputs;
+    const outputs = rawOutputs === undefined
+      ? []
+      : Array.isArray(rawOutputs)
+        ? rawOutputs.map(normalizeTraceOutput).filter(Boolean)
+        : [];
 
-    if (parsed?.schema_version !== 1 || !Array.isArray(rawInputs) || inputs.length !== rawInputs.length) {
+    if (
+      parsed?.schema_version !== 1
+      || !Array.isArray(rawInputs)
+      || inputs.length !== rawInputs.length
+      || rawOutputs !== undefined && (!Array.isArray(rawOutputs) || outputs.length !== rawOutputs.length)
+    ) {
       return {
         path: item.path,
         exists: true,
         valid: false,
         stale: null,
         inputs: [],
+        outputs: [],
         content: item.content,
-        error: 'Trace JSON must have schema_version 1 and valid inputs.'
+        error: 'Trace JSON must have schema_version 1 and valid inputs/outputs.'
       };
     }
 
@@ -673,6 +696,7 @@ async function readGeneratedRulesTrace(rootDir, generatedDir, changeId) {
       valid: true,
       stale: null,
       inputs,
+      outputs,
       content: item.content,
       error: null
     };
@@ -683,6 +707,7 @@ async function readGeneratedRulesTrace(rootDir, generatedDir, changeId) {
       valid: false,
       stale: null,
       inputs: [],
+      outputs: [],
       content: item.content,
       error: err?.message ?? 'Invalid JSON.'
     };
@@ -709,6 +734,40 @@ function normalizeTraceInput(input) {
     sha256,
     kind: input.kind
   };
+}
+
+function normalizeTraceOutput(output) {
+  if (
+    output === null
+    || typeof output !== 'object'
+    || typeof output.path !== 'string'
+    || typeof output.sha256 !== 'string'
+    || typeof output.kind !== 'string'
+  ) {
+    return null;
+  }
+
+  const sha256 = output.sha256.startsWith('sha256:')
+    ? output.sha256
+    : `sha256:${output.sha256}`;
+
+  return {
+    path: toPosix(output.path),
+    sha256,
+    kind: output.kind
+  };
+}
+
+function combineTraceStaleness(inputStale, outputStale) {
+  if (inputStale === true || outputStale === true) {
+    return true;
+  }
+
+  if (inputStale === false && (outputStale === false || outputStale === null)) {
+    return false;
+  }
+
+  return inputStale ?? outputStale;
 }
 
 function determineTraceStaleness(inputs, expectedFingerprints, traceInputKinds) {
@@ -746,12 +805,30 @@ function determineTraceStaleness(inputs, expectedFingerprints, traceInputKinds) 
   return false;
 }
 
+function determineTraceOutputStaleness(outputs, generatedRule, traceOutputKind) {
+  if (!Array.isArray(outputs) || outputs.length === 0) {
+    return null;
+  }
+
+  const output = outputs.find((item) =>
+    item.path === generatedRule.path
+    || item.kind === traceOutputKind
+  );
+
+  if (output === undefined) {
+    return null;
+  }
+
+  return output.sha256 !== createFingerprint(generatedRule.content);
+}
+
 function summarizeGeneratedRulesTrace(trace, stale) {
   return {
     path: trace.path,
     exists: trace.exists,
     valid: trace.valid,
     stale,
+    outputs: trace.outputs.length,
     error: trace.error
   };
 }

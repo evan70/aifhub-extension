@@ -1,6 +1,7 @@
 // openspec-rules-compiler.test.mjs - tests for OpenSpec generated rules compiler
 import { afterEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { access, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -47,6 +48,10 @@ async function readGenerated(rootDir, fileName) {
 
 async function readGeneratedJson(rootDir, fileName) {
   return JSON.parse(await readGenerated(rootDir, fileName));
+}
+
+function fingerprint(content) {
+  return `sha256:${createHash('sha256').update(content).digest('hex')}`;
 }
 
 function missingCliDetection() {
@@ -186,6 +191,10 @@ describe('compileOpenSpecRules filesystem fallback', () => {
         kind: 'base-spec'
       }
     ]);
+    assert.deepEqual(trace.outputs.map((output) => output.kind), ['base-rules', 'change-rules', 'merged-rules']);
+    assert.equal(trace.outputs.find((output) => output.kind === 'base-rules').sha256, fingerprint(baseRules));
+    assert.equal(trace.outputs.find((output) => output.kind === 'change-rules').sha256, fingerprint(changeRules));
+    assert.equal(trace.outputs.find((output) => output.kind === 'merged-rules').sha256, fingerprint(mergedRules));
     assert.equal(trace.rules.length, 1);
     assert.match(trace.rules[0].id, /^base-billing-track-usage-[a-f0-9]{8}$/);
     assert.equal(trace.rules[0].severity, 'must');
@@ -223,6 +232,39 @@ describe('compileOpenSpecRules filesystem fallback', () => {
     assert.equal(index.base.markdown, '.ai-factory/rules/generated/openspec-base.md');
     assert.deepEqual(index.changes, []);
     assert.equal(await pathExists(path.join(rootDir, '.ai-factory', 'rules', 'generated', 'openspec-rules-trace-add-generated-rules.json')), false);
+  });
+
+  it('preserves change trace index entries during direct base-only refresh by default', async () => {
+    const { compileOpenSpecBaseRules } = await loadCompiler();
+    const rootDir = await createTempRoot();
+    await writeFixture(rootDir, 'openspec/specs/billing/spec.md', baseBillingSpec);
+    await writeFixture(rootDir, '.ai-factory/rules/generated/index.json', `${JSON.stringify({
+      schema_version: 1,
+      generated_at: '2026-05-09T00:00:00.000Z',
+      base: null,
+      changes: [
+        {
+          change_id: 'add-existing',
+          generated_at: '2026-05-09T00:00:00.000Z',
+          trace: '.ai-factory/rules/generated/openspec-rules-trace-add-existing.json',
+          markdown: {
+            base: '.ai-factory/rules/generated/openspec-base.md',
+            change: '.ai-factory/rules/generated/openspec-change-add-existing.md',
+            merged: '.ai-factory/rules/generated/openspec-merged-add-existing.md'
+          }
+        }
+      ]
+    }, null, 2)}\n`);
+
+    const result = await compileOpenSpecBaseRules(compilerOptions(rootDir, {
+      now: new Date('2026-05-09T02:00:00.000Z')
+    }));
+
+    assert.equal(result.ok, true);
+    const index = await readGeneratedJson(rootDir, 'index.json');
+    assert.equal(index.generated_at, '2026-05-09T02:00:00.000Z');
+    assert.equal(index.base.markdown, '.ai-factory/rules/generated/openspec-base.md');
+    assert.deepEqual(index.changes.map((entry) => entry.change_id), ['add-existing']);
   });
 
   it('compiles delta specs only and includes change metadata in change and merged output', async () => {

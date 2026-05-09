@@ -745,7 +745,12 @@ async function syncGeneratedRules(options = {}) {
   const results = [];
 
   if (changeIds.length === 0) {
-    const result = await compileOpenSpecBaseRules({ ...options, rootDir, dryRun });
+    const result = await compileOpenSpecBaseRules({
+      ...options,
+      rootDir,
+      dryRun,
+      resetIndexChanges: true
+    });
 
     return {
       ok: result.ok,

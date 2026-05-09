@@ -115,7 +115,7 @@ Generated rules are compiled as markdown plus provenance JSON:
 .ai-factory/rules/generated/index.json
 ```
 
-Generated-rule failures must cite trace-backed `source.path` and `source.requirement`. Missing or invalid trace metadata is warning-only and should be fixed with sync; it is not enough on its own for a generated-rule `FAIL`.
+Generated-rule failures must cite trace-backed `source.path` and `source.requirement`. The trace also records output hashes for generated markdown so status/doctor can detect manual edits to generated rule text. Missing or invalid trace metadata is warning-only and should be fixed with sync; it is not enough on its own for a generated-rule `FAIL`.
 
 If generated rules are missing or stale, run:
 
