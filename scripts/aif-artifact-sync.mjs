@@ -34,6 +34,11 @@ import {
   readOpenSpecCoverageMatrix,
   summarizeOpenSpecCoverage
 } from './openspec-coverage-matrix.mjs';
+import {
+  readOpenSpecRulesGateEvidence,
+  resolveOpenSpecPolicy,
+  summarizeOpenSpecPolicy
+} from './openspec-policy.mjs';
 
 export const MODES = {
   openspec: 'openspec',
@@ -62,8 +67,21 @@ const DEFAULT_OPENSPEC_SETTINGS = {
   useInstructionsApply: true,
   compileRulesOnSync: true,
   validateOnSync: true,
+  requireCliForPlan: false,
+  requireCliForImprove: false,
   requireCliForVerify: false,
-  requireCliForDone: true
+  requireCliForDone: true,
+  requireGeneratedRulesForVerify: false,
+  requireGeneratedRulesForDone: true,
+  requireRulesPassForVerify: false,
+  requireRulesPassForDone: true,
+  requireSpecCoverageForVerify: false,
+  requireSpecCoverageForDone: true,
+  allowWarnOnDone: {
+    rules: false,
+    coverage: false,
+    openspecStatus: true
+  }
 };
 const DEFAULT_AI_FACTORY_PATHS = {
   plans: '.ai-factory/plans',
@@ -82,6 +100,7 @@ const OPEN_SPEC_CONFIG = path.join('openspec', 'config.yaml');
 export async function getModeStatus(options = {}) {
   const rootDir = resolveRootDir(options);
   const config = await readProjectConfig(rootDir);
+  const effectivePolicy = resolveOpenSpecPolicy(config);
   const mode = resolveMode(config);
   const detection = await detectOpenSpecCapability(rootDir, options);
   const openSpecChanges = await listOpenSpecChanges({ rootDir });
@@ -104,6 +123,7 @@ export async function getModeStatus(options = {}) {
     ok: true,
     mode,
     config,
+    effectivePolicy,
     configMarker: config.marker,
     configPath: DEFAULT_CONFIG_PATH,
     configExists: config.exists,
@@ -370,10 +390,12 @@ export async function syncAiFactoryArtifacts(options = {}) {
 export async function doctorAifMode(options = {}) {
   const rootDir = resolveRootDir(options);
   const status = await getModeStatus({ ...options, rootDir });
-  const openspecSettings = getOpenSpecSettings(status.config);
+  const effectivePolicy = status.effectivePolicy ?? resolveOpenSpecPolicy(status.config);
+  const openspecSettings = effectivePolicy;
   const diagnostics = [];
   let artifactContract = null;
   let coverage = null;
+  let rulesGate = null;
 
   diagnostics.push(status.configExists && status.configMarker !== null
     ? pass('config-marker', `Config marker is ${status.configMarker}.`)
@@ -389,6 +411,11 @@ export async function doctorAifMode(options = {}) {
   diagnostics.push(status.openspecCli.known
     ? pass('openspec-cli-known', `OpenSpec CLI capability is ${status.openspecCli.state}.`)
     : warn('openspec-cli-unknown', 'OpenSpec CLI capability could not be detected.'));
+
+  diagnostics.push(pass('openspec-effective-policy', summarizeOpenSpecPolicy(effectivePolicy)));
+  for (const diagnostic of effectivePolicy.diagnostics ?? []) {
+    diagnostics.push(warn(diagnostic.code, diagnostic.message));
+  }
 
   if (status.openspecCli.nodeSupported === false) {
     diagnostics.push(fail(
@@ -408,11 +435,23 @@ export async function doctorAifMode(options = {}) {
   if (status.generatedRules.state === 'ok') {
     diagnostics.push(pass('generated-rules', 'Generated rules are present and current.'));
   } else if (status.generatedRules.state === 'warn') {
-    diagnostics.push(warn('generated-rules-warning', 'Generated rules have trace warnings.'));
+    diagnostics.push(policyWarnOrFail(
+      effectivePolicy.requirements.generatedRules.done,
+      'generated-rules-warning',
+      'Generated rules have trace warnings; blocking for /aif-done under current policy.'
+    ));
   } else if (status.generatedRules.state === 'stale') {
-    diagnostics.push(warn('generated-rules-stale', 'Generated rules are stale.'));
+    diagnostics.push(policyWarnOrFail(
+      effectivePolicy.requirements.generatedRules.done,
+      'generated-rules-stale',
+      'Generated rules are stale; blocking for /aif-done under current policy.'
+    ));
   } else {
-    diagnostics.push(warn('generated-rules-missing', 'Generated rules are missing.'));
+    diagnostics.push(policyWarnOrFail(
+      effectivePolicy.requirements.generatedRules.done,
+      'generated-rules-missing',
+      'Generated rules are missing; blocking for /aif-done under current policy.'
+    ));
   }
 
   if (status.mode === MODES.openspec && status.legacyPlans.length > 0) {
@@ -436,7 +475,13 @@ export async function doctorAifMode(options = {}) {
       ...options,
       rootDir
     });
-    diagnostics.push(renderCoverageDiagnostic(coverage));
+    diagnostics.push(renderCoverageDiagnostic(coverage, effectivePolicy));
+    rulesGate = await readOpenSpecRulesGateEvidence(status.activeChange.changeId, {
+      ...options,
+      rootDir,
+      qaDir: status.config.paths.qa ?? DEFAULT_OPEN_SPEC_PATHS.qa
+    });
+    diagnostics.push(renderRulesGateDiagnostic(rulesGate, effectivePolicy));
   }
 
   if (status.mode === MODES.openspec && status.openspecCli.canValidate && status.activeChange.state === 'resolved') {
@@ -468,6 +513,8 @@ export async function doctorAifMode(options = {}) {
     status,
     artifactContract,
     coverage,
+    rulesGate,
+    effectivePolicy,
     diagnostics,
     warnings,
     errors
@@ -548,10 +595,7 @@ export async function readProjectConfig(rootDir = process.cwd()) {
 }
 
 function getOpenSpecSettings(config) {
-  return {
-    ...DEFAULT_OPENSPEC_SETTINGS,
-    ...(config?.aifhub?.openspec ?? config?.parsed?.aifhub?.openspec ?? {})
-  };
+  return resolveOpenSpecPolicy(config ?? { aifhub: { openspec: DEFAULT_OPENSPEC_SETTINGS } });
 }
 
 export async function writeModeConfig(mode, options = {}) {
@@ -1574,8 +1618,24 @@ function renderAifhubBlock(mode) {
       '    useInstructionsApply: true',
       '    compileRulesOnSync: true',
       '    validateOnSync: true',
+      '    requireCliForPlan: false',
+      '    requireCliForImprove: false',
       '    requireCliForVerify: false',
-      '    requireCliForDone: true'
+      '    requireCliForDone: true',
+      '',
+      '    requireGeneratedRulesForVerify: false',
+      '    requireGeneratedRulesForDone: true',
+      '',
+      '    requireRulesPassForVerify: false',
+      '    requireRulesPassForDone: true',
+      '',
+      '    requireSpecCoverageForVerify: false',
+      '    requireSpecCoverageForDone: true',
+      '',
+      '    allowWarnOnDone:',
+      '      rules: false',
+      '      coverage: false',
+      '      openspecStatus: true'
     ].join('\n');
   }
 
@@ -1853,6 +1913,12 @@ function fail(code, message) {
   return { level: 'fail', code, message };
 }
 
+function policyWarnOrFail(blocking, code, blockingMessage, warningMessage = null) {
+  return blocking
+    ? fail(code, blockingMessage)
+    : warn(code, warningMessage ?? blockingMessage.replace(/; blocking for \/aif-done under current policy\./, '.'));
+}
+
 function renderArtifactContractDiagnostic(result) {
   if (!result) {
     return warn('aifhub-artifact-contract', 'AIFHub OpenSpec artifact contract validation did not run.');
@@ -1879,9 +1945,17 @@ function renderArtifactContractDiagnostic(result) {
   );
 }
 
-function renderCoverageDiagnostic(result) {
+function renderCoverageDiagnostic(result, policy = null) {
+  const strictDone = Boolean(policy?.requirements?.specCoverage?.done);
+  const allowCoverageWarn = Boolean(policy?.allowWarnOnDone?.coverage);
+
   if (!result?.exists) {
-    return warn('openspec-coverage-missing', `${result?.warnings?.[0] ?? 'Coverage matrix is missing.'} Run /aif-verify to regenerate coverage.`);
+    return policyWarnOrFail(
+      strictDone,
+      'openspec-coverage-missing',
+      `${result?.warnings?.[0] ?? 'Coverage matrix is missing.'} Run /aif-verify to regenerate coverage. Blocking for /aif-done under current policy.`,
+      `${result?.warnings?.[0] ?? 'Coverage matrix is missing.'} Run /aif-verify to regenerate coverage.`
+    );
   }
 
   if (!result.ok) {
@@ -1889,7 +1963,12 @@ function renderCoverageDiagnostic(result) {
   }
 
   if (result.stale) {
-    return warn('openspec-coverage-stale', 'Coverage matrix is stale. Run /aif-verify to regenerate coverage.');
+    return policyWarnOrFail(
+      strictDone,
+      'openspec-coverage-stale',
+      'Coverage matrix is stale. Run /aif-verify to regenerate coverage. Blocking for /aif-done under current policy.',
+      'Coverage matrix is stale. Run /aif-verify to regenerate coverage.'
+    );
   }
 
   const summary = summarizeOpenSpecCoverage(result.coverage).replace(/\n/g, '; ');
@@ -1898,10 +1977,40 @@ function renderCoverageDiagnostic(result) {
   }
 
   if (result.coverage?.status === 'warn') {
-    return warn('openspec-coverage-warn', summary);
+    return allowCoverageWarn ? warn('openspec-coverage-warn', summary) : fail('openspec-coverage-warn', `${summary}; blocking for /aif-done under current policy.`);
   }
 
   return pass('openspec-coverage-pass', summary);
+}
+
+function renderRulesGateDiagnostic(result, policy) {
+  const strictDone = Boolean(policy?.requirements?.rulesPass?.done);
+  const allowRulesWarn = Boolean(policy?.allowWarnOnDone?.rules);
+
+  if (!result?.exists) {
+    return policyWarnOrFail(
+      strictDone,
+      'rules-gate-missing',
+      `${result?.errors?.[0]?.message ?? 'Rules gate evidence is missing.'} Blocking for /aif-done under current policy.`,
+      result?.errors?.[0]?.message ?? 'Rules gate evidence is missing.'
+    );
+  }
+
+  if (result.status === 'invalid') {
+    return fail('rules-gate-invalid', result.errors?.[0]?.message ?? 'Rules gate evidence is invalid.');
+  }
+
+  if (result.status === 'fail') {
+    return fail('rules-gate-failed', 'Rules gate result failed for active change.');
+  }
+
+  if (result.status === 'warn') {
+    return allowRulesWarn
+      ? warn('rules-gate-warn', 'Rules gate result has policy-accepted warnings.')
+      : fail('rules-gate-warn', 'Rules gate result has warnings; blocking for /aif-done under current policy.');
+  }
+
+  return pass('rules-gate-pass', 'Rules gate result passed for active change.');
 }
 
 function createSkippedResult(reason) {

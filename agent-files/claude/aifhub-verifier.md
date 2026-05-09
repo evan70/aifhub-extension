@@ -19,7 +19,7 @@ Use this mode when config declares `aifhub.artifactProtocol: openspec`.
 - Before lint, tests, review, security, or rules checks, use `scripts/openspec-verification-context.mjs` and `scripts/openspec-runner.mjs` when available.
 - Request OpenSpec validation through `validateOpenSpecChange(changeId)` and status through `getOpenSpecStatus(changeId)` from `scripts/openspec-runner.mjs`.
 - Fail-fast OpenSpec validation before code checks: fail invalid OpenSpec artifacts before code checks and use `shouldRunCodeVerification` as the handoff signal.
-- Missing CLI remains degraded missing-CLI behavior unless strict config `requireCliForVerify` requires the CLI.
+- Resolve effective policy with `scripts/openspec-policy.mjs`. Missing CLI, generated rules, rules gate evidence, and coverage evidence remain degraded warnings unless strict config such as `requireCliForVerify` or the matching verify policy flag requires failure.
 - Read canonical artifacts: `openspec/specs/**` plus `openspec/changes/<change-id>/proposal.md`, `design.md`, `tasks.md`, and `specs/**/spec.md`.
 - Read generated rules from `.ai-factory/rules/generated/` when present.
 - Read runtime state from `.ai-factory/state/<change-id>/` when present.
@@ -27,9 +27,10 @@ Use this mode when config declares `aifhub.artifactProtocol: openspec`.
 - Record OpenSpec validation/status evidence under `.ai-factory/qa/<change-id>/` before code verification.
 - Build and write `.ai-factory/qa/<change-id>/coverage.json` with `scripts/openspec-coverage-matrix.mjs` when available.
 - Missing requirement coverage fails strict verification and warns in normal verification.
+- Read durable rules gate evidence from `.ai-factory/qa/<change-id>/rules.md` when present; generated rules readiness does not satisfy `requireRulesPassForVerify`.
 - Do not archive, never archive from `/aif-verify`, do not write runtime state, and do not create legacy plan artifacts in OpenSpec-native mode.
 - Return findings first, then a gate result: `PASS`, `PASS with notes`, or `FAIL`.
-- Include active OpenSpec change, canonical artifacts inspected, generated rules state, runtime state path, QA evidence path, validation status, `shouldRunCodeVerification`, coverage summary, code verification status, counts for blocking/important/optional findings, and next recommended command.
+- Include active OpenSpec change, canonical artifacts inspected, effective policy summary, generated rules state, runtime state path, QA evidence path, validation status, `shouldRunCodeVerification`, coverage summary, code verification status, counts for blocking/important/optional findings, and next recommended command.
 - Recommend `/aif-fix <change-id>` when validation or verification fails, and `/aif-done <change-id>` only after passing verification.
 - Optional read-only gates before or during verification are `/aif-rules-check`, `/aif-review`, and `/aif-security-checklist`. The authoritative final verification remains `/aif-verify <change-id>`.
 - End with exactly one final fenced `aif-gate-result` JSON block using `"gate": "verify"` and lowercase `status`: `pass`, `warn`, or `fail`. Write the same final block into `.ai-factory/qa/<change-id>/verify.md`.

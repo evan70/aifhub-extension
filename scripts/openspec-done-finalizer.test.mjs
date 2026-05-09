@@ -8,6 +8,7 @@ import path from 'node:path';
 import {
   archiveChangeWithOpenSpec,
   assertCoverageAcceptable,
+  assertRulesGateAcceptable,
   assertVerificationPassed,
   buildDoneContext,
   detectWorkingTreeState,
@@ -19,6 +20,9 @@ import {
   createGateResult,
   renderGateResultBlock
 } from './aif-gate-result.mjs';
+import {
+  syncOpenSpecArtifacts
+} from './aif-artifact-sync.mjs';
 
 const tempRoots = [];
 
@@ -46,9 +50,39 @@ async function createOpenSpecChange(rootDir, changeId = 'add-oauth') {
 async function createRuntimeEvidence(rootDir, changeId = 'add-oauth') {
   await writeFixture(rootDir, `.ai-factory/state/${changeId}/implementation/run-001.md`, '# Implementation Trace\n');
   await writeFixture(rootDir, `.ai-factory/state/${changeId}/fixes/fix-001.md`, '# Fix Trace\n');
-  await writeFixture(rootDir, '.ai-factory/rules/generated/openspec-base.md', '# Base Rules\n');
-  await writeFixture(rootDir, `.ai-factory/rules/generated/openspec-change-${changeId}.md`, '# Change Rules\n');
-  await writeFixture(rootDir, `.ai-factory/rules/generated/openspec-merged-${changeId}.md`, '# Merged Rules\n');
+  await syncOpenSpecArtifacts({
+    rootDir,
+    changeId,
+    writeReport: false,
+    detectOpenSpec: async () => missingCliDetection()
+  });
+  await writeRulesGateEvidence(rootDir, changeId);
+}
+
+async function writeRulesGateEvidence(rootDir, changeId = 'add-oauth', status = 'pass', qaRoot = '.ai-factory/qa') {
+  await writeFixture(rootDir, `${qaRoot}/${changeId}/rules.md`, [
+    '# Rules Gate',
+    '',
+    renderGateResultBlock(createGateResult({
+      gate: 'rules',
+      status,
+      blockers: status === 'fail'
+        ? [{
+          id: 'rules-failed',
+          severity: 'error',
+          summary: 'Rules failed.'
+        }]
+        : [],
+      affectedFiles: [],
+      suggestedNext: status === 'fail'
+        ? {
+          command: '/aif-fix',
+          reason: 'Rules failed.'
+        }
+        : null
+    })),
+    ''
+  ].join('\n'));
 }
 
 async function pathExists(targetPath) {
@@ -234,6 +268,7 @@ describe('OpenSpec done finalizer API', () => {
       finalizeOpenSpecChange,
       buildDoneContext,
       assertCoverageAcceptable,
+      assertRulesGateAcceptable,
       assertVerificationPassed,
       archiveChangeWithOpenSpec,
       writeDoneSummary,
@@ -311,6 +346,8 @@ describe('OpenSpec done finalizer API', () => {
       ''
     ].join('\n'));
     await writeFixture(rootDir, 'custom-qa/add-oauth/coverage.json', JSON.stringify(coverageMatrix(), null, 2));
+    await createRuntimeEvidence(rootDir);
+    await writeRulesGateEvidence(rootDir, 'add-oauth', 'pass', 'custom-qa');
 
     const context = await buildDoneContext({
       rootDir,
@@ -477,8 +514,51 @@ describe('OpenSpec done finalizer API', () => {
         })
       })
     });
-    assert.equal(warned.ok, true);
-    assert.equal(warned.warnings[0].code, 'coverage-policy-warn');
+    assert.equal(warned.ok, false);
+    assert.equal(warned.errors[0].code, 'coverage-policy-warn');
+
+    const acceptedWarn = await assertCoverageAcceptable('add-oauth', {
+      policy: {
+        requirements: { specCoverage: { done: true } },
+        allowWarnOnDone: { coverage: true }
+      },
+      readOpenSpecCoverageMatrix: async () => coverageEvidence({
+        coverage: coverageMatrix({
+          status: 'warn',
+          policy: 'normal',
+          summary: { covered: 0, partial: 0, missing: 1, not_applicable: 0 }
+        })
+      })
+    });
+    assert.equal(acceptedWarn.ok, true);
+    assert.equal(acceptedWarn.warnings[0].code, 'coverage-policy-warn');
+  });
+
+  it('requires rules gate evidence according to done policy', async () => {
+    const rootDir = await createTempRoot();
+
+    const missing = await assertRulesGateAcceptable('add-oauth', { rootDir });
+    assert.equal(missing.ok, false);
+    assert.equal(missing.errors[0].code, 'rules-gate-evidence-missing');
+
+    await writeRulesGateEvidence(rootDir, 'add-oauth', 'warn');
+    const warned = await assertRulesGateAcceptable('add-oauth', { rootDir });
+    assert.equal(warned.ok, false);
+    assert.equal(warned.errors[0].code, 'rules-gate-warn');
+
+    const acceptedWarn = await assertRulesGateAcceptable('add-oauth', {
+      rootDir,
+      policy: {
+        requirements: { rulesPass: { done: true } },
+        allowWarnOnDone: { rules: true }
+      }
+    });
+    assert.equal(acceptedWarn.ok, true);
+    assert.equal(acceptedWarn.warnings[0].code, 'rules-gate-warn');
+
+    await writeRulesGateEvidence(rootDir, 'add-oauth', 'pass');
+    const passed = await assertRulesGateAcceptable('add-oauth', { rootDir });
+    assert.equal(passed.ok, true);
   });
 
   it('detects dirty working tree state and records it only when explicit', async () => {
@@ -696,6 +776,7 @@ describe('OpenSpec done finalizer API', () => {
   it('records dirty state and still writes summaries when explicitly allowed', async () => {
     const rootDir = await createTempRoot();
     await createOpenSpecChange(rootDir);
+    await createRuntimeEvidence(rootDir);
 
     const result = await finalizeOpenSpecChange({
       rootDir,

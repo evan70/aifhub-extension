@@ -96,7 +96,7 @@ The default policy follows `workflow.verify_mode` from `.ai-factory/config.yaml`
 
 `/aif-mode doctor --change <change-id>` reads the latest coverage artifact and reports missing, stale, failed, warning, or passing coverage diagnostics.
 
-`/aif-done` requires a current coverage artifact. It refuses missing, invalid, stale, or failed coverage. A `warn` coverage matrix is accepted when the policy produced a non-blocking warning.
+`/aif-done` requires current coverage according to effective OpenSpec policy. By default `requireSpecCoverageForDone: true` and `allowWarnOnDone.coverage: false`, so done refuses missing, invalid, stale, failed, and warning-only coverage. Set `allowWarnOnDone.coverage: true` only when warning coverage is acceptable for finalization.
 
 ## Evidence Sources
 
@@ -107,6 +107,8 @@ The matrix uses:
 - implementation and fix traces under `.ai-factory/state/<change-id>/`
 - generated rules state from `.ai-factory/rules/generated/`
 - optional existing verification evidence under `.ai-factory/qa/<change-id>/verify.md`
+
+Coverage includes a `rules_gate` field, but finalization policy still treats durable rules gate evidence separately. A passing generated-rules state or coverage-inferred rules status does not replace `.ai-factory/qa/<change-id>/rules.md` when `requireRulesPassForDone` is true.
 
 Each material source gets a SHA-256 fingerprint. If any fingerprint changes, the matrix is stale and `/aif-done` requires rerunning `/aif-verify <change-id>`.
 

@@ -211,7 +211,7 @@ Does not write in OpenSpec-native mode:
 
 Docs/tooling-only changes may omit delta specs only when the proposal explains why no product or workflow behavior changes.
 
-When `aifhub.openspec.validateOnPlan` is enabled, planning requests `openspec validate` through the AIFHub OpenSpec runner if a compatible CLI is available. Missing CLI is a degraded warning, not a planning failure.
+When `aifhub.openspec.validateOnPlan` is enabled, planning requests `openspec validate` through the AIFHub OpenSpec runner if a compatible CLI is available. Missing CLI is a degraded warning unless `aifhub.openspec.requireCliForPlan` is true.
 
 ### `/aif-explore`
 
@@ -287,7 +287,7 @@ Does not write:
 - legacy `.ai-factory/plans` artifacts in OpenSpec-native mode
 - archived changes under `openspec/changes/archive/**` unless the user explicitly chooses a supported recovery path
 
-When `aifhub.openspec.validateOnImprove` is enabled, refinement requests OpenSpec validation through the runner after canonical artifact edits.
+When `aifhub.openspec.validateOnImprove` is enabled, refinement requests OpenSpec validation through the runner after canonical artifact edits. Missing CLI is a degraded warning unless `aifhub.openspec.requireCliForImprove` is true.
 
 ### `/aif-implement`
 
@@ -349,6 +349,8 @@ Writes:
 - none
 
 `/aif-rules-check` is optional after implementation or fixes and useful for strict/high-risk changes. In OpenSpec-native mode it uses generated rules first, loads trace JSON when present, returns a final `aif-gate-result` with `gate: "rules"`, and does not regenerate generated rules.
+
+When done policy requires a rules pass, persist the final rules gate block under `.ai-factory/qa/<change-id>/rules.md`. Generated rules freshness and rules gate pass are separate signals.
 
 Generated-rule `FAIL` findings must cite trace-backed `source.path` and `source.requirement`. The generated trace includes output hashes for generated markdown, so status/doctor can warn when generated rule text is manually edited without source-spec changes. If the generated trace is missing or invalid, generated-rule findings are capped at `WARN`; rerun sync to regenerate trace metadata.
 
@@ -412,7 +414,7 @@ Does not write:
 - final archive output
 - legacy `.ai-factory/specs` archives in OpenSpec-native mode
 
-Invalid OpenSpec validation is a hard stop before code checks. Missing or unsupported CLI is degraded mode unless `aifhub.openspec.requireCliForVerify` is true. `openspec-status.json` is written when `aifhub.openspec.statusOnVerify` is enabled. Missing requirement coverage makes verify `fail` in strict mode and `warn` in normal mode.
+Invalid OpenSpec validation is a hard stop before code checks. Missing or unsupported CLI, generated rules, rules gate evidence, or coverage evidence is degraded mode unless the matching verify policy flag is true. `openspec-status.json` is written when `aifhub.openspec.statusOnVerify` is enabled. Missing requirement coverage makes verify `fail` in strict mode and `warn` in normal mode.
 
 ### `/aif-fix`
 
@@ -447,6 +449,7 @@ Reads:
 - passing verification evidence from `.ai-factory/qa/<change-id>/`
 - the latest valid verify `aif-gate-result` block from `.ai-factory/qa/<change-id>/verify.md`
 - current coverage evidence from `.ai-factory/qa/<change-id>/coverage.json`
+- durable rules gate evidence from `.ai-factory/qa/<change-id>/rules.md` when policy requires it
 - the read-only AIFHub OpenSpec artifact contract result
 - git working tree state
 

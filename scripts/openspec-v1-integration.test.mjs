@@ -1,7 +1,7 @@
 // openspec-v1-integration.test.mjs - integration coverage for OpenSpec-native mode
 import { afterEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { access, cp, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -168,6 +168,58 @@ function openspecInstructionsResult() {
     jsonParseError: null,
     error: null
   };
+}
+
+async function writeRulesGateEvidence(rootDir, changeId, status = 'pass') {
+  const qaDir = path.join(rootDir, '.ai-factory', 'qa', changeId);
+  await mkdir(qaDir, { recursive: true });
+  await writeFile(
+    path.join(qaDir, 'rules.md'),
+    [
+      `# Rules Gate: ${changeId}`,
+      '',
+      renderGateResultBlock(createGateResult({
+        gate: 'rules',
+        status,
+        blockers: [],
+        affectedFiles: [],
+        suggestedNext: null
+      })),
+      ''
+    ].join('\n'),
+    'utf8'
+  );
+}
+
+async function writePassingCoverageEvidence(rootDir, changeId) {
+  const qaDir = path.join(rootDir, '.ai-factory', 'qa', changeId);
+  await mkdir(qaDir, { recursive: true });
+  await writeFile(
+    path.join(qaDir, 'coverage.json'),
+    `${JSON.stringify({
+      schema_version: 1,
+      change_id: changeId,
+      status: 'pass',
+      blocking: false,
+      policy: {
+        mode: 'strict',
+        missing_requirement: 'fail'
+      },
+      requirements: [],
+      summary: {
+        covered: 0,
+        partial: 0,
+        missing: 0,
+        not_applicable: 0
+      },
+      sources: [],
+      stale: false,
+      diagnostics: [],
+      warnings: [],
+      errors: []
+    }, null, 2)}\n`,
+    'utf8'
+  );
 }
 
 afterEach(async () => {
@@ -452,6 +504,8 @@ describe('Full OpenSpec v1 mocked paths', () => {
     }, {
       rootDir
     });
+    await writeRulesGateEvidence(rootDir, 'add-oauth');
+    await writePassingCoverageEvidence(rootDir, 'add-oauth');
     await writeFile(
       path.join(rootDir, '.ai-factory', 'qa', 'add-oauth', 'verify.md'),
       [
@@ -508,6 +562,11 @@ describe('Full OpenSpec v1 mocked paths', () => {
     await copyFixture('openspec-native', rootDir);
 
     const canonicalBefore = await listFiles(rootDir, 'openspec/specs');
+    const rules = await compileOpenSpecRules('add-oauth', {
+      rootDir,
+      detectOpenSpec: async () => missingCliDetection(),
+      getCurrentBranch: async () => 'feat/add-oauth'
+    });
     const implementation = await buildImplementationContext({
       rootDir,
       changeId: 'add-oauth',
@@ -538,6 +597,8 @@ describe('Full OpenSpec v1 mocked paths', () => {
       ].join('\n'),
       'utf8'
     );
+    await writeRulesGateEvidence(rootDir, 'add-oauth');
+    await writePassingCoverageEvidence(rootDir, 'add-oauth');
     const finalized = await finalizeOpenSpecChange({
       rootDir,
       changeId: 'add-oauth',
@@ -549,13 +610,15 @@ describe('Full OpenSpec v1 mocked paths', () => {
     });
     const canonicalAfter = await listFiles(rootDir, 'openspec/specs');
 
+    assert.equal(rules.ok, true);
     assert.equal(implementation.ok, true);
     assert.equal(implementation.openspecInstructions.available, false);
     assert.equal(verification.ok, true);
     assert.equal(verification.shouldRunCodeVerification, true);
     assert.ok(verification.warnings.some((warning) => warning.code === 'openspec-cli-unavailable'));
     assert.equal(finalized.ok, false);
-    assert.equal(finalized.archive.errors[0].code, 'openspec-cli-required-for-archive');
+    assert.equal(finalized.errors[0].code, 'openspec-cli-required-for-done');
+    assert.equal(finalized.archive.warnings[0].code, 'context-failed');
     assert.deepEqual(canonicalAfter, canonicalBefore);
     assert.equal(await pathExists(rootDir, 'openspec/specs/archive'), false);
   });

@@ -139,6 +139,12 @@ Runtime QA output belongs under `.ai-factory/qa/<change-id>/`.
 
 #### OpenSpec validation
 
+Before validation, resolve the effective OpenSpec policy through:
+
+```bash
+node scripts/openspec-policy.mjs --json
+```
+
 When a compatible OpenSpec CLI is available, validate through `scripts/openspec-runner.mjs` using `validateOpenSpecChange(changeId)` or equivalent runner behavior.
 
 The runner command corresponds to:
@@ -149,10 +155,10 @@ openspec validate <change-id> --type change --strict --json --no-interactive --n
 
 - If validation passes, report success.
 - If validation fails, repair generated artifacts when possible or clearly report the failing file, requirement, or section.
-- Missing or unsupported OpenSpec CLI is degraded validation, not planning failure.
+- Missing or unsupported OpenSpec CLI is degraded validation, not planning failure, unless the effective policy has `requireCliForPlan: true`; when required, treat the missing CLI as a planning blocker and do not claim OpenSpec validation passed.
 - Do not install OpenSpec skills or slash commands.
 
-Report generated OpenSpec artifact paths and validation status in the normal planning response. Persist validation evidence only under `.ai-factory/state/<change-id>/` when a runtime file is needed.
+Report generated OpenSpec artifact paths, effective policy summary, and validation status in the normal planning response. Persist validation evidence only under `.ai-factory/state/<change-id>/` when a runtime file is needed.
 
 ### Legacy AI Factory-only mode
 

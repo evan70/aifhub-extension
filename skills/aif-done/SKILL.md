@@ -23,13 +23,16 @@ OpenSpec-native mode finalizes the verified change state through `scripts/opensp
 ### Preconditions
 
 - Resolve exactly one active change or explicit `<change-id>`.
+- Resolve effective policy through `scripts/openspec-policy.mjs`; `/aif-verify`, `/aif-mode doctor`, and `/aif-done` must use the same policy semantics.
 - Read QA evidence from `.ai-factory/qa/<change-id>/`.
 - Treat verification as passing only when QA evidence clearly records a final PASS or PASS-with-notes for this change.
 - Require the latest final fenced `aif-gate-result` block in `verify.md` to be valid JSON with `"gate": "verify"` and `status` of `pass` or `warn`.
 - Require `.ai-factory/qa/<change-id>/coverage.json` to exist, be current, and have coverage status `pass` or policy-accepted `warn`.
+- Require generated rules and durable rules gate evidence according to `requireGeneratedRulesForDone` and `requireRulesPassForDone`; generated rules readiness does not satisfy rules gate pass.
+- Apply `allowWarnOnDone.rules`, `allowWarnOnDone.coverage`, and `allowWarnOnDone.openspecStatus` before accepting warning-only finalization evidence.
 - If verification has not run or verdict is `fail`, stop and suggest `/aif-verify` or `/aif-fix`.
 - If the verify gate result is missing, invalid, or `fail`, stop and suggest rerunning `/aif-verify <change-id>` or `/aif-fix <change-id>`.
-- If coverage is missing, invalid, stale, or failed by policy, stop and suggest rerunning `/aif-verify <change-id>`.
+- If coverage, generated rules, or rules gate evidence is missing, invalid, stale, failed, or warning-only when policy does not allow the warning, stop and suggest the owning command (`/aif-mode sync --change <change-id>`, `/aif-rules-check`, or `/aif-verify <change-id>`).
 - Refuse unverified changes; do not accept `Code verification: PENDING` as final verification.
 - Check dirty working tree state before archive and either fail or record it only when explicit dirty-state recording is requested.
 
@@ -53,6 +56,7 @@ Runtime state and QA evidence live outside canonical changes:
 
 - `.ai-factory/state/<change-id>/`
 - `.ai-factory/qa/<change-id>/`, including `verify.md` and `coverage.json`
+- `.ai-factory/qa/<change-id>/rules.md` when a durable rules gate is required or available
 
 ### Archive Policy
 
@@ -78,6 +82,7 @@ Normal output must report:
 - archive result;
 - canonical artifacts inspected;
 - generated rules state when relevant;
+- effective policy summary and policy-derived finalization blockers;
 - runtime state and QA evidence paths;
 - final evidence under `.ai-factory/qa/<change-id>/`;
 - final summaries under `.ai-factory/state/<change-id>/`;
@@ -193,6 +198,8 @@ Legacy AI Factory-only mode preserves the verified plan finalization contract ba
 - Never finalize a plan that has not passed verification.
 - In OpenSpec-native mode, never finalize an unverified change.
 - In OpenSpec-native mode, never finalize a change with missing, stale, invalid, or failed `coverage.json`.
+- In OpenSpec-native mode, never treat generated rules as a substitute for durable `rules` gate evidence.
+- In OpenSpec-native mode, obey `allowWarnOnDone` before accepting warning-only rules, coverage, or OpenSpec status evidence.
 - In OpenSpec-native mode, archive only through `archiveOpenSpecChange`; never use custom OpenSpec archive logic.
 - In OpenSpec-native mode, never silently archive through legacy `.ai-factory/specs`.
 - Never invent governance changes without evidence from the verified plan.
