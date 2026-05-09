@@ -65,6 +65,8 @@ Runtime state and QA evidence boundaries:
 - Read implementation runtime state from `.ai-factory/state/<change-id>/` when present.
 - Write verification findings, verdicts, command results, and review evidence only under `.ai-factory/qa/<change-id>/`.
 - Record OpenSpec validation/status evidence under `.ai-factory/qa/<change-id>/` before code verification.
+- Build and write the OpenSpec coverage matrix at `.ai-factory/qa/<change-id>/coverage.json` using `scripts/openspec-coverage-matrix.mjs` when available.
+- Treat missing requirement coverage as `fail` in strict mode and `warn` in normal mode.
 - Do not write QA evidence or runtime-only files into `openspec/changes/<change-id>/`.
 - Do not archive. `/aif-verify` records verification evidence only; `/aif-done <change-id>` owns OpenSpec archive/finalization.
 - Do not create legacy plan-folder verification artifacts in OpenSpec-native mode.
@@ -75,6 +77,7 @@ Normal verification responses should report:
 - canonical artifacts inspected;
 - generated rules freshness or missing/stale `WARN`;
 - OpenSpec validation status and `shouldRunCodeVerification`;
+- coverage summary and policy result;
 - QA evidence path under `.ai-factory/qa/<change-id>/`;
 - verdict and finding counts;
 - fix guidance `/aif-fix <change-id>` when verification fails;
@@ -82,7 +85,7 @@ Normal verification responses should report:
 
 Optional read-only gates before or during verification are `/aif-rules-check`, `/aif-review`, and `/aif-security-checklist`. The authoritative final verification remains `/aif-verify <change-id>`.
 
-End verification output and `.ai-factory/qa/<change-id>/verify.md` with exactly one final fenced `aif-gate-result` JSON block using `"gate": "verify"` and lowercase JSON `status`: `pass`, `warn`, or `fail`. Use `fail` for blocking OpenSpec validation, test, lint, build, review, security, or rules failures; use `warn` only for non-blocking notes after verification completes.
+End verification output and `.ai-factory/qa/<change-id>/verify.md` with exactly one final fenced `aif-gate-result` JSON block using `"gate": "verify"` and lowercase JSON `status`: `pass`, `warn`, or `fail`. Use `fail` for blocking OpenSpec validation, coverage, test, lint, build, review, security, or rules failures; use `warn` only for non-blocking notes after verification completes.
 
 Do not install OpenSpec skills or slash commands.
 Do not redirect the user to legacy finalize aliases.

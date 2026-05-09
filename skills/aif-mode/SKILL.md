@@ -97,7 +97,7 @@ Refresh derived or compatibility artifacts without changing mode.
 
 ### `doctor`
 
-Read-only diagnostics for config marker, configured paths, OpenSpec CLI capability, Node compatibility, active change ambiguity, generated rules, legacy artifacts in OpenSpec-native mode, OpenSpec validation when available, and archive readiness for `/aif-done`.
+Read-only diagnostics for config marker, configured paths, OpenSpec CLI capability, Node compatibility, active change ambiguity, generated rules, coverage matrix status, legacy artifacts in OpenSpec-native mode, OpenSpec validation when available, and archive readiness for `/aif-done`.
 
 ## References
 

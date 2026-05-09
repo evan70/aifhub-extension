@@ -894,6 +894,101 @@ describe('doctor', () => {
     assert.ok(result.diagnostics.some((item) => item.code === 'verify-gate-failed'));
   });
 
+  it('includes coverage matrix diagnostics for the resolved active change', async () => {
+    const rootDir = await createTempRoot();
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: openspec',
+      '  openspec:',
+      '    archiveOnDone: false',
+      'paths:',
+      '  plans: openspec/changes',
+      '  specs: openspec/specs',
+      '  state: .ai-factory/state',
+      '  qa: .ai-factory/qa',
+      '  generated_rules: .ai-factory/rules/generated',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'openspec/config.yaml', 'project: test\n');
+    await writeFixture(rootDir, 'openspec/changes/beta/proposal.md', '# Beta\n');
+    await writeFixture(rootDir, 'openspec/changes/beta/tasks.md', '# Tasks\n');
+    await writeFixture(rootDir, 'openspec/changes/beta/specs/auth/spec.md', '# Auth\n');
+    await writeFixture(rootDir, '.ai-factory/state/current.yaml', 'change_id: beta\n');
+    await writeFixture(rootDir, '.ai-factory/qa/beta/openspec-validation.json', JSON.stringify({
+      changeId: 'beta',
+      ok: true
+    }, null, 2));
+    await writeFixture(rootDir, '.ai-factory/qa/beta/verify.md', [
+      '# Verify: beta',
+      '',
+      'Verdict: PASS',
+      'Code verification: PASS',
+      '',
+      renderGateResultBlock(createGateResult({
+        gate: 'verify',
+        status: 'pass',
+        blockers: [],
+        affectedFiles: [],
+        suggestedNext: null
+      })),
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, '.ai-factory/qa/beta/coverage.json', JSON.stringify({
+      schema_version: 1,
+      change_id: 'beta',
+      status: 'pass',
+      blocking: false,
+      policy: {
+        mode: 'strict',
+        missing_requirement: 'fail'
+      },
+      requirements: [],
+      summary: {
+        covered: 0,
+        partial: 0,
+        missing: 0,
+        not_applicable: 0
+      },
+      sources: [],
+      stale: false,
+      diagnostics: [],
+      warnings: [],
+      errors: []
+    }, null, 2));
+    await mkdir(path.join(rootDir, 'openspec/specs'), { recursive: true });
+    await mkdir(path.join(rootDir, '.ai-factory/rules/generated'), { recursive: true });
+
+    const result = await doctorAifMode({
+      rootDir,
+      detectOpenSpec: async () => availableCliDetection(),
+      getCurrentBranch: async () => 'feat/unmatched',
+      validateOpenSpecArtifactContract: async (options) => ({
+        schema_version: 1,
+        validator: 'aifhub-openspec-artifact-contract',
+        change_id: options.changeId,
+        status: 'pass',
+        blocking: false,
+        checks: [],
+        suggested_next: null
+      }),
+      validateOpenSpecChange: async () => ({
+        ok: true,
+        stdout: '{"valid":true}',
+        stderr: '',
+        json: { valid: true }
+      }),
+      getOpenSpecStatus: async () => ({
+        ok: true,
+        stdout: '{"ok":true}',
+        stderr: '',
+        json: { ok: true }
+      })
+    });
+
+    assert.equal(result.coverage.coverage.status, 'pass');
+    assert.ok(result.diagnostics.some((item) => item.code === 'openspec-coverage-pass'));
+  });
+
   it('reports unsupported Node for OpenSpec CLI capability', async () => {
     const rootDir = await createTempRoot();
     await writeFixture(rootDir, '.ai-factory/config.yaml', [

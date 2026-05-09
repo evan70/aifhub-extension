@@ -1,4 +1,4 @@
-[Previous Page](openspec-compatibility.md) | [Back to Documentation](README.md) | [Next Page](legacy-plan-migration.md)
+[Previous Page](openspec-compatibility.md) | [Back to Documentation](README.md) | [Next Page](spec-coverage.md)
 
 # OpenSpec Artifact Validation
 
@@ -86,7 +86,7 @@ Missing verification evidence suggests:
 
 `/aif-done` runs the validator with verification evidence required and refuses to archive when the validator returns `fail`.
 
-`/aif-verify` is unchanged. It still writes validation/status/verify evidence under `.ai-factory/qa/<change-id>/` and does not archive.
+`/aif-verify` still writes validation/status/verify evidence under `.ai-factory/qa/<change-id>/` and does not archive. It also writes the separate OpenSpec coverage matrix described in [OpenSpec Coverage Matrix](spec-coverage.md).
 
 ## Read-Only Boundary
 
@@ -104,5 +104,6 @@ Use `/aif-mode sync --change <change-id>` to regenerate derived rules and `/aif-
 ## See Also
 
 - [OpenSpec Compatibility](openspec-compatibility.md)
+- [OpenSpec Coverage Matrix](spec-coverage.md)
 - [Usage](usage.md)
 - [Active Change Resolver](active-change-resolver.md)

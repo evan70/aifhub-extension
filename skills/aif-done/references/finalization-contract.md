@@ -11,8 +11,10 @@ Reference for the `aif-done` skill and `aifhub-done-finalizer` agents.
 - QA evidence exists under `.ai-factory/qa/<change-id>/`.
 - Verification evidence clearly records final PASS or PASS-with-notes for this change.
 - The latest final fenced `aif-gate-result` block in `verify.md` is valid JSON with `"gate": "verify"` and `status` of `pass` or `warn`.
+- `.ai-factory/qa/<change-id>/coverage.json` exists, is current, and has coverage status `pass` or policy-accepted `warn`.
 - OpenSpec-native `/aif-done` refuses unverified changes.
 - Missing, invalid, or failed verify gate results refuse finalization and require `/aif-verify` or `/aif-fix`.
+- Missing, invalid, stale, or failed coverage refuses finalization and requires `/aif-verify`.
 - `Code verification: PENDING` is ambiguous and must refuse finalization.
 - Dirty working tree state is empty, or explicit dirty-state recording is enabled.
 
@@ -31,6 +33,7 @@ openspec/changes/<change-id>/specs/**/spec.md
 .ai-factory/rules/generated/openspec-base.md
 .ai-factory/state/<change-id>/
 .ai-factory/qa/<change-id>/
+.ai-factory/qa/<change-id>/coverage.json
 ```
 
 ### Archive Policy
@@ -69,7 +72,7 @@ Do not write runtime-only files into `openspec/changes/<change-id>/`.
 
 ### Output
 
-Report selected `change-id`, verification status, dirty working tree state, QA evidence path, `.ai-factory/qa/<change-id>/` final evidence path, `.ai-factory/state/<change-id>/` final summary path, canonical artifacts inspected, generated rules state, archive result, `--skip-specs` state, commit draft, PR draft, and next steps: `/aif-mode sync`, `/aif-commit`, and optional `/aif-evolve`.
+Report selected `change-id`, verification status, coverage matrix status, dirty working tree state, QA evidence path, `.ai-factory/qa/<change-id>/` final evidence path, `.ai-factory/state/<change-id>/` final summary path, canonical artifacts inspected, generated rules state, archive result, `--skip-specs` state, commit draft, PR draft, and next steps: `/aif-mode sync`, `/aif-commit`, and optional `/aif-evolve`.
 
 After successful finalization:
 
@@ -184,6 +187,7 @@ finalization:
 | No active plan found | Stop with guidance to select a plan |
 | Verification not run / verdict missing | Stop, suggest `/aif-verify` |
 | Verification failed (`fail`) | Stop, suggest `/aif-fix` then `/aif-verify` |
+| Coverage missing, stale, invalid, or failed | Stop, suggest `/aif-verify` |
 | Workspace dirty outside plan scope | Stop, ask user to confirm |
 | Archive already exists | Refresh archive/spec/index outputs; do not fail |
 | `gh` not available | Output manual PR instructions instead of failing |

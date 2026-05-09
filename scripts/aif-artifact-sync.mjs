@@ -30,6 +30,10 @@ import {
 import {
   validateOpenSpecArtifactContract as defaultValidateOpenSpecArtifactContract
 } from './openspec-artifact-validator.mjs';
+import {
+  readOpenSpecCoverageMatrix,
+  summarizeOpenSpecCoverage
+} from './openspec-coverage-matrix.mjs';
 
 export const MODES = {
   openspec: 'openspec',
@@ -369,6 +373,7 @@ export async function doctorAifMode(options = {}) {
   const openspecSettings = getOpenSpecSettings(status.config);
   const diagnostics = [];
   let artifactContract = null;
+  let coverage = null;
 
   diagnostics.push(status.configExists && status.configMarker !== null
     ? pass('config-marker', `Config marker is ${status.configMarker}.`)
@@ -427,6 +432,11 @@ export async function doctorAifMode(options = {}) {
       requireVerificationEvidence: true
     });
     diagnostics.push(renderArtifactContractDiagnostic(artifactContract));
+    coverage = await readOpenSpecCoverageMatrix(status.activeChange.changeId, {
+      ...options,
+      rootDir
+    });
+    diagnostics.push(renderCoverageDiagnostic(coverage));
   }
 
   if (status.mode === MODES.openspec && status.openspecCli.canValidate && status.activeChange.state === 'resolved') {
@@ -457,6 +467,7 @@ export async function doctorAifMode(options = {}) {
     mode: status.mode,
     status,
     artifactContract,
+    coverage,
     diagnostics,
     warnings,
     errors
@@ -1866,6 +1877,31 @@ function renderArtifactContractDiagnostic(result) {
     'aifhub-artifact-contract',
     `AIFHub OpenSpec artifact contract failed${first ? `: ${first.id}` : ''}.`
   );
+}
+
+function renderCoverageDiagnostic(result) {
+  if (!result?.exists) {
+    return warn('openspec-coverage-missing', `${result?.warnings?.[0] ?? 'Coverage matrix is missing.'} Run /aif-verify to regenerate coverage.`);
+  }
+
+  if (!result.ok) {
+    return fail('openspec-coverage-invalid', `${result.errors?.[0] ?? 'Coverage matrix is invalid.'} Run /aif-verify to regenerate coverage.`);
+  }
+
+  if (result.stale) {
+    return warn('openspec-coverage-stale', 'Coverage matrix is stale. Run /aif-verify to regenerate coverage.');
+  }
+
+  const summary = summarizeOpenSpecCoverage(result.coverage).replace(/\n/g, '; ');
+  if (result.coverage?.status === 'fail') {
+    return fail('openspec-coverage-failed', summary);
+  }
+
+  if (result.coverage?.status === 'warn') {
+    return warn('openspec-coverage-warn', summary);
+  }
+
+  return pass('openspec-coverage-pass', summary);
 }
 
 function createSkippedResult(reason) {

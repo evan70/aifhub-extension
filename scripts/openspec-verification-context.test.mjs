@@ -181,10 +181,12 @@ describe('OpenSpec verification context API', () => {
 
     const validationEvidencePath = path.join(rootDir, '.ai-factory', 'qa', 'add-oauth', 'openspec-validation.json');
     const statusEvidencePath = path.join(rootDir, '.ai-factory', 'qa', 'add-oauth', 'openspec-status.json');
+    const coveragePath = path.join(rootDir, '.ai-factory', 'qa', 'add-oauth', 'coverage.json');
     const verifyPath = path.join(rootDir, '.ai-factory', 'qa', 'add-oauth', 'verify.md');
 
     assert.equal(await pathExists(validationEvidencePath), true, 'validation evidence JSON should be written');
     assert.equal(await pathExists(statusEvidencePath), true, 'status evidence JSON should be written');
+    assert.equal(await pathExists(coveragePath), true, 'coverage matrix JSON should be written');
     assert.equal(await pathExists(verifyPath), true, 'verify.md summary should be written');
     assert.equal(await pathExists(path.join(rootDir, 'openspec', 'changes', 'add-oauth', 'verify.md')), false);
     assert.equal(await pathExists(path.join(rootDir, '.ai-factory', 'plans', 'add-oauth')), false);
@@ -194,7 +196,12 @@ describe('OpenSpec verification context API', () => {
     assert.deepEqual(validationEvidence.parsedJson, { valid: true });
     assert.equal(validationEvidence.rawStdoutPath, '.ai-factory/qa/add-oauth/raw/openspec-validate.stdout');
     assert.equal(validationEvidence.rawStderrPath, '.ai-factory/qa/add-oauth/raw/openspec-validate.stderr');
-    assert.match(await readFile(verifyPath, 'utf8'), /Code verification: PENDING/);
+    const coverage = await readJson(coveragePath);
+    assert.equal(coverage.schema_version, 1);
+    assert.equal(coverage.change_id, 'add-oauth');
+    const verifySummary = await readFile(verifyPath, 'utf8');
+    assert.match(verifySummary, /Code verification: PENDING/);
+    assert.match(verifySummary, /## Coverage/);
   });
 
   it('uses injected active-change resolver and runtime layout hooks', async () => {
@@ -508,6 +515,48 @@ describe('OpenSpec verification context API', () => {
     assert.equal(latest.validation.changeId, 'add-oauth');
     assert.equal(latest.status, null, 'missing optional status output should not throw');
     assert.equal(latest.verify.exists, true);
+    assert.equal(latest.coverage.exists, true, 'latest verification evidence should include coverage artifact status');
+  });
+
+  it('fails the verify gate when strict coverage has missing requirements', async () => {
+    const rootDir = await createTempRoot();
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'workflow:',
+      '  verify_mode: strict',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'openspec/changes/add-oauth/proposal.md', '# Proposal\n');
+    await writeFixture(rootDir, 'openspec/changes/add-oauth/design.md', '# Design\n');
+    await writeFixture(rootDir, 'openspec/changes/add-oauth/tasks.md', '# Tasks\n');
+    await writeFixture(rootDir, 'openspec/changes/add-oauth/specs/auth/spec.md', [
+      '# Auth Delta',
+      '',
+      '## ADDED Requirements',
+      '',
+      '### Requirement: OAuth Login',
+      '',
+      'The system MUST support OAuth login.',
+      ''
+    ].join('\n'));
+
+    await writeVerificationEvidence('add-oauth', {
+      validation: validationResult(),
+      status: null,
+      generatedRules: [],
+      shouldRunCodeVerification: true,
+      warnings: [],
+      errors: []
+    }, {
+      rootDir
+    });
+
+    const latest = await readLatestVerificationEvidence('add-oauth', { rootDir });
+
+    assert.equal(latest.coverage.coverage.status, 'fail');
+    assert.match(latest.verify.content, /Coverage matrix: FAIL/);
+    assert.equal(latest.gateResult.ok, true);
+    assert.equal(latest.gateResult.result.status, 'fail');
+    assert.ok(latest.gateResult.result.blockers.some((blocker) => blocker.id === 'coverage-missing-requirements'));
   });
 
   it('writes and reloads the final verify gate result block', async () => {
