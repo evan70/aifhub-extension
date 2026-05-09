@@ -66,10 +66,12 @@ They may also load derived/runtime artifacts:
 - `.ai-factory/rules/generated/openspec-base.md`
 - `.ai-factory/rules/generated/openspec-change-<change-id>.md`
 - `.ai-factory/rules/generated/openspec-merged-<change-id>.md`
+- `.ai-factory/rules/generated/openspec-rules-trace-<change-id>.json`
+- `.ai-factory/rules/generated/index.json`
 - `.ai-factory/state/<change-id>/**`
 - `.ai-factory/qa/<change-id>/**`
 
-Generated rules are derived guidance only. If generated rules conflict with canonical OpenSpec artifacts, canonical OpenSpec artifacts win.
+Generated rules and generated trace metadata are derived guidance only. If generated rules conflict with canonical OpenSpec artifacts, canonical OpenSpec artifacts win.
 
 Runner output from OpenSpec CLI commands is runtime guidance or evidence. It does not replace the canonical filesystem artifacts under `openspec/`.
 

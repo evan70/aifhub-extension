@@ -45,6 +45,10 @@ async function readGenerated(rootDir, fileName) {
   return readFile(path.join(rootDir, '.ai-factory', 'rules', 'generated', fileName), 'utf8');
 }
 
+async function readGeneratedJson(rootDir, fileName) {
+  return JSON.parse(await readGenerated(rootDir, fileName));
+}
+
 function missingCliDetection() {
   return {
     available: false,
@@ -118,6 +122,7 @@ describe('OpenSpec rules compiler API', () => {
     const {
       collectOpenSpecRuleSources,
       compileOpenSpecRules,
+      compileOpenSpecBaseRules,
       extractRequirementsFromShowJson,
       parseSpecMarkdownFallback,
       renderGeneratedRules,
@@ -125,6 +130,7 @@ describe('OpenSpec rules compiler API', () => {
     } = await loadCompiler();
 
     assert.equal(typeof compileOpenSpecRules, 'function');
+    assert.equal(typeof compileOpenSpecBaseRules, 'function');
     assert.equal(typeof collectOpenSpecRuleSources, 'function');
     assert.equal(typeof renderGeneratedRules, 'function');
     assert.equal(typeof writeGeneratedRules, 'function');
@@ -140,13 +146,16 @@ describe('compileOpenSpecRules filesystem fallback', () => {
     await createChange(rootDir, 'add-generated-rules');
     const specPath = await writeFixture(rootDir, 'openspec/specs/billing/spec.md', baseBillingSpec);
 
-    const result = await compileOpenSpecRules('add-generated-rules', compilerOptions(rootDir));
+    const result = await compileOpenSpecRules('add-generated-rules', compilerOptions(rootDir, {
+      now: new Date('2026-05-09T00:00:00.000Z')
+    }));
 
     assert.equal(result.ok, true);
     assert.equal(result.changeId, 'add-generated-rules');
     assert.equal(result.mode, 'filesystem-fallback');
     assert.deepEqual(result.errors, []);
-    assert.equal(result.files.length, 3);
+    assert.equal(result.files.length, 5);
+    assert.deepEqual(result.files.map((file) => file.kind), ['base', 'change', 'merged', 'trace', 'index']);
     assert.equal(result.files.every((file) => path.isAbsolute(file.path) && file.written), true);
     assert.equal(result.sources.some((source) => source.kind === 'base' && source.relativePath === 'openspec/specs/billing/spec.md'), true);
     assert.equal(result.warnings.some((warning) => warning.code === 'missing-cli'), true);
@@ -154,6 +163,8 @@ describe('compileOpenSpecRules filesystem fallback', () => {
     const baseRules = await readGenerated(rootDir, 'openspec-base.md');
     const changeRules = await readGenerated(rootDir, 'openspec-change-add-generated-rules.md');
     const mergedRules = await readGenerated(rootDir, 'openspec-merged-add-generated-rules.md');
+    const trace = await readGeneratedJson(rootDir, 'openspec-rules-trace-add-generated-rules.json');
+    const index = await readGeneratedJson(rootDir, 'index.json');
 
     assert.match(baseRules, /^# Generated OpenSpec Rules/m);
     assert.match(baseRules, /openspec\/specs\/billing\/spec\.md/);
@@ -164,8 +175,54 @@ describe('compileOpenSpecRules filesystem fallback', () => {
     assert.doesNotMatch(baseRules, /\d{4}-\d{2}-\d{2}T/);
     assert.match(changeRules, /No OpenSpec change requirements found/);
     assert.match(mergedRules, /Requirement: Track Usage/);
+    assert.equal(trace.schema_version, 1);
+    assert.equal(trace.validator, 'aifhub-generated-rules-trace');
+    assert.equal(trace.change_id, 'add-generated-rules');
+    assert.equal(trace.generated_at, '2026-05-09T00:00:00.000Z');
+    assert.deepEqual(trace.inputs, [
+      {
+        path: 'openspec/specs/billing/spec.md',
+        sha256: result.sources[0].fingerprint,
+        kind: 'base-spec'
+      }
+    ]);
+    assert.equal(trace.rules.length, 1);
+    assert.match(trace.rules[0].id, /^base-billing-track-usage-[a-f0-9]{8}$/);
+    assert.equal(trace.rules[0].severity, 'must');
+    assert.deepEqual(trace.rules[0].source, {
+      path: 'openspec/specs/billing/spec.md',
+      requirement: 'Track Usage'
+    });
+    assert.match(trace.rules[0].rule_text, /MUST track customer usage/);
+    assert.equal(index.schema_version, 1);
+    assert.equal(index.generated_at, '2026-05-09T00:00:00.000Z');
+    assert.deepEqual(index.base.inputs, trace.inputs);
+    assert.deepEqual(index.changes.map((entry) => entry.change_id), ['add-generated-rules']);
+    assert.equal(index.changes[0].trace, '.ai-factory/rules/generated/openspec-rules-trace-add-generated-rules.json');
+    assert.equal(index.changes[0].markdown.merged, '.ai-factory/rules/generated/openspec-merged-add-generated-rules.md');
     assert.equal(await readFile(specPath, 'utf8'), baseBillingSpec);
     assert.equal(await pathExists(path.join(rootDir, 'openspec', 'changes', 'add-generated-rules', '.ai-factory')), false);
+  });
+
+  it('refreshes base-only generated rules and index without requiring a change trace', async () => {
+    const { compileOpenSpecBaseRules } = await loadCompiler();
+    const rootDir = await createTempRoot();
+    await writeFixture(rootDir, 'openspec/specs/billing/spec.md', baseBillingSpec);
+
+    const result = await compileOpenSpecBaseRules(compilerOptions(rootDir, {
+      now: new Date('2026-05-09T01:00:00.000Z')
+    }));
+
+    assert.equal(result.ok, true);
+    assert.equal(result.changeId, null);
+    assert.deepEqual(result.files.map((file) => file.kind), ['base', 'index']);
+    assert.match(await readGenerated(rootDir, 'openspec-base.md'), /Requirement: Track Usage/);
+
+    const index = await readGeneratedJson(rootDir, 'index.json');
+    assert.equal(index.generated_at, '2026-05-09T01:00:00.000Z');
+    assert.equal(index.base.markdown, '.ai-factory/rules/generated/openspec-base.md');
+    assert.deepEqual(index.changes, []);
+    assert.equal(await pathExists(path.join(rootDir, '.ai-factory', 'rules', 'generated', 'openspec-rules-trace-add-generated-rules.json')), false);
   });
 
   it('compiles delta specs only and includes change metadata in change and merged output', async () => {

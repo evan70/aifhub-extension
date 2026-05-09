@@ -36,6 +36,10 @@ async function readFixture(rootDir, relativePath) {
   return readFile(path.join(rootDir, ...relativePath.split('/')), 'utf8');
 }
 
+async function readJsonFixture(rootDir, relativePath) {
+  return JSON.parse(await readFixture(rootDir, relativePath));
+}
+
 async function pathExists(rootDir, relativePath) {
   try {
     await access(path.join(rootDir, ...relativePath.split('/')));
@@ -131,6 +135,85 @@ describe('mode status', () => {
 
     assert.equal(status.mode, 'ai-factory');
     assert.equal(status.configMarker, 'ai-factory');
+  });
+
+  it('surfaces missing generated rules trace in status diagnostics', async () => {
+    const rootDir = await createTempRoot();
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: openspec',
+      'paths:',
+      '  plans: openspec/changes',
+      '  specs: openspec/specs',
+      '  state: .ai-factory/state',
+      '  qa: .ai-factory/qa',
+      '  generated_rules: .ai-factory/rules/generated',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'openspec/changes/add-oauth/proposal.md', '# Proposal\n');
+    await writeFixture(rootDir, 'openspec/changes/add-oauth/design.md', '# Design\n');
+    await writeFixture(rootDir, 'openspec/changes/add-oauth/tasks.md', '# Tasks\n');
+    await writeFixture(rootDir, 'openspec/changes/add-oauth/specs/auth/spec.md', '# Auth\n');
+    await writeFixture(rootDir, '.ai-factory/rules/generated/openspec-base.md', '# Generated\n\n## Source Fingerprints\n');
+    await writeFixture(rootDir, '.ai-factory/rules/generated/openspec-change-add-oauth.md', '# Generated\n\n## Source Fingerprints\n');
+    await writeFixture(rootDir, '.ai-factory/rules/generated/openspec-merged-add-oauth.md', '# Generated\n\n## Source Fingerprints\n');
+    await writeFixture(rootDir, '.ai-factory/rules/generated/index.json', '{"schema_version":1,"changes":[]}\n');
+
+    const status = await getModeStatus({
+      rootDir,
+      detectOpenSpec: async () => missingCliDetection(),
+      getCurrentBranch: async () => 'feat/add-oauth'
+    });
+
+    assert.equal(status.generatedRules.state, 'missing');
+    assert.ok(status.generatedRules.missing.includes('openspec-rules-trace-add-oauth.json'));
+    assert.ok(status.generatedRules.warnings.some((warning) => warning.code === 'missing-generated-rules-trace'));
+  });
+
+  it('limits generated-rule status inspection to an explicit change when provided', async () => {
+    const rootDir = await createTempRoot();
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: openspec',
+      'paths:',
+      '  plans: openspec/changes',
+      '  specs: openspec/specs',
+      '  state: .ai-factory/state',
+      '  qa: .ai-factory/qa',
+      '  generated_rules: .ai-factory/rules/generated',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'openspec/config.yaml', 'project: test\n');
+    await writeFixture(rootDir, 'openspec/changes/add-oauth/proposal.md', '# Proposal\n');
+    await writeFixture(rootDir, 'openspec/changes/add-oauth/specs/auth/spec.md', [
+      '# Auth',
+      '',
+      '## ADDED Requirements',
+      '',
+      '### Requirement: OAuth',
+      '',
+      'The system MUST support OAuth.',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'openspec/changes/add-passkeys/proposal.md', '# Proposal\n');
+
+    await syncOpenSpecArtifacts({
+      rootDir,
+      changeId: 'add-oauth',
+      detectOpenSpec: async () => missingCliDetection(),
+      timestamp: '2026-04-29T03-00-00-000Z'
+    });
+
+    const explicit = await getModeStatus({
+      rootDir,
+      changeId: 'add-oauth',
+      detectOpenSpec: async () => missingCliDetection(),
+      getCurrentBranch: async () => 'feat/add-oauth'
+    });
+
+    assert.equal(explicit.activeChange.changeId, 'add-oauth');
+    assert.equal(explicit.generatedRules.state, 'ok');
+    assert.deepEqual(explicit.generatedRules.missing, []);
   });
 });
 
@@ -244,9 +327,25 @@ describe('artifact sync and export', () => {
     });
 
     assert.equal(result.ok, true);
+    assert.deepEqual(result.generatedRules.files.map((file) => file.kind), ['base', 'change', 'merged', 'trace', 'index']);
     assert.match(await readFixture(rootDir, '.ai-factory/rules/generated/openspec-base.md'), /No base OpenSpec requirements found/);
     assert.match(await readFixture(rootDir, '.ai-factory/rules/generated/openspec-change-add-mfa.md'), /Requirement: Require MFA/);
     assert.match(await readFixture(rootDir, '.ai-factory/rules/generated/openspec-merged-add-mfa.md'), /Requirement: Require MFA/);
+    const trace = await readJsonFixture(rootDir, '.ai-factory/rules/generated/openspec-rules-trace-add-mfa.json');
+    const index = await readJsonFixture(rootDir, '.ai-factory/rules/generated/index.json');
+    assert.equal(trace.schema_version, 1);
+    assert.equal(trace.change_id, 'add-mfa');
+    assert.deepEqual(trace.inputs.map((input) => input.kind), ['delta-spec']);
+    assert.equal(index.base.markdown, '.ai-factory/rules/generated/openspec-base.md');
+    assert.deepEqual(index.changes.map((entry) => entry.change_id), ['add-mfa']);
+    assert.equal(index.changes[0].trace, '.ai-factory/rules/generated/openspec-rules-trace-add-mfa.json');
+
+    const status = await getModeStatus({
+      rootDir,
+      detectOpenSpec: async () => missingCliDetection(),
+      getCurrentBranch: async () => 'feat/add-mfa'
+    });
+    assert.equal(status.generatedRules.state, 'ok');
     assert.equal(result.validation.skipped, true);
     assert.equal(result.validation.reason, 'missing-cli');
     assert.equal(await pathExists(rootDir, '.ai-factory/state/mode-switches/2026-04-29T00-00-00-000Z-sync-openspec.md'), true);
@@ -311,6 +410,8 @@ describe('artifact sync and export', () => {
     assert.match(await readFixture(rootDir, '.ai-factory/rules/generated/openspec-base.md'), /Requirement: Base Auth/);
     assert.match(await readFixture(rootDir, '.ai-factory/rules/generated/openspec-change-add-mfa.md'), /Requirement: Require MFA/);
     assert.match(await readFixture(rootDir, '.ai-factory/rules/generated/openspec-merged-add-passkeys.md'), /Requirement: Support Passkeys/);
+    const index = await readJsonFixture(rootDir, '.ai-factory/rules/generated/index.json');
+    assert.deepEqual(index.changes.map((entry) => entry.change_id), ['add-mfa', 'add-passkeys']);
   });
 
   it('skips sync validation for active changes without delta specs', async () => {
@@ -464,9 +565,13 @@ describe('artifact sync and export', () => {
     assert.deepEqual(result.changes.changeIds, []);
     assert.equal(result.generatedRules.baseOnly, true);
     assert.equal(result.generatedRules.changeSpecificSkipped, true);
+    assert.deepEqual(result.generatedRules.files.map((file) => file.kind), ['base', 'index']);
     assert.equal(result.validation.skipped, true);
     assert.equal(result.validation.reason, 'no-selected-changes');
     assert.match(await readFixture(rootDir, '.ai-factory/rules/generated/openspec-base.md'), /Requirement: Accepted Auth/);
+    const index = await readJsonFixture(rootDir, '.ai-factory/rules/generated/index.json');
+    assert.equal(index.base.markdown, '.ai-factory/rules/generated/openspec-base.md');
+    assert.deepEqual(index.changes, []);
     assert.equal(await pathExists(rootDir, '.ai-factory/rules/generated/openspec-change-accepted-auth.md'), false);
     assert.equal(await pathExists(rootDir, 'openspec/changes/.ai-factory'), false);
     assert.equal(await pathExists(rootDir, '.ai-factory/state/mode-switches/2026-04-29T02-00-00-000Z-sync-openspec.md'), true);

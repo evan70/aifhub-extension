@@ -415,8 +415,12 @@ async function inspectGeneratedRules(changeId, options) {
 
   const missing = generated.generatedRules.filter((rule) => !rule.exists);
   const stale = generated.generatedRules.filter((rule) => rule.stale === true);
+  const traceWarnings = generated.warnings.filter((warning) =>
+    warning.code !== 'missing-generated-rules'
+    && warning.code !== 'stale-generated-rules'
+  );
 
-  if (missing.length === 0 && stale.length === 0) {
+  if (missing.length === 0 && stale.length === 0 && traceWarnings.length === 0) {
     return [
       createCheck({
         id: 'generated-rules-current',
@@ -439,6 +443,13 @@ async function inspectGeneratedRules(changeId, options) {
       status: 'warn',
       path: rule.path,
       message: 'Generated OpenSpec rules are stale.'
+    })),
+    ...traceWarnings.map((warning) => createCheck({
+      id: 'generated-rules-current',
+      status: 'warn',
+      path: warning.path ?? '.ai-factory/rules/generated',
+      message: warning.message,
+      details: warning
     }))
   ];
 }

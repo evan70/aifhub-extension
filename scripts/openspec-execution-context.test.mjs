@@ -1,6 +1,7 @@
 // openspec-execution-context.test.mjs - tests for OpenSpec implement/fix runtime context
 import { afterEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { access, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -63,6 +64,30 @@ async function createGeneratedRules(rootDir, changeId = 'add-oauth', options = {
   }));
 }
 
+async function createGeneratedRulesTrace(rootDir, changeId = 'add-oauth', options = {}) {
+  const baseFingerprint = options.baseFingerprint ?? fingerprint(baseAuthSpec);
+  const changeFingerprint = options.changeFingerprint ?? fingerprint(deltaAuthSpec);
+  await writeFixture(rootDir, `.ai-factory/rules/generated/openspec-rules-trace-${changeId}.json`, `${JSON.stringify({
+    schema_version: 1,
+    validator: 'aifhub-generated-rules-trace',
+    change_id: changeId,
+    generated_at: '2026-05-09T00:00:00.000Z',
+    inputs: [
+      {
+        path: 'openspec/specs/auth/spec.md',
+        sha256: baseFingerprint,
+        kind: 'base-spec'
+      },
+      {
+        path: `openspec/changes/${changeId}/specs/auth/spec.md`,
+        sha256: changeFingerprint,
+        kind: 'delta-spec'
+      }
+    ],
+    rules: []
+  }, null, 2)}\n`);
+}
+
 async function pathExists(targetPath) {
   try {
     await access(targetPath);
@@ -109,6 +134,10 @@ function generatedRulesContent({ title, fingerprints }) {
     ...fingerprints.map((fingerprint) => `- ${fingerprint}`),
     ''
   ].join('\n');
+}
+
+function fingerprint(content) {
+  return `sha256:${createHash('sha256').update(content).digest('hex')}`;
 }
 
 const baseAuthSpec = `# Auth
@@ -252,6 +281,86 @@ describe('OpenSpec execution context API', () => {
     ]);
     assert.deepEqual(result.openspecInstructions.json, { steps: ['apply change'] });
     assert.equal(result.openspecInstructions.available, true);
+  });
+
+  it('prefers trace input hashes over markdown fingerprints for generated-rule freshness', async () => {
+    const { collectGeneratedRules } = await loadExecutionContext();
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir, 'add-oauth');
+    await createGeneratedRules(rootDir, 'add-oauth', {
+      baseFingerprint: 'sha256:stale-markdown-base',
+      changeFingerprint: 'sha256:stale-markdown-change'
+    });
+    await createGeneratedRulesTrace(rootDir, 'add-oauth');
+
+    const result = await collectGeneratedRules('add-oauth', { rootDir });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.generatedRules.every((item) => item.stale === false), true);
+    assert.equal(result.generatedRules.every((item) => item.staleSource === 'trace'), true);
+    assert.equal(result.generatedRules.every((item) => item.trace.exists && item.trace.valid), true);
+    assert.equal(result.warnings.some((warning) => warning.code === 'stale-generated-rules'), false);
+  });
+
+  it('warns when trace is missing while preserving markdown fingerprint fallback', async () => {
+    const { collectGeneratedRules } = await loadExecutionContext();
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir, 'add-oauth');
+    await createGeneratedRules(rootDir, 'add-oauth', {
+      baseFingerprint: fingerprint(baseAuthSpec),
+      changeFingerprint: fingerprint(deltaAuthSpec)
+    });
+
+    const result = await collectGeneratedRules('add-oauth', { rootDir });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.generatedRules.every((item) => item.stale === false), true);
+    assert.equal(result.generatedRules.every((item) => item.staleSource === 'markdown'), true);
+    assert.ok(result.warnings.some((warning) => warning.code === 'missing-generated-rules-trace'));
+    assert.equal(result.warnings.some((warning) => warning.code === 'stale-generated-rules'), false);
+  });
+
+  it('detects stale generated rules from trace input hash drift', async () => {
+    const { collectGeneratedRules } = await loadExecutionContext();
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir, 'add-oauth');
+    await createGeneratedRules(rootDir, 'add-oauth', {
+      baseFingerprint: fingerprint(baseAuthSpec),
+      changeFingerprint: fingerprint(deltaAuthSpec)
+    });
+    await createGeneratedRulesTrace(rootDir, 'add-oauth', {
+      baseFingerprint: 'sha256:old-base',
+      changeFingerprint: fingerprint(deltaAuthSpec)
+    });
+
+    const result = await collectGeneratedRules('add-oauth', { rootDir });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.generatedRules.find((item) => item.kind === 'base').stale, true);
+    assert.equal(result.generatedRules.find((item) => item.kind === 'change').stale, false);
+    assert.equal(result.generatedRules.find((item) => item.kind === 'merged').stale, true);
+    assert.ok(result.warnings.some((warning) => warning.code === 'stale-generated-rules'));
+  });
+
+  it('warns on invalid trace JSON and falls back to markdown fingerprints', async () => {
+    const { collectGeneratedRules } = await loadExecutionContext();
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir, 'add-oauth');
+    await createGeneratedRules(rootDir, 'add-oauth', {
+      baseFingerprint: fingerprint(baseAuthSpec),
+      changeFingerprint: fingerprint(deltaAuthSpec)
+    });
+    await writeFixture(rootDir, '.ai-factory/rules/generated/openspec-rules-trace-add-oauth.json', JSON.stringify({
+      schema_version: 1,
+      change_id: 'add-oauth'
+    }, null, 2));
+
+    const result = await collectGeneratedRules('add-oauth', { rootDir });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.generatedRules.every((item) => item.stale === false), true);
+    assert.equal(result.generatedRules.every((item) => item.staleSource === 'markdown'), true);
+    assert.ok(result.warnings.some((warning) => warning.code === 'invalid-generated-rules-trace'));
   });
 
   it('skips OpenSpec apply instructions when useInstructionsApply is false', async () => {

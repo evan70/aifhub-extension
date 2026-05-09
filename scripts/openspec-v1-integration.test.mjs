@@ -351,23 +351,29 @@ describe('Generated rules integration', () => {
     ];
     const first = await compileOpenSpecRules('add-oauth', {
       rootDir,
+      now: new Date('2026-05-09T00:00:00.000Z'),
       detectOpenSpec: async () => missingCliDetection(),
       getCurrentBranch: async () => 'feat/add-oauth'
     });
     const outputsAfterFirst = {
       base: await readText(rootDir, '.ai-factory/rules/generated/openspec-base.md'),
       change: await readText(rootDir, '.ai-factory/rules/generated/openspec-change-add-oauth.md'),
-      merged: await readText(rootDir, '.ai-factory/rules/generated/openspec-merged-add-oauth.md')
+      merged: await readText(rootDir, '.ai-factory/rules/generated/openspec-merged-add-oauth.md'),
+      trace: await readText(rootDir, '.ai-factory/rules/generated/openspec-rules-trace-add-oauth.json'),
+      index: await readText(rootDir, '.ai-factory/rules/generated/index.json')
     };
     const second = await compileOpenSpecRules('add-oauth', {
       rootDir,
+      now: new Date('2026-05-09T00:00:00.000Z'),
       detectOpenSpec: async () => missingCliDetection(),
       getCurrentBranch: async () => 'feat/add-oauth'
     });
     const outputsAfterSecond = {
       base: await readText(rootDir, '.ai-factory/rules/generated/openspec-base.md'),
       change: await readText(rootDir, '.ai-factory/rules/generated/openspec-change-add-oauth.md'),
-      merged: await readText(rootDir, '.ai-factory/rules/generated/openspec-merged-add-oauth.md')
+      merged: await readText(rootDir, '.ai-factory/rules/generated/openspec-merged-add-oauth.md'),
+      trace: await readText(rootDir, '.ai-factory/rules/generated/openspec-rules-trace-add-oauth.json'),
+      index: await readText(rootDir, '.ai-factory/rules/generated/index.json')
     };
     const afterCanonical = [
       ...await listFiles(rootDir, 'openspec/specs'),
@@ -379,7 +385,9 @@ describe('Generated rules integration', () => {
     assert.deepEqual(first.files.map((file) => path.relative(rootDir, file.path).replaceAll('\\', '/')), [
       '.ai-factory/rules/generated/openspec-base.md',
       '.ai-factory/rules/generated/openspec-change-add-oauth.md',
-      '.ai-factory/rules/generated/openspec-merged-add-oauth.md'
+      '.ai-factory/rules/generated/openspec-merged-add-oauth.md',
+      '.ai-factory/rules/generated/openspec-rules-trace-add-oauth.json',
+      '.ai-factory/rules/generated/index.json'
     ]);
     assert.deepEqual(outputsAfterSecond, outputsAfterFirst);
     assert.deepEqual(afterCanonical, beforeCanonical);
@@ -389,6 +397,11 @@ describe('Generated rules integration', () => {
     assert.match(outputsAfterFirst.merged, /openspec\/specs\/auth\/spec\.md/);
     assert.match(outputsAfterFirst.merged, /openspec\/changes\/add-oauth\/specs\/auth\/spec\.md/);
     assert.doesNotMatch(outputsAfterFirst.merged, /\b\d{4}-\d{2}-\d{2}T\d{2}:/);
+    const trace = JSON.parse(outputsAfterFirst.trace);
+    const index = JSON.parse(outputsAfterFirst.index);
+    assert.equal(trace.generated_at, '2026-05-09T00:00:00.000Z');
+    assert.deepEqual(trace.inputs.map((input) => input.kind), ['base-spec', 'delta-spec']);
+    assert.deepEqual(index.changes.map((entry) => entry.change_id), ['add-oauth']);
   });
 });
 

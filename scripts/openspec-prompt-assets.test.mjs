@@ -310,6 +310,10 @@ describe('OpenSpec-native prompt asset contract', () => {
       assert.notEqual(mergedIndex, -1, `${relativePath} missing merged generated rules priority`);
       assert.notEqual(changeIndex, -1, `${relativePath} missing change generated rules priority`);
       assert.notEqual(generatedBaseIndex, -1, `${relativePath} missing base generated rules priority`);
+      assertIncludes(openspec, '.ai-factory/rules/generated/openspec-rules-trace-<change-id>.json', `${relativePath} OpenSpec-native mode`);
+      assertIncludes(openspec, '.ai-factory/rules/generated/index.json', `${relativePath} OpenSpec-native mode`);
+      assertIncludes(openspec, 'source.path', `${relativePath} OpenSpec-native mode`);
+      assertIncludes(openspec, 'source.requirement', `${relativePath} OpenSpec-native mode`);
       assert.ok(mergedIndex < changeIndex, `${relativePath} merged generated rules should be highest priority`);
       assert.ok(changeIndex < generatedBaseIndex, `${relativePath} change generated rules should precede base generated rules`);
       assert.ok(generatedBaseIndex < projectRulesIndex, `${relativePath} generated rules should precede project rules`);

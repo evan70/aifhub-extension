@@ -261,6 +261,11 @@ describe('aif-rules-check gate contract', () => {
       assert.match(asset, /final machine-readable `aif-gate-result` fenced JSON block/i);
       assert.match(asset, /"gate": "rules"/);
       assert.match(asset, /lowercase JSON `status`: `pass`, `warn`, or `fail`/);
+      assert.match(asset, /openspec-rules-trace-<change-id>\.json/);
+      assert.match(asset, /source\.path/);
+      assert.match(asset, /source\.requirement/);
+      assert.match(asset, /capped at `WARN`/i);
+      assert.match(asset, /Do not return final `status: "fail"` solely/i);
     }
   });
 
@@ -284,6 +289,10 @@ describe('aif-rules-check gate contract', () => {
       assert.match(asset, /"gate": "rules"/);
       assert.match(asset, /Verdict: PASS/);
       assert.match(asset, /\.ai-factory\/rules\/generated\/\*/);
+      assert.match(asset, /openspec-rules-trace-<change-id>\.json/);
+      assert.match(asset, /source\.path/);
+      assert.match(asset, /source\.requirement/);
+      assert.match(asset, /cap .*WARN/i);
       assert.match(asset, /upstream .*rules-sidecar/i);
       assert.match(asset, /Do not edit files/);
     }
