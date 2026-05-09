@@ -716,6 +716,7 @@ export async function inspectGeneratedRules(options = {}) {
       if (!rule.exists) {
         missing.push(fileName);
       } else if (rule.stale === true) {
+        // Includes source-hash drift and generated markdown output hash drift.
         stale.push(fileName);
       }
     }
