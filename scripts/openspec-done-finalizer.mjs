@@ -540,11 +540,15 @@ export async function assertRulesGateAcceptable(changeId, options = {}) {
     };
   }
 
+  const rulesGatePolicyMessage = requireRulesPass
+    ? `Refusing to archive because rules gate evidence is ${rulesGate.status}.`
+    : `Rules gate evidence is ${rulesGate.status}; continuing because requireRulesPassForDone is false.`;
+
   return createRulesGatePolicyResult({
-    blocking: requireRulesPass || rulesGate.status === 'fail' || rulesGate.status === 'invalid' || rulesGate.status === 'warn',
+    blocking: requireRulesPass,
     changeId: normalized.changeId,
     code: rulesGate.errors?.[0]?.code ?? `rules-gate-${rulesGate.status}`,
-    message: rulesGate.errors?.[0]?.message ?? `Refusing to archive because rules gate evidence is ${rulesGate.status}.`,
+    message: rulesGate.errors?.[0]?.message ?? rulesGatePolicyMessage,
     rulesGate
   });
 }

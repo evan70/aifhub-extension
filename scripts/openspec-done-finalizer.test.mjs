@@ -561,6 +561,54 @@ describe('OpenSpec done finalizer API', () => {
     assert.equal(passed.ok, true);
   });
 
+  it('allows non-pass rules gate results when done policy does not require pass', async () => {
+    const rootDir = await createTempRoot();
+    const relaxedPolicy = {
+      requirements: { rulesPass: { done: false } },
+      allowWarnOnDone: { rules: false }
+    };
+
+    const missing = await assertRulesGateAcceptable('add-oauth', {
+      rootDir,
+      policy: relaxedPolicy
+    });
+    assert.equal(missing.ok, true);
+    assert.equal(missing.rulesGate.status, 'missing');
+    assert.equal(missing.warnings.at(-1).code, 'rules-gate-evidence-missing');
+
+    await writeRulesGateEvidence(rootDir, 'add-oauth', 'warn');
+    const warned = await assertRulesGateAcceptable('add-oauth', {
+      rootDir,
+      policy: relaxedPolicy
+    });
+    assert.equal(warned.ok, true);
+    assert.equal(warned.rulesGate.status, 'warn');
+    assert.equal(warned.warnings.at(-1).code, 'rules-gate-warn');
+
+    await writeRulesGateEvidence(rootDir, 'add-oauth', 'fail');
+    const failed = await assertRulesGateAcceptable('add-oauth', {
+      rootDir,
+      policy: relaxedPolicy
+    });
+    assert.equal(failed.ok, true);
+    assert.equal(failed.rulesGate.status, 'fail');
+    assert.equal(failed.warnings.at(-1).code, 'rules-gate-fail');
+    assert.match(failed.warnings.at(-1).message, /requireRulesPassForDone is false/);
+
+    const invalid = await assertRulesGateAcceptable('add-oauth', {
+      rootDir,
+      policy: relaxedPolicy,
+      rulesGateEvidence: {
+        exists: true,
+        path: '.ai-factory/qa/add-oauth/rules.md',
+        gateResult: { ok: false }
+      }
+    });
+    assert.equal(invalid.ok, true);
+    assert.equal(invalid.rulesGate.status, 'invalid');
+    assert.equal(invalid.warnings.at(-1).code, 'rules-gate-result-invalid');
+  });
+
   it('detects dirty working tree state and records it only when explicit', async () => {
     const clean = await detectWorkingTreeState({
       gitStatus: async () => ({ exitCode: 0, stdout: '', stderr: '' })
