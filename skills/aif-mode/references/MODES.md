@@ -18,8 +18,20 @@ aifhub:
     useInstructionsApply: true
     compileRulesOnSync: true
     validateOnSync: true
+    requireCliForPlan: false
+    requireCliForImprove: false
     requireCliForVerify: false
     requireCliForDone: true
+    requireGeneratedRulesForVerify: false
+    requireGeneratedRulesForDone: true
+    requireRulesPassForVerify: false
+    requireRulesPassForDone: true
+    requireSpecCoverageForVerify: false
+    requireSpecCoverageForDone: true
+    allowWarnOnDone:
+      rules: false
+      coverage: false
+      openspecStatus: true
 
 paths:
   plans: openspec/changes

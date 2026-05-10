@@ -60,6 +60,7 @@ Runtime state and QA evidence are external context only:
 
 - Name `.ai-factory/state/<change-id>/` as the runtime state path when useful.
 - Name `.ai-factory/qa/<change-id>/` as the QA evidence path when useful.
+- When strict done policy needs durable rules evidence, name `.ai-factory/qa/<change-id>/rules.md` as the expected storage location for the final rules `aif-gate-result`, but keep this gate read-only.
 - Do not write runtime state, QA evidence, generated rules, rule artifacts, source files, or canonical OpenSpec artifacts.
 
 The final response must still follow the upstream rules-check output contract and end with exactly one final machine-readable `aif-gate-result` fenced JSON block. Use `"gate": "rules"` and lowercase JSON `status`: `pass`, `warn`, or `fail`.

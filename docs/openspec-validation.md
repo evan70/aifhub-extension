@@ -84,6 +84,8 @@ Missing verification evidence suggests:
 
 `/aif-mode doctor --change <change-id>` includes the full validator result in JSON as `artifactContract` and adds a human diagnostic line. Doctor requires verification evidence because it is a pre-archive readiness check.
 
+Doctor also reports `effectivePolicy` from `scripts/openspec-policy.mjs`, including CLI, generated-rules, rules-gate, spec-coverage, and `allowWarnOnDone` settings. Human diagnostics show whether missing or warning evidence is only degraded or blocking under the current policy.
+
 `/aif-done` runs the validator with verification evidence required and refuses to archive when the validator returns `fail`.
 
 `/aif-verify` still writes validation/status/verify evidence under `.ai-factory/qa/<change-id>/` and does not archive. It also writes the separate OpenSpec coverage matrix described in [OpenSpec Coverage Matrix](spec-coverage.md).

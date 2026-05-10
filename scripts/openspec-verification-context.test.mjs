@@ -13,6 +13,8 @@ import {
   writeVerificationEvidence
 } from './openspec-verification-context.mjs';
 import {
+  createGateResult,
+  renderGateResultBlock,
   getLatestGateResult
 } from './aif-gate-result.mjs';
 
@@ -378,6 +380,62 @@ describe('OpenSpec verification context API', () => {
     assert.equal(strict.ok, false, 'strict missing CLI should fail verification context');
     assert.equal(strict.shouldRunCodeVerification, false, 'strict missing CLI should stop code verification');
     assert.equal(strict.errors[0].code, 'openspec-cli-required');
+  });
+
+  it('applies strict generated-rules and rules-gate policy overrides', async () => {
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir);
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  openspec:',
+      '    requireGeneratedRulesForVerify: true',
+      '    requireRulesPassForVerify: true',
+      ''
+    ].join('\n'));
+
+    const missingEvidence = await buildVerificationContext({
+      rootDir,
+      changeId: 'add-oauth',
+      detectOpenSpec: async () => availableCliDetection(),
+      validateOpenSpecChange: async () => validationResult(),
+      getOpenSpecStatus: async () => statusResult()
+    });
+
+    assert.equal(missingEvidence.ok, false);
+    assert.ok(missingEvidence.errors.some((error) => error.code === 'missing-generated-rules'));
+    assert.ok(missingEvidence.errors.some((error) => error.code === 'rules-gate-evidence-missing'));
+
+    await writeFixture(rootDir, '.ai-factory/qa/add-oauth/rules.md', [
+      '# Rules Gate',
+      '',
+      renderGateResultBlock(createGateResult({
+        gate: 'rules',
+        status: 'pass',
+        blockers: [],
+        affectedFiles: [],
+        suggestedNext: null
+      })),
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  openspec:',
+      '    requireGeneratedRulesForVerify: false',
+      '    requireRulesPassForVerify: true',
+      ''
+    ].join('\n'));
+
+    const rulesPassed = await buildVerificationContext({
+      rootDir,
+      changeId: 'add-oauth',
+      detectOpenSpec: async () => availableCliDetection(),
+      validateOpenSpecChange: async () => validationResult(),
+      getOpenSpecStatus: async () => statusResult()
+    });
+
+    assert.equal(rulesPassed.ok, true);
+    assert.equal(rulesPassed.rulesGate.status, 'pass');
+    assert.ok(rulesPassed.warnings.some((warning) => warning.code === 'missing-generated-rules'));
   });
 
   it('skips validation when config disables validateOnVerify', async () => {

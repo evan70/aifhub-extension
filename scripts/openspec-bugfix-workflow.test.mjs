@@ -189,8 +189,20 @@ async function createOpenSpecConfig(rootDir) {
     '    validateOnSync: true',
     '    validateOnVerify: true',
     '    statusOnVerify: true',
+    '    requireCliForPlan: false',
+    '    requireCliForImprove: false',
     '    requireCliForVerify: false',
     '    requireCliForDone: true',
+    '    requireGeneratedRulesForVerify: false',
+    '    requireGeneratedRulesForDone: true',
+    '    requireRulesPassForVerify: false',
+    '    requireRulesPassForDone: true',
+    '    requireSpecCoverageForVerify: false',
+    '    requireSpecCoverageForDone: true',
+    '    allowWarnOnDone:',
+    '      rules: false',
+    '      coverage: false',
+    '      openspecStatus: true',
     'paths:',
     '  plans: openspec/changes',
     '  specs: openspec/specs',
@@ -241,6 +253,8 @@ async function createBugFixChange(rootDir, changeId, requirementName = 'Login re
 
 async function finalizeWithArchive(rootDir, changeId) {
   const archiveCalls = [];
+  await writeRulesGateEvidence(rootDir, changeId);
+  await writePassingCoverageEvidence(rootDir, changeId);
   const finalized = await finalizeOpenSpecChange({
     rootDir,
     changeId,
@@ -254,6 +268,46 @@ async function finalizeWithArchive(rootDir, changeId) {
   });
 
   return { finalized, archiveCalls };
+}
+
+async function writeRulesGateEvidence(rootDir, changeId) {
+  await writeFixture(rootDir, `.ai-factory/qa/${changeId}/rules.md`, [
+    '# Rules Gate',
+    '',
+    renderGateResultBlock(createGateResult({
+      gate: 'rules',
+      status: 'pass',
+      blockers: [],
+      affectedFiles: [],
+      suggestedNext: null
+    })),
+    ''
+  ].join('\n'));
+}
+
+async function writePassingCoverageEvidence(rootDir, changeId) {
+  await writeFixture(rootDir, `.ai-factory/qa/${changeId}/coverage.json`, JSON.stringify({
+    schema_version: 1,
+    change_id: changeId,
+    status: 'pass',
+    blocking: false,
+    policy: {
+      mode: 'strict',
+      missing_requirement: 'fail'
+    },
+    requirements: [],
+    summary: {
+      covered: 0,
+      partial: 0,
+      missing: 0,
+      not_applicable: 0
+    },
+    sources: [],
+    stale: false,
+    diagnostics: [],
+    warnings: [],
+    errors: []
+  }, null, 2));
 }
 
 afterEach(async () => {

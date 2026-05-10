@@ -114,6 +114,8 @@ describe('mode status', () => {
     assert.equal(status.openSpecChanges.length, 1);
     assert.equal(status.activeChange.changeId, 'add-oauth');
     assert.equal(status.generatedRules.state, 'missing');
+    assert.equal(status.effectivePolicy.requirements.cli.done, true);
+    assert.equal(status.effectivePolicy.requirements.specCoverage.verify, false);
   });
 
   it('reports AI Factory mode', async () => {
@@ -301,8 +303,20 @@ describe('mode switching', () => {
       'useInstructionsApply: true',
       'compileRulesOnSync: true',
       'validateOnSync: true',
+      'requireCliForPlan: false',
+      'requireCliForImprove: false',
       'requireCliForVerify: false',
-      'requireCliForDone: true'
+      'requireCliForDone: true',
+      'requireGeneratedRulesForVerify: false',
+      'requireGeneratedRulesForDone: true',
+      'requireRulesPassForVerify: false',
+      'requireRulesPassForDone: true',
+      'requireSpecCoverageForVerify: false',
+      'requireSpecCoverageForDone: true',
+      'allowWarnOnDone:',
+      'rules: false',
+      'coverage: false',
+      'openspecStatus: true'
     ]) {
       assert.match(config, new RegExp(line), `OpenSpec config should include ${line}`);
     }
@@ -759,6 +773,9 @@ describe('doctor', () => {
       '  artifactProtocol: openspec',
       '  openspec:',
       '    archiveOnDone: true',
+      '    requireGeneratedRulesForDone: false',
+      '    requireRulesPassForDone: false',
+      '    requireSpecCoverageForDone: false',
       'paths:',
       '  plans: openspec/changes',
       '  specs: openspec/specs',
@@ -793,6 +810,9 @@ describe('doctor', () => {
       '  artifactProtocol: openspec',
       '  openspec:',
       '    archiveOnDone: true',
+      '    requireGeneratedRulesForDone: false',
+      '    requireRulesPassForDone: false',
+      '    requireSpecCoverageForDone: false',
       'paths:',
       '  plans: openspec/changes',
       '  specs: openspec/specs',
@@ -836,7 +856,9 @@ describe('doctor', () => {
 
     assert.deepEqual(validated, ['beta']);
     assert.equal(result.ok, true);
+    assert.equal(result.effectivePolicy.requirements.generatedRules.done, false);
     assert.ok(result.diagnostics.some((item) => item.code === 'active-change'));
+    assert.ok(result.diagnostics.some((item) => item.code === 'openspec-effective-policy'));
     assert.ok(result.diagnostics.some((item) => item.code === 'openspec-validation'));
   });
 

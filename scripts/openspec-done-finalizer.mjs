@@ -32,6 +32,10 @@ import {
   readOpenSpecCoverageMatrix,
   summarizeOpenSpecCoverage
 } from './openspec-coverage-matrix.mjs';
+import {
+  readOpenSpecPolicy,
+  readOpenSpecRulesGateEvidence
+} from './openspec-policy.mjs';
 
 const execFileAsync = promisify(execFile);
 const MODE = 'openspec-native';
@@ -73,7 +77,8 @@ export async function finalizeOpenSpecChange(options = {}) {
 
   const archive = await archiveChangeWithOpenSpec(context.changeId, {
     ...options,
-    rootDir
+    rootDir,
+    policy: context.effectivePolicy
   });
 
   const baseResult = {
@@ -194,6 +199,8 @@ export async function buildDoneContext(options = {}) {
     ...options,
     rootDir
   });
+  const effectivePolicy = options.policy ?? await readOpenSpecPolicy({ ...options, rootDir });
+  const generatedRulesPolicy = classifyGeneratedRulesForDone(generatedRules, effectivePolicy);
   const verification = await assertVerificationPassed(resolverResult.changeId, {
     ...options,
     rootDir,
@@ -202,7 +209,14 @@ export async function buildDoneContext(options = {}) {
   const coverage = await assertCoverageAcceptable(resolverResult.changeId, {
     ...options,
     rootDir,
-    qaPath: layout.qaPath
+    qaPath: layout.qaPath,
+    policy: effectivePolicy
+  });
+  const rulesGate = await assertRulesGateAcceptable(resolverResult.changeId, {
+    ...options,
+    rootDir,
+    qaPath: layout.qaPath,
+    policy: effectivePolicy
   });
   const validateOpenSpecArtifactContract = options.validateOpenSpecArtifactContract ?? defaultValidateOpenSpecArtifactContract;
   const artifactContract = await validateOpenSpecArtifactContract({
@@ -213,24 +227,31 @@ export async function buildDoneContext(options = {}) {
   });
   const runtimeTraces = await collectRuntimeTraces(rootDir, layout.statePath);
   const openspec = await detectOpenSpecCapability(options, rootDir);
+  const openspecPolicy = classifyOpenSpecCliForDone(openspec, effectivePolicy);
   const warnings = dedupeDiagnostics([
     ...resolverResult.warnings,
     ...canonical.warnings,
-    ...generatedRules.warnings,
+    ...generatedRulesPolicy.warnings,
     ...verification.warnings,
     ...coverage.warnings,
+    ...rulesGate.warnings,
     ...artifactContractWarnings(artifactContract),
     ...runtimeTraces.warnings,
-    ...openspec.warnings
+    ...openspec.warnings,
+    ...openspecPolicy.warnings,
+    ...(effectivePolicy.diagnostics ?? [])
   ]);
   const errors = [
     ...canonical.errors,
-    ...generatedRules.errors,
     ...verification.errors,
     ...coverage.errors,
+    ...rulesGate.errors,
+    ...generatedRules.errors,
+    ...generatedRulesPolicy.errors,
     ...artifactContractErrors(artifactContract),
     ...runtimeTraces.errors,
-    ...openspec.errors
+    ...openspec.errors,
+    ...openspecPolicy.errors
   ];
 
   return {
@@ -245,6 +266,8 @@ export async function buildDoneContext(options = {}) {
     },
     verification: verification.verification,
     coverage: coverage.coverage,
+    rulesGate: rulesGate.rulesGate,
+    effectivePolicy,
     openspec: openspec.openspec,
     canonicalArtifacts: canonical.canonicalArtifacts,
     runtimeTraces: runtimeTraces.runtimeTraces,
@@ -400,13 +423,17 @@ export async function assertCoverageAcceptable(changeId, options = {}) {
   }
 
   const readCoverage = options.readOpenSpecCoverageMatrix ?? readOpenSpecCoverageMatrix;
+  const policy = options.policy ?? await readOpenSpecPolicy({ ...options, rootDir });
+  const requireCoverage = Boolean(policy.requirements?.specCoverage?.done);
+  const allowCoverageWarn = Boolean(policy.allowWarnOnDone?.coverage);
   const coverage = await readCoverage(normalized.changeId, {
     ...options,
     rootDir
   });
 
   if (!coverage?.exists) {
-    return createCoverageFailure({
+    return createCoveragePolicyResult({
+      blocking: requireCoverage,
       changeId: normalized.changeId,
       code: 'coverage-evidence-missing',
       message: `Run /aif-verify ${normalized.changeId} before /aif-done so coverage.json is generated.`,
@@ -415,7 +442,8 @@ export async function assertCoverageAcceptable(changeId, options = {}) {
   }
 
   if (!coverage.ok) {
-    return createCoverageFailure({
+    return createCoveragePolicyResult({
+      blocking: requireCoverage,
       changeId: normalized.changeId,
       code: 'coverage-evidence-invalid',
       message: 'Refusing to archive because coverage evidence is invalid.',
@@ -424,7 +452,8 @@ export async function assertCoverageAcceptable(changeId, options = {}) {
   }
 
   if (coverage.stale) {
-    return createCoverageFailure({
+    return createCoveragePolicyResult({
+      blocking: requireCoverage,
       changeId: normalized.changeId,
       code: 'coverage-evidence-stale',
       message: 'Refusing to archive because coverage evidence is stale. Rerun /aif-verify.',
@@ -433,10 +462,21 @@ export async function assertCoverageAcceptable(changeId, options = {}) {
   }
 
   if (coverage.coverage?.status === 'fail') {
-    return createCoverageFailure({
+    return createCoveragePolicyResult({
+      blocking: requireCoverage,
       changeId: normalized.changeId,
       code: 'coverage-policy-failed',
       message: 'Refusing to archive because OpenSpec coverage policy failed.',
+      coverage
+    });
+  }
+
+  if (coverage.coverage?.status === 'warn' && !allowCoverageWarn) {
+    return createCoveragePolicyResult({
+      blocking: true,
+      changeId: normalized.changeId,
+      code: 'coverage-policy-warn',
+      message: 'Refusing to archive because OpenSpec coverage completed with warnings and allowWarnOnDone.coverage is false.',
       coverage
     });
   }
@@ -455,6 +495,82 @@ export async function assertCoverageAcceptable(changeId, options = {}) {
   };
 }
 
+export async function assertRulesGateAcceptable(changeId, options = {}) {
+  const rootDir = resolveRootDir(options);
+  const normalized = normalizeChangeId(changeId);
+
+  if (!normalized.ok) {
+    return createRulesGateFailure({
+      changeId: null,
+      code: normalized.error.code,
+      message: normalized.error.message,
+      rulesGate: null
+    });
+  }
+
+  const policy = options.policy ?? await readOpenSpecPolicy({ ...options, rootDir });
+  const rulesGate = await readOpenSpecRulesGateEvidence(normalized.changeId, {
+    ...options,
+    rootDir
+  });
+  const requireRulesPass = Boolean(policy.requirements?.rulesPass?.done);
+  const allowRulesWarn = Boolean(policy.allowWarnOnDone?.rules);
+
+  if (rulesGate.status === 'pass') {
+    return {
+      ok: true,
+      changeId: normalized.changeId,
+      rulesGate,
+      warnings: [],
+      errors: []
+    };
+  }
+
+  if (rulesGate.status === 'warn' && allowRulesWarn) {
+    return {
+      ok: true,
+      changeId: normalized.changeId,
+      rulesGate,
+      warnings: [{
+        code: 'rules-gate-warn',
+        message: 'Rules gate completed with warnings accepted by policy.',
+        path: rulesGate.path
+      }],
+      errors: []
+    };
+  }
+
+  const rulesGatePolicyMessage = requireRulesPass
+    ? `Refusing to archive because rules gate evidence is ${rulesGate.status}.`
+    : `Rules gate evidence is ${rulesGate.status}; continuing because requireRulesPassForDone is false.`;
+
+  return createRulesGatePolicyResult({
+    blocking: requireRulesPass,
+    changeId: normalized.changeId,
+    code: rulesGate.errors?.[0]?.code ?? `rules-gate-${rulesGate.status}`,
+    message: rulesGate.errors?.[0]?.message ?? rulesGatePolicyMessage,
+    rulesGate
+  });
+}
+
+function createCoveragePolicyResult({ blocking, changeId, code, message, coverage }) {
+  return blocking
+    ? createCoverageFailure({ changeId, code, message, coverage })
+    : {
+      ok: true,
+      changeId,
+      coverage: coverage?.coverage ?? null,
+      warnings: [
+        ...(coverage?.warnings ?? []),
+        {
+          code,
+          message
+        }
+      ],
+      errors: []
+    };
+}
+
 function createCoverageFailure({ changeId, code, message, coverage }) {
   return {
     ok: false,
@@ -467,6 +583,76 @@ function createCoverageFailure({ changeId, code, message, coverage }) {
         message
       }
     ]
+  };
+}
+
+function createRulesGatePolicyResult({ blocking, changeId, code, message, rulesGate }) {
+  return blocking
+    ? createRulesGateFailure({ changeId, code, message, rulesGate })
+    : {
+      ok: true,
+      changeId,
+      rulesGate,
+      warnings: [
+        ...(rulesGate?.warnings ?? []),
+        {
+          code,
+          message,
+          path: rulesGate?.path
+        }
+      ],
+      errors: []
+    };
+}
+
+function createRulesGateFailure({ changeId, code, message, rulesGate }) {
+  return {
+    ok: false,
+    changeId,
+    rulesGate,
+    warnings: rulesGate?.warnings ?? [],
+    errors: [
+      {
+        code,
+        message,
+        path: rulesGate?.path
+      }
+    ]
+  };
+}
+
+function classifyGeneratedRulesForDone(generatedRules, policy) {
+  const diagnostics = generatedRules?.warnings ?? [];
+  if (diagnostics.length === 0) {
+    return { warnings: [], errors: [] };
+  }
+
+  const required = Boolean(policy?.requirements?.generatedRules?.done);
+  return required
+    ? {
+      warnings: [],
+      errors: diagnostics.map((diagnostic) => ({
+        ...diagnostic,
+        message: `${diagnostic.message} Refusing to archive until generated rules are current.`
+      }))
+    }
+    : { warnings: diagnostics, errors: [] };
+}
+
+function classifyOpenSpecCliForDone(openspec, policy) {
+  const required = Boolean(policy?.requirements?.cli?.done);
+  const summary = openspec?.openspec ?? {};
+  if (!required || summary.canArchive) {
+    return { warnings: [], errors: [] };
+  }
+
+  return {
+    warnings: [],
+    errors: [{
+      code: 'openspec-cli-required-for-done',
+      message: 'OpenSpec CLI archive capability is required for /aif-done under current policy.',
+      detail: summary.errors?.[0]?.message ?? summary.reason ?? null
+    }]
   };
 }
 
@@ -511,6 +697,7 @@ export async function archiveChangeWithOpenSpec(changeId, options = {}) {
   }
 
   const skipSpecs = Boolean(options.skipSpecs);
+  const policy = options.policy ?? await readOpenSpecPolicy({ ...options, rootDir });
 
   if (options.skipArchive || options.dryRun || options.summaryOnly) {
     const archive = {
@@ -558,6 +745,20 @@ export async function archiveChangeWithOpenSpec(changeId, options = {}) {
   }
 
   const preArchiveStatus = await readPreArchiveStatus(normalized.changeId, options, rootDir);
+  if (preArchiveStatus !== null && preArchiveStatus.ok === false && !policy.allowWarnOnDone?.openspecStatus) {
+    const archive = createArchiveFailure({
+      changeId: normalized.changeId,
+      skipSpecs,
+      error: {
+        code: 'openspec-status-warning-blocked',
+        message: 'OpenSpec status returned warnings before archive and allowWarnOnDone.openspecStatus is false.',
+        detail: preArchiveStatus.error?.message ?? null
+      }
+    });
+    archive.preArchiveStatus = preArchiveStatus;
+    await writeArchiveEvidence(normalized.changeId, archive, { ...options, rootDir });
+    return archive;
+  }
   const archiveOpenSpecChange = options.archiveOpenSpecChange ?? defaultArchiveOpenSpecChange;
   const archiveOptions = createRunOptions(options, rootDir);
 

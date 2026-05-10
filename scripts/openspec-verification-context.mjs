@@ -28,6 +28,10 @@ import {
   summarizeOpenSpecCoverage,
   writeOpenSpecCoverageMatrix
 } from './openspec-coverage-matrix.mjs';
+import {
+  readOpenSpecPolicy,
+  readOpenSpecRulesGateEvidence
+} from './openspec-policy.mjs';
 
 const MODE = 'openspec-native';
 const DEFAULT_QA_DIR = path.join('.ai-factory', 'qa');
@@ -70,7 +74,7 @@ export async function runOpenSpecVerification(changeId, options = {}) {
   });
   assertSafeQaPath(rootDir, layout.qaPath);
 
-  const config = await readVerificationConfig(rootDir);
+  const config = await readOpenSpecPolicy({ ...options, rootDir });
   const canonical = await collectCanonicalChangeArtifacts(resolverResult.changeId, {
     ...options,
     rootDir
@@ -79,6 +83,13 @@ export async function runOpenSpecVerification(changeId, options = {}) {
     ...options,
     rootDir
   });
+  const generatedRulesPolicy = classifyGeneratedRulesForPolicy(generatedRules, config, 'verify');
+  const rulesGate = await readOpenSpecRulesGateEvidence(resolverResult.changeId, {
+    ...options,
+    rootDir,
+    qaPath: layout.qaPath
+  });
+  const rulesGatePolicy = classifyRulesGateForPolicy(rulesGate, config, 'verify');
   const openspec = await runValidationPipeline(resolverResult.changeId, {
     ...options,
     rootDir,
@@ -87,12 +98,16 @@ export async function runOpenSpecVerification(changeId, options = {}) {
   const warnings = dedupeDiagnostics([
     ...resolverResult.warnings,
     ...canonical.warnings,
-    ...generatedRules.warnings,
-    ...openspec.warnings
+    ...generatedRulesPolicy.warnings,
+    ...rulesGatePolicy.warnings,
+    ...openspec.warnings,
+    ...(config.diagnostics ?? [])
   ]);
   const errors = [
     ...canonical.errors,
     ...generatedRules.errors,
+    ...generatedRulesPolicy.errors,
+    ...rulesGatePolicy.errors,
     ...openspec.errors
   ];
   const shouldRunCodeVerification = errors.length === 0 && openspec.shouldRunCodeVerification;
@@ -111,6 +126,7 @@ export async function runOpenSpecVerification(changeId, options = {}) {
     config,
     canonicalArtifacts: canonical.canonicalArtifacts,
     generatedRules: generatedRules.generatedRules,
+    rulesGate,
     openspec: {
       ...openspec.openspec,
       validation: openspec.validation,
@@ -129,6 +145,7 @@ export async function runOpenSpecVerification(changeId, options = {}) {
     validation: openspec.validation,
     status: openspec.status,
     generatedRules: generatedRules.generatedRules,
+    rulesGate,
     shouldRunCodeVerification,
     warnings,
     errors,
@@ -337,6 +354,76 @@ function createVerifyGateResult(changeId, evidence) {
       }
       : null
   });
+}
+
+function classifyGeneratedRulesForPolicy(generatedRules, policy, action) {
+  const diagnostics = generatedRules?.warnings ?? [];
+  if (diagnostics.length === 0) {
+    return { warnings: [], errors: [] };
+  }
+
+  const required = Boolean(policy?.requirements?.generatedRules?.[action]);
+  return required
+    ? { warnings: [], errors: diagnostics.map((diagnostic) => policyDiagnostic(diagnostic, action, 'generated-rules')) }
+    : { warnings: diagnostics.map((diagnostic) => policyDiagnostic(diagnostic, action, 'generated-rules')), errors: [] };
+}
+
+function classifyRulesGateForPolicy(rulesGate, policy, action) {
+  const status = rulesGate?.status ?? 'missing';
+  if (status === 'pass') {
+    return { warnings: [], errors: [] };
+  }
+
+  const required = Boolean(policy?.requirements?.rulesPass?.[action]);
+  const diagnostic = policyDiagnostic(
+    rulesGateDiagnostic(rulesGate),
+    action,
+    'rules-gate'
+  );
+
+  return required
+    ? { warnings: [], errors: [diagnostic] }
+    : { warnings: [diagnostic], errors: [] };
+}
+
+function rulesGateDiagnostic(rulesGate) {
+  if (rulesGate?.status === 'warn') {
+    return {
+      code: 'rules-gate-warn',
+      message: 'Rules gate evidence has warnings.',
+      path: rulesGate.path
+    };
+  }
+
+  if (rulesGate?.status === 'fail') {
+    return {
+      code: 'rules-gate-failed',
+      message: 'Rules gate evidence failed.',
+      path: rulesGate.path
+    };
+  }
+
+  if (rulesGate?.status === 'invalid') {
+    return {
+      code: 'rules-gate-invalid',
+      message: rulesGate.errors?.[0]?.message ?? 'Rules gate evidence is invalid.',
+      path: rulesGate.path
+    };
+  }
+
+  return {
+    code: 'rules-gate-evidence-missing',
+    message: rulesGate?.errors?.[0]?.message ?? 'Rules gate evidence is missing.',
+    path: rulesGate?.path
+  };
+}
+
+function policyDiagnostic(diagnostic, action, kind) {
+  return {
+    ...diagnostic,
+    code: diagnostic.code ?? `openspec-policy-${action}-${kind}`,
+    message: diagnostic.message ?? `OpenSpec ${kind} policy finding for ${action}.`
+  };
 }
 
 function coverageDiagnostics(coverage, severity) {

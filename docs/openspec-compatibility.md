@@ -58,8 +58,20 @@ aifhub:
     useInstructionsApply: true
     compileRulesOnSync: true
     validateOnSync: true
+    requireCliForPlan: false
+    requireCliForImprove: false
     requireCliForVerify: false
     requireCliForDone: true
+    requireGeneratedRulesForVerify: false
+    requireGeneratedRulesForDone: true
+    requireRulesPassForVerify: false
+    requireRulesPassForDone: true
+    requireSpecCoverageForVerify: false
+    requireSpecCoverageForDone: true
+    allowWarnOnDone:
+      rules: false
+      coverage: false
+      openspecStatus: true
 
 paths:
   plans: openspec/changes
@@ -71,19 +83,23 @@ paths:
 
 `installSkills: false` is intentional. AIFHub Extension uses OpenSpec artifacts and `scripts/openspec-runner.mjs` as the optional CLI adapter, not OpenSpec-installed skills or slash commands.
 
+Action toggles such as `validateOnPlan`, `validateOnImprove`, `validateOnVerify`, `statusOnVerify`, `archiveOnDone`, `compileRulesOnSync`, and `validateOnSync` decide which operations are attempted. Policy flags such as `require*` and `allowWarnOnDone` decide whether missing, stale, failed, or warning-only evidence blocks a command.
+
+The defaults keep planning and verification degraded-friendly while making `/aif-done` strict: verify can warn on missing CLI, generated rules, rules gate evidence, or coverage evidence; done requires current generated rules, a passing durable rules gate, current passing coverage, and archive-capable CLI unless config relaxes those requirements.
+
 ## AIFHub Wrapper Behavior
 
 | AIFHub command | OpenSpec CLI feature |
 |---|---|
 | `/aif-analyze` | optional `openspec init --tools none` guidance or filesystem skeleton |
-| `/aif-plan full` | `openspec validate <change>` when `validateOnPlan` is enabled and CLI is available |
-| `/aif-improve` | `openspec validate <change>` when `validateOnImprove` is enabled and CLI is available |
+| `/aif-plan full` | `openspec validate <change>` when `validateOnPlan` is enabled; CLI absence blocks only when `requireCliForPlan` is true |
+| `/aif-improve` | `openspec validate <change>` when `validateOnImprove` is enabled; CLI absence blocks only when `requireCliForImprove` is true |
 | `/aif-implement` | `openspec instructions apply --change <id>` when `useInstructionsApply` is enabled and CLI is available |
-| `/aif-verify` | `openspec validate`, optional `openspec status` evidence, and final `aif-gate-result` with `"gate": "verify"` |
+| `/aif-verify` | `openspec validate`, optional `openspec status` evidence, policy-derived diagnostics, coverage, and final `aif-gate-result` with `"gate": "verify"` |
 | `/aif-rules-check` | Upstream rules gate plus AIFHub generated-rules overlay for OpenSpec specs/deltas |
 | `/aif-done` | AIFHub artifact contract check, then `openspec archive <change> --yes` when archive is required |
 | `/aif-mode sync` | generated-rule compile plus validate/status according to sync flags |
-| `/aif-mode doctor` | CLI, Node, active change, generated rules, latest verify gate, AIFHub artifact contract, and archive readiness diagnostics |
+| `/aif-mode doctor` | CLI, Node, active change, effective policy, generated rules, latest verify gate, rules gate, coverage, AIFHub artifact contract, and archive readiness diagnostics |
 
 Do not route users to OpenSpec slash commands such as `/opsx:propose`, `/opsx:apply`, or `/opsx:archive`.
 
@@ -104,6 +120,8 @@ For `/aif-mode sync --all`, selected active changes without `openspec/changes/<c
 ## Rules Gate
 
 `/aif-rules-check` is read-only. It uses AIFHub generated rules in OpenSpec-native mode and returns a machine-readable `aif-gate-result` with `gate: "rules"`.
+
+When done policy requires a rules gate pass, save durable rules evidence under `.ai-factory/qa/<change-id>/rules.md` with the final fenced `aif-gate-result` block. Generated rules being present and current is a separate readiness signal; it does not satisfy `requireRulesPassForVerify` or `requireRulesPassForDone`.
 
 Generated rules are compiled as markdown plus provenance JSON:
 

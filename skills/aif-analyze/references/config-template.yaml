@@ -36,10 +36,22 @@ aifhub:
     useInstructionsApply: true
     compileRulesOnSync: true
     validateOnSync: true
+    requireCliForPlan: false
+    requireCliForImprove: false
     requireCliForVerify: false
     # /aif-done archive-required finalization needs a compatible CLI.
     # Do not install OpenSpec skills or silently archive through legacy specs.
     requireCliForDone: true
+    requireGeneratedRulesForVerify: false
+    requireGeneratedRulesForDone: true
+    requireRulesPassForVerify: false
+    requireRulesPassForDone: true
+    requireSpecCoverageForVerify: false
+    requireSpecCoverageForDone: true
+    allowWarnOnDone:
+      rules: false
+      coverage: false
+      openspecStatus: true
 
 # ============================================================================
 # PATH CONFIGURATION
