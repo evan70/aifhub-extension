@@ -530,6 +530,7 @@ describe('Full OpenSpec v1 mocked paths', () => {
       rootDir,
       changeId: 'add-oauth',
       detectOpenSpec: async () => availableCliDetection(),
+      validateOpenSpecChange: async () => validationResult('add-oauth'),
       getOpenSpecStatus: async () => statusResult('add-oauth'),
       gitStatus: async () => ({ exitCode: 0, stdout: '', stderr: '' }),
       archiveOpenSpecChange: async (changeId, options) => {
