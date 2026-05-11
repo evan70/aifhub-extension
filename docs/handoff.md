@@ -13,6 +13,8 @@
 Названия стадий можно использовать как краткие названия этапов, но они не обязаны совпадать со slash commands.
 Legacy slash aliases и handoff stage names — разные смысловые слои.
 
+Для machine-readable orchestration summary см. [Handoff Validation Profile](handoff-validation-profile.md). Этот профиль даёт Handoff один JSON summary по validation gates, но не является отдельным runtime.
+
 ## Future Handoff Prompt Stubs
 
 Кроме stage vocabulary, в `injections/handoff/` лежат четыре future stub prompt assets для review/security/rules/done layer.
@@ -125,5 +127,7 @@ passing full /aif-verify -> /aif-done (archive, commit/PR drafts, governance/evo
 - **Auto-transition**: переход между stages по verdict (pass/fail) должен управляться orchestrator, а не вручную.
 - **Multi-gate aggregation**: параллельный запуск review/security/rules gates и агрегация findings.
 - **Runtime binding stubs**: активация `injections/handoff/*.md` через Handoff runtime, а не через `extension.json`.
+
+Текущий read-only bridge для aggregation contract описан в [Handoff Validation Profile](handoff-validation-profile.md): Handoff может читать один summary вместо прямого парсинга всех gate Markdown files.
 
 Handoff не auto-использует `aifhub-*` agents — для этого требуется upstream support configurable stage mapping.
