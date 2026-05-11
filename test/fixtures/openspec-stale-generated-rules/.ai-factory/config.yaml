@@ -1,0 +1,10 @@
+aifhub:
+  artifactProtocol: openspec
+  openspec:
+    requireCliForDone: true
+    requireGeneratedRulesForDone: true
+    requireRulesPassForDone: true
+    requireSpecCoverageForDone: true
+paths:
+  qa: .ai-factory/qa
+  generated_rules: .ai-factory/rules/generated
