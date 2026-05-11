@@ -228,6 +228,8 @@ export async function runHandoffGateSummaryCommand(argv = process.argv.slice(2),
 async function readGateStatus(gate, options) {
   const candidates = GATE_CANDIDATES[gate];
   const expectedPath = relativePath(options.rootDir, path.join(options.qaPath, candidates[0]));
+  const fallbackDiagnostics = [];
+  let firstExistingEvidencePath = null;
 
   for (const candidate of candidates) {
     const candidatePath = path.join(options.qaPath, candidate);
@@ -239,6 +241,8 @@ async function readGateStatus(gate, options) {
       continue;
     }
 
+    firstExistingEvidencePath ??= evidencePath;
+
     let content;
     try {
       content = await options.readFile(candidatePath, 'utf8');
@@ -246,7 +250,7 @@ async function readGateStatus(gate, options) {
       return {
         status: 'warn',
         evidencePath,
-        diagnostics: [diagnostic({
+        diagnostics: [...fallbackDiagnostics, diagnostic({
           code: `${gate}-evidence-unreadable`,
           severity: 'warning',
           message: `${gate} gate evidence could not be read: ${evidencePath}.`,
@@ -258,36 +262,44 @@ async function readGateStatus(gate, options) {
 
     const latest = getLatestGateResult(content, { gate });
     if (latest === null) {
-      return {
-        status: 'warn',
-        evidencePath,
-        diagnostics: [diagnostic({
-          code: `${gate}-gate-result-missing`,
-          severity: 'warning',
-          message: `${gate} gate evidence has no aif-gate-result block: ${evidencePath}.`,
-          path: evidencePath
-        })]
-      };
+      fallbackDiagnostics.push(diagnostic({
+        code: `${gate}-gate-result-missing`,
+        severity: 'warning',
+        message: `${gate} gate evidence has no aif-gate-result block: ${evidencePath}.`,
+        path: evidencePath
+      }));
+      continue;
     }
 
     if (!latest.ok) {
       return {
         status: 'warn',
         evidencePath,
-        diagnostics: latest.errors.map((error) => diagnostic({
-          code: `${gate}-gate-result-invalid`,
-          severity: 'warning',
-          message: `${gate} gate latest aif-gate-result block is invalid: ${error.message}`,
-          path: evidencePath,
-          detail: error.code
-        }))
+        diagnostics: [
+          ...fallbackDiagnostics,
+          ...latest.errors.map((error) => diagnostic({
+            code: `${gate}-gate-result-invalid`,
+            severity: 'warning',
+            message: `${gate} gate latest aif-gate-result block is invalid: ${error.message}`,
+            path: evidencePath,
+            detail: error.code
+          }))
+        ]
       };
     }
 
     return {
       status: latest.result.status,
       evidencePath,
-      diagnostics: []
+      diagnostics: fallbackDiagnostics
+    };
+  }
+
+  if (firstExistingEvidencePath !== null) {
+    return {
+      status: 'warn',
+      evidencePath: firstExistingEvidencePath,
+      diagnostics: fallbackDiagnostics
     };
   }
 

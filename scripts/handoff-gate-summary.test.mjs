@@ -236,6 +236,30 @@ describe('Handoff gate summary', () => {
     assert.equal(summary.diagnostics.some((diagnostic) => diagnostic.code === 'rules-evidence-missing'), true);
   });
 
+  it('continues scanning fallback gate evidence after narrative markdown without a gate result', async () => {
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir);
+    await writeGate(rootDir, 'add-oauth-login', 'rules.md', 'rules', 'pass');
+    await writeFixture(rootDir, '.ai-factory/qa/add-oauth-login/review.md', '# Review\n\nNarrative review notes.\n');
+    await writeGate(rootDir, 'add-oauth-login', 'gates/review.md', 'review', 'fail');
+    await writeGate(rootDir, 'add-oauth-login', 'aif-security-checklist.md', 'security', 'pass');
+    await writeGate(rootDir, 'add-oauth-login', 'verify.md', 'verify', 'pass');
+    await writeCoverage(rootDir, 'add-oauth-login', 'pass');
+
+    const summary = await buildHandoffGateSummary({
+      rootDir,
+      changeId: 'add-oauth-login',
+      collectGeneratedRules: async () => generatedRulesPass()
+    });
+
+    assert.equal(summary.gates.review, 'fail');
+    assert.equal(summary.blocking, true);
+    assert.equal(summary.next_stage, 'implementing');
+    assert.equal(summary.suggested_next, '/aif-fix add-oauth-login');
+    assert.equal(summary.evidence.review, '.ai-factory/qa/add-oauth-login/gates/review.md');
+    assert.equal(summary.diagnostics.some((diagnostic) => diagnostic.code === 'review-gate-result-missing'), true);
+  });
+
   it('does not fall back when the latest gate result block is invalid', async () => {
     const rootDir = await createTempRoot();
     await createPassingReviewEvidence(rootDir);
