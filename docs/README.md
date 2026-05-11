@@ -22,7 +22,8 @@ OpenSpec CLI features are reached through AIFHub wrappers and `scripts/openspec-
 6. [OpenSpec Coverage Matrix](spec-coverage.md) for requirement-to-task-to-code coverage evidence and verify/done policy.
 7. [Legacy Plan Migration](legacy-plan-migration.md) if existing `.ai-factory/plans` artifacts need to move into OpenSpec-native changes.
 8. [Active Change Resolver](active-change-resolver.md) for active change selection, runtime paths, current pointer behavior, and ambiguity diagnostics.
-9. [ADR 0001](adr/0001-openspec-native-artifact-protocol.md) for the v1 artifact ownership decision.
+9. [Handoff Validation Profile](handoff-validation-profile.md) for the read-only orchestration summary contract.
+10. [ADR 0001](adr/0001-openspec-native-artifact-protocol.md) for the v1 artifact ownership decision.
 
 The remaining runtime-specific guides are supporting references:
 
@@ -31,6 +32,7 @@ The remaining runtime-specific guides are supporting references:
 - [Claude Agents](claude-agents.md)
 - [Codex Plan Mode](codex-plan-mode.md)
 - [Handoff Naming](handoff.md)
+- [Handoff Validation Profile](handoff-validation-profile.md)
 
 ## Guides
 
@@ -43,6 +45,7 @@ The remaining runtime-specific guides are supporting references:
 | [OpenSpec Coverage Matrix](spec-coverage.md) | Requirement-to-task-to-code coverage evidence, policy, staleness, and integration points |
 | [Legacy Plan Migration](legacy-plan-migration.md) | Explicit migration commands and artifact mapping |
 | [Active Change Resolver](active-change-resolver.md) | Active change selection and runtime paths |
+| [Handoff Validation Profile](handoff-validation-profile.md) | Read-only validation summary contract for Handoff orchestration |
 | [ADR 0001](adr/0001-openspec-native-artifact-protocol.md) | Canonical OpenSpec and AI Factory runtime state contract |
 | [AIFHub MCP](aifhub-mcp.md) | Optional MCP server tools and runtime-specific config shapes |
 | [Codex Agents](codex-agents.md) | Namespaced Codex subagents and invocation contract |
@@ -89,5 +92,6 @@ npm test
 - [OpenSpec Coverage Matrix](spec-coverage.md)
 - [Legacy Plan Migration](legacy-plan-migration.md)
 - [Active Change Resolver](active-change-resolver.md)
+- [Handoff Validation Profile](handoff-validation-profile.md)
 - [ADR 0001](adr/0001-openspec-native-artifact-protocol.md)
 - [AIFHub MCP](aifhub-mcp.md)
