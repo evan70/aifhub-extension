@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "change_id": "fixture-change",
+  "status": "pass",
+  "blocking": false,
+  "policy": {
+    "mode": "strict",
+    "missing_requirement": "fail"
+  },
+  "requirements": [],
+  "summary": {
+    "covered": 0,
+    "partial": 0,
+    "missing": 0,
+    "not_applicable": 0
+  },
+  "sources": [],
+  "stale": false,
+  "diagnostics": [],
+  "warnings": [],
+  "errors": []
+}

@@ -1,0 +1,80 @@
+{
+  "change_id": "fixture-change",
+  "artifact_contract": {
+    "status": "pass",
+    "blocking": false,
+    "checks": {
+      "delta-specs-present": "pass",
+      "generated-rules-current": "pass",
+      "runtime-files-outside-change": "pass",
+      "qa-verify-gate": "pass"
+    },
+    "suggested_next": null
+  },
+  "rules_compiler_trace": {
+    "status": "pass",
+    "warning_codes": [],
+    "error_codes": [],
+    "generated_rules": {
+      "merged": {
+        "exists": true,
+        "stale": false,
+        "stale_source": "trace",
+        "trace": {
+          "exists": true,
+          "valid": true,
+          "stale": false
+        }
+      },
+      "change": {
+        "exists": true,
+        "stale": false,
+        "stale_source": "trace",
+        "trace": {
+          "exists": true,
+          "valid": true,
+          "stale": false
+        }
+      },
+      "base": {
+        "exists": true,
+        "stale": false,
+        "stale_source": "trace",
+        "trace": {
+          "exists": true,
+          "valid": true,
+          "stale": false
+        }
+      }
+    }
+  },
+  "coverage_matrix": {
+    "ok": false,
+    "exists": false,
+    "stale": null,
+    "status": null,
+    "blocking": null,
+    "summary": null,
+    "diagnostic_codes": [
+      "coverage-missing"
+    ]
+  },
+  "done_readiness": {
+    "status": "fail",
+    "blocking": true,
+    "checks": {
+      "openspec_validate": "pass",
+      "openspec_status": "pass",
+      "artifact_contract": "pass",
+      "generated_rules": "pass",
+      "rules_gate": "pass",
+      "coverage": "fail",
+      "verify_gate": "pass",
+      "dirty_workspace": "pass"
+    },
+    "diagnostic_codes": [
+      "coverage-evidence-missing"
+    ],
+    "suggested_next": "/aif-verify fixture-change"
+  }
+}
