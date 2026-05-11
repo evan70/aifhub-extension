@@ -295,6 +295,7 @@ async function finalizeWithArchive(rootDir, changeId) {
     rootDir,
     changeId,
     detectOpenSpec: async () => availableCliDetection(),
+    validateOpenSpecChange: async () => validationResult(changeId),
     getOpenSpecStatus: async () => statusResult(changeId),
     gitStatus: async () => ({ exitCode: 0, stdout: '', stderr: '' }),
     archiveOpenSpecChange: async (requestedChangeId, options) => {

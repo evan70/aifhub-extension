@@ -36,6 +36,12 @@ import {
   readOpenSpecPolicy,
   readOpenSpecRulesGateEvidence
 } from './openspec-policy.mjs';
+import {
+  DONE_READINESS_FILE,
+  buildOpenSpecDoneReadiness,
+  summarizeOpenSpecDoneReadiness,
+  writeOpenSpecDoneReadiness
+} from './openspec-done-readiness.mjs';
 
 const execFileAsync = promisify(execFile);
 const MODE = 'openspec-native';
@@ -48,20 +54,59 @@ const FINAL_SUMMARY_MARKDOWN = 'final-summary.md';
 export async function finalizeOpenSpecChange(options = {}) {
   const rootDir = resolveRootDir(options);
   const context = await buildDoneContext({ ...options, rootDir });
+  const readiness = shouldSkipReadinessForContext(context)
+    ? null
+    : await buildAndWriteDoneReadiness({
+      ...options,
+      rootDir,
+      policy: context.effectivePolicy
+    });
 
   if (!context.ok) {
+    const archive = createSkippedArchiveSummary(
+      context.changeId,
+      options,
+      readiness?.blocking ? 'done-readiness-failed' : 'context-failed'
+    );
     return {
       ...context,
       status: 'FAIL',
-      archive: createSkippedArchiveSummary(context.changeId, options, 'context-failed'),
-      workingTree: null,
+      readiness,
+      archive,
+      workingTree: readiness?.context?.workingTree ?? null,
       commitMessage: context.changeId ? createCommitMessage(context.changeId) : '',
-      prSummary: '',
+      prSummary: context.changeId
+        ? createPrSummary({
+          changeId: context.changeId,
+          context,
+          archive,
+          readiness
+        })
+        : '',
+      warnings: dedupeDiagnostics([
+        ...(context.warnings ?? []),
+        ...readinessWarnings(readiness),
+        ...archive.warnings
+      ]),
+      errors: dedupeDiagnostics([
+        ...(context.errors ?? []),
+        ...readinessErrors(readiness)
+      ]),
       summaryFiles: []
     };
   }
 
-  const workingTree = await detectWorkingTreeState({
+  if (readiness?.blocking) {
+    return createFinalizeFailure({
+      context,
+      readiness,
+      workingTree: readiness?.context?.workingTree ?? null,
+      archive: createSkippedArchiveSummary(context.changeId, options, 'done-readiness-failed'),
+      errors: readinessErrors(readiness)
+    });
+  }
+
+  const workingTree = readiness?.context?.workingTree ?? await detectWorkingTreeState({
     ...options,
     rootDir
   });
@@ -69,6 +114,7 @@ export async function finalizeOpenSpecChange(options = {}) {
   if (!workingTree.ok) {
     return createFinalizeFailure({
       context,
+      readiness,
       workingTree,
       archive: createSkippedArchiveSummary(context.changeId, options, 'dirty-working-tree'),
       errors: workingTree.errors
@@ -88,16 +134,19 @@ export async function finalizeOpenSpecChange(options = {}) {
     status: archive.ok ? archive.status : 'FAIL',
     context,
     verification: context.verification,
+    readiness,
     workingTree,
     archive,
     commitMessage: createCommitMessage(context.changeId),
     prSummary: createPrSummary({
       changeId: context.changeId,
       context,
-      archive
+      archive,
+      readiness
     }),
     warnings: dedupeDiagnostics([
       ...context.warnings,
+      ...readinessWarnings(readiness),
       ...workingTree.warnings,
       ...archive.warnings
     ]),
@@ -910,6 +959,7 @@ export function summarizeDoneResult(result, options = {}) {
   const changeId = result?.changeId ?? '<change-id>';
   const archived = result?.archive?.archived ? 'yes' : 'no';
   const skipSpecs = result?.archive?.skipSpecs ? 'yes' : 'no';
+  const readinessStatus = result?.readiness?.status ? String(result.readiness.status).toUpperCase() : null;
   const lines = [
     `Finalization status: ${status}`,
     `Change: ${changeId}`,
@@ -917,9 +967,18 @@ export function summarizeDoneResult(result, options = {}) {
     `Skip specs: ${skipSpecs}`
   ];
 
+  if (readinessStatus !== null) {
+    lines.push(`Done readiness: ${readinessStatus}`);
+  }
+
   if (Array.isArray(result?.summaryFiles) && result.summaryFiles.length > 0) {
     lines.push('Summary files:');
     lines.push(...result.summaryFiles.map((file) => `- ${file}`));
+  }
+
+  if (result?.readiness?.suggested_next) {
+    lines.push(`Suggested next: ${result.readiness.suggested_next.command}`);
+    lines.push(`Reason: ${result.readiness.suggested_next.reason}`);
   }
 
   if (options.includeErrors && Array.isArray(result?.errors) && result.errors.length > 0) {
@@ -1096,7 +1155,51 @@ function createSkippedArchiveSummary(changeId, options, reason) {
   };
 }
 
-function createFinalizeFailure({ context, workingTree, archive, errors }) {
+async function buildAndWriteDoneReadiness(options = {}) {
+  const readiness = await buildOpenSpecDoneReadiness(options);
+
+  if (!readiness.change_id) {
+    return readiness;
+  }
+
+  const written = await writeOpenSpecDoneReadiness(readiness.change_id, readiness, options);
+  return written.readiness;
+}
+
+function shouldSkipReadinessForContext(context) {
+  return (context?.errors ?? []).some((error) => error?.code === 'change-already-archived');
+}
+
+function readinessWarnings(readiness) {
+  return readinessDiagnostics(readiness)
+    .filter((diagnostic) => diagnostic.level === 'warn')
+    .map(toReadinessDiagnostic);
+}
+
+function readinessErrors(readiness) {
+  return readinessDiagnostics(readiness)
+    .filter((diagnostic) => diagnostic.blocking || diagnostic.level === 'fail')
+    .map(toReadinessDiagnostic);
+}
+
+function readinessDiagnostics(readiness) {
+  return Array.isArray(readiness?.diagnostics) ? readiness.diagnostics : [];
+}
+
+function toReadinessDiagnostic(diagnostic) {
+  const result = {
+    code: diagnostic.code ?? 'done-readiness-diagnostic',
+    message: diagnostic.message ?? 'Done readiness reported a diagnostic.'
+  };
+
+  if (diagnostic.path !== undefined && diagnostic.path !== null) {
+    result.path = diagnostic.path;
+  }
+
+  return result;
+}
+
+function createFinalizeFailure({ context, readiness, workingTree, archive, errors }) {
   return {
     ok: false,
     mode: MODE,
@@ -1104,16 +1207,19 @@ function createFinalizeFailure({ context, workingTree, archive, errors }) {
     status: 'FAIL',
     context,
     verification: context.verification,
+    readiness,
     workingTree,
     archive,
     commitMessage: createCommitMessage(context.changeId),
     prSummary: createPrSummary({
       changeId: context.changeId,
       context,
-      archive
+      archive,
+      readiness
     }),
     warnings: dedupeDiagnostics([
       ...context.warnings,
+      ...readinessWarnings(readiness),
       ...(workingTree?.warnings ?? []),
       ...(archive?.warnings ?? [])
     ]),
@@ -1424,10 +1530,12 @@ function createCommitMessage(changeId) {
   return `feat: finalize ${changeId}`;
 }
 
-function createPrSummary({ changeId, context, archive }) {
+function createPrSummary({ changeId, context, archive, readiness }) {
   const validationState = summarizeValidationState(context?.verification?.validation);
   const codeState = summarizeCodeState(context?.verification?.verify?.content);
   const coverageState = context?.coverage?.status ? context.coverage.status.toUpperCase() : 'UNKNOWN';
+  const readinessState = readiness?.status ? String(readiness.status).toUpperCase() : 'UNKNOWN';
+  const verificationState = context?.verification?.passed ? 'PASS' : 'FAIL';
   return [
     '## Summary',
     '',
@@ -1442,13 +1550,15 @@ function createPrSummary({ changeId, context, archive }) {
     '',
     '## Verification',
     '',
-    '- /aif-verify: PASS',
+    `- /aif-verify: ${verificationState}`,
+    `- Done readiness: ${readinessState}`,
     `- OpenSpec validation: ${validationState}`,
     `- Code verification: ${codeState}`,
     `- Coverage matrix: ${coverageState}`,
     '',
     '## Artifacts',
     '',
+    `- .ai-factory/qa/${changeId}/${DONE_READINESS_FILE}`,
     `- .ai-factory/qa/${changeId}/coverage.json`,
     `- .ai-factory/qa/${changeId}/done.md`,
     `- .ai-factory/qa/${changeId}/openspec-archive.json`,
@@ -1460,10 +1570,11 @@ function createPrSummary({ changeId, context, archive }) {
 function renderDoneMarkdown(changeId, summary) {
   const context = summary.context ?? {};
   const archive = summary.archive ?? {};
+  const readiness = summary.readiness ?? null;
   const verificationGate = context?.verification?.passed ? 'PASS' : 'FAIL';
   const finalizationStatus = summary.status ?? (summary.ok ? 'PASS' : 'FAIL');
   const canonicalPaths = collectCanonicalArtifactPaths(context.canonicalArtifacts);
-  const qaEvidencePaths = collectQaEvidencePaths(changeId, context.verification, context.coverage);
+  const qaEvidencePaths = collectQaEvidencePaths(changeId, context.verification, context.coverage, readiness);
   const runtimeTracePaths = Array.isArray(context.runtimeTraces)
     ? context.runtimeTraces.map((trace) => trace.path)
     : [];
@@ -1474,6 +1585,12 @@ function renderDoneMarkdown(changeId, summary) {
     '## Finalization status',
     '',
     finalizationStatus,
+    '',
+    '## Done readiness',
+    '',
+    ...(readiness === null
+      ? ['Done readiness: UNKNOWN']
+      : summarizeOpenSpecDoneReadiness(readiness).split('\n')),
     '',
     '## Verification gate',
     '',
@@ -1510,7 +1627,7 @@ function renderDoneMarkdown(changeId, summary) {
     '',
     '## Suggested PR summary',
     '',
-    summary.prSummary ?? createPrSummary({ changeId, context, archive })
+    summary.prSummary ?? createPrSummary({ changeId, context, archive, readiness })
   ].join('\n');
 }
 
@@ -1546,9 +1663,10 @@ function collectCanonicalArtifactPaths(canonicalArtifacts = {}) {
   return paths;
 }
 
-function collectQaEvidencePaths(changeId, verification, coverage) {
+function collectQaEvidencePaths(changeId, verification, coverage, readiness) {
   const paths = [
     verification?.verify?.path,
+    readiness?.evidence_path ?? `.ai-factory/qa/${changeId}/${DONE_READINESS_FILE}`,
     coverage ? `.ai-factory/qa/${changeId}/coverage.json` : null,
     `.ai-factory/qa/${changeId}/${ARCHIVE_JSON}`,
     `.ai-factory/qa/${changeId}/${DONE_MARKDOWN}`

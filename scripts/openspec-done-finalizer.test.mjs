@@ -756,6 +756,7 @@ describe('OpenSpec done finalizer API', () => {
       rootDir,
       changeId: 'add-oauth',
       detectOpenSpec: async () => availableCliDetection(),
+      validateOpenSpecChange: async () => statusResult(),
       readLatestVerificationEvidence: async () => verificationEvidence(),
       readOpenSpecCoverageMatrix: async () => coverageEvidence(),
       validateOpenSpecArtifactContract: async () => ({
@@ -782,8 +783,10 @@ describe('OpenSpec done finalizer API', () => {
 
     assert.equal(result.ok, false);
     assert.equal(result.archive.archived, false);
+    assert.equal(result.readiness.status, 'fail');
     assert.equal(result.errors[0].code, 'artifact-contract-failed');
     assert.equal(archiveCalls, 0);
+    assert.equal(await pathExists(path.join(rootDir, '.ai-factory', 'qa', 'add-oauth', 'done-readiness.json')), true);
   });
 
   it('finalizes passing changes, writes done summaries, and stays out of canonical/legacy paths', async () => {
@@ -795,6 +798,7 @@ describe('OpenSpec done finalizer API', () => {
       rootDir,
       changeId: 'add-oauth',
       detectOpenSpec: async () => availableCliDetection(),
+      validateOpenSpecChange: async () => statusResult(),
       getOpenSpecStatus: async () => statusResult(),
       gitStatus: async () => ({ exitCode: 0, stdout: '', stderr: '' }),
       readLatestVerificationEvidence: async () => verificationEvidence(),
@@ -806,14 +810,19 @@ describe('OpenSpec done finalizer API', () => {
     assert.equal(result.archive.archived, true);
     assert.match(result.commitMessage, /^feat: finalize add-oauth$/);
     assert.match(result.prSummary, /## OpenSpec/);
+    assert.match(result.prSummary, /Done readiness: PASS/);
     assert.match(result.prSummary, /Coverage matrix: PASS/);
     assert.match(summarizeDoneResult(result), /Finalization status: PASS/);
 
+    const readinessPath = path.join(rootDir, '.ai-factory', 'qa', 'add-oauth', 'done-readiness.json');
     const donePath = path.join(rootDir, '.ai-factory', 'qa', 'add-oauth', 'done.md');
     const finalSummaryPath = path.join(rootDir, '.ai-factory', 'state', 'add-oauth', 'final-summary.md');
+    assert.equal(await pathExists(readinessPath), true, 'done-readiness.json should be written under QA path');
     assert.equal(await pathExists(donePath), true, 'done.md should be written under QA path');
     assert.equal(await pathExists(finalSummaryPath), true, 'final-summary.md should be written under state path');
+    assert.equal((await readJson(readinessPath)).gate, 'done-readiness');
     assert.match(await readFile(donePath, 'utf8'), /# Done: add-oauth/);
+    assert.match(await readFile(donePath, 'utf8'), /## Done readiness/);
     assert.match(await readFile(donePath, 'utf8'), /Coverage matrix: PASS/);
     assert.match(await readFile(donePath, 'utf8'), /Archived: yes/);
     assert.match(await readFile(finalSummaryPath, 'utf8'), /## Suggested PR summary/);
@@ -831,6 +840,7 @@ describe('OpenSpec done finalizer API', () => {
       changeId: 'add-oauth',
       allowDirty: true,
       detectOpenSpec: async () => availableCliDetection(),
+      validateOpenSpecChange: async () => statusResult(),
       gitStatus: async () => ({ exitCode: 0, stdout: ' M README.md\n', stderr: '' }),
       readLatestVerificationEvidence: async () => verificationEvidence(),
       readOpenSpecCoverageMatrix: async () => coverageEvidence(),

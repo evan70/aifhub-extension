@@ -30,9 +30,11 @@ OpenSpec-native mode finalizes the verified change state through `scripts/opensp
 - Require `.ai-factory/qa/<change-id>/coverage.json` to exist, be current, and have coverage status `pass` or policy-accepted `warn`.
 - Require generated rules and durable rules gate evidence according to `requireGeneratedRulesForDone` and `requireRulesPassForDone`; generated rules readiness does not satisfy rules gate pass.
 - Apply `allowWarnOnDone.rules`, `allowWarnOnDone.coverage`, and `allowWarnOnDone.openspecStatus` before accepting warning-only finalization evidence.
+- Always run the pre-archive readiness gate through `scripts/openspec-done-readiness.mjs` before archive and persist `.ai-factory/qa/<change-id>/done-readiness.json`.
 - If verification has not run or verdict is `fail`, stop and suggest `/aif-verify` or `/aif-fix`.
 - If the verify gate result is missing, invalid, or `fail`, stop and suggest rerunning `/aif-verify <change-id>` or `/aif-fix <change-id>`.
 - If coverage, generated rules, or rules gate evidence is missing, invalid, stale, failed, or warning-only when policy does not allow the warning, stop and suggest the owning command (`/aif-mode sync --change <change-id>`, `/aif-rules-check`, or `/aif-verify <change-id>`).
+- If readiness reports a blocking failure, refuse archive and show `suggested_next.command` and `suggested_next.reason` exactly.
 - Refuse unverified changes; do not accept `Code verification: PENDING` as final verification.
 - Check dirty working tree state before archive and either fail or record it only when explicit dirty-state recording is requested.
 
@@ -55,7 +57,7 @@ Read generated rules as derived guidance when present:
 Runtime state and QA evidence live outside canonical changes:
 
 - `.ai-factory/state/<change-id>/`
-- `.ai-factory/qa/<change-id>/`, including `verify.md` and `coverage.json`
+- `.ai-factory/qa/<change-id>/`, including `verify.md`, `coverage.json`, and `done-readiness.json`
 - `.ai-factory/qa/<change-id>/rules.md` when a durable rules gate is required or available
 
 ### Archive Policy
@@ -77,6 +79,7 @@ Runtime state and QA evidence live outside canonical changes:
 Normal output must report:
 
 - selected `change-id`;
+- readiness status, blocking checks, and exact suggested next command when blocked;
 - verification status and refusal reason when unverified;
 - dirty working tree state;
 - archive result;
@@ -183,7 +186,7 @@ Legacy AI Factory-only mode preserves the verified plan finalization contract ba
 | Artifact | Owner | This Skill |
 |----------|-------|------------|
 | `openspec/changes/<change-id>/` | OpenSpec-native workflow | Reads before archive; OpenSpec CLI owns lifecycle mutation |
-| `.ai-factory/qa/<change-id>/` | `/aif-verify` and **aif-done** | Reads verification and coverage evidence; writes `done.md`, `openspec-archive.json`, and raw archive output |
+| `.ai-factory/qa/<change-id>/` | `/aif-verify` and **aif-done** | Reads verification and coverage evidence; writes `done-readiness.json`, `done.md`, `openspec-archive.json`, and raw archive output |
 | `.ai-factory/state/<change-id>/` | OpenSpec-native runtime and **aif-done** | Reads traces; writes `final-summary.md` |
 | `.ai-factory/specs/<plan-id>/` | **aif-done** legacy mode only | Creates or refreshes on legacy finalization |
 | `.ai-factory/specs/index.yaml` | **aif-done** | Updates |

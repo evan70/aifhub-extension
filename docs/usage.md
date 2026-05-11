@@ -451,10 +451,12 @@ Reads:
 - current coverage evidence from `.ai-factory/qa/<change-id>/coverage.json`
 - durable rules gate evidence from `.ai-factory/qa/<change-id>/rules.md` when policy requires it
 - the read-only AIFHub OpenSpec artifact contract result
+- the pre-archive readiness result from `scripts/openspec-done-readiness.mjs`
 - git working tree state
 
 Writes:
 
+- `.ai-factory/qa/<change-id>/done-readiness.json`
 - `.ai-factory/qa/<change-id>/done.md`
 - `.ai-factory/qa/<change-id>/openspec-archive.json`
 - `.ai-factory/qa/<change-id>/raw/`
@@ -467,7 +469,7 @@ Does not write:
 - manual file moves from `openspec/changes` to archives
 - legacy `.ai-factory/specs` archives in OpenSpec-native mode
 
-Use `--skip-specs` for docs/tooling-only changes where no accepted spec update is expected. Archive-required finalization needs a compatible OpenSpec CLI when `aifhub.openspec.requireCliForDone` is true. `/aif-done` refuses archive when the artifact contract validator returns `fail`, or when coverage is missing, stale, invalid, or failed by policy.
+Use `--skip-specs` for docs/tooling-only changes where no accepted spec update is expected. Archive-required finalization needs a compatible OpenSpec CLI when `aifhub.openspec.requireCliForDone` is true. `/aif-done` runs a pre-archive readiness gate and refuses archive on blocking OpenSpec validate, artifact contract, generated rules, rules gate, coverage, verify gate, or dirty workspace failures. The readiness output includes the exact next command to run.
 
 Next steps after `/aif-done`:
 

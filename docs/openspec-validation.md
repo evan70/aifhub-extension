@@ -86,9 +86,62 @@ Missing verification evidence suggests:
 
 Doctor also reports `effectivePolicy` from `scripts/openspec-policy.mjs`, including CLI, generated-rules, rules-gate, spec-coverage, and `allowWarnOnDone` settings. Human diagnostics show whether missing or warning evidence is only degraded or blocking under the current policy.
 
-`/aif-done` runs the validator with verification evidence required and refuses to archive when the validator returns `fail`.
+`/aif-done` runs `scripts/openspec-done-readiness.mjs` before archive and writes `.ai-factory/qa/<change-id>/done-readiness.json`. The readiness gate checks OpenSpec validate, OpenSpec status, artifact contract, generated rules freshness, rules gate evidence, coverage, verify gate evidence, and dirty workspace state. Blocking failures refuse archive and include an exact suggested next command, such as `/aif-mode sync --change <change-id>`, `/aif-rules-check`, or `/aif-verify <change-id>`.
+
+The readiness gate runs the artifact validator with verification evidence required and refuses to archive when the validator returns `fail` or blocking `warn`.
 
 `/aif-verify` still writes validation/status/verify evidence under `.ai-factory/qa/<change-id>/` and does not archive. It also writes the separate OpenSpec coverage matrix described in [OpenSpec Coverage Matrix](spec-coverage.md).
+
+## Done Readiness
+
+Run the pre-archive gate directly when diagnosing `/aif-done` refusal:
+
+```bash
+node scripts/openspec-done-readiness.mjs --change <change-id> --json
+```
+
+It writes `.ai-factory/qa/<change-id>/done-readiness.json` unless `--no-write` is passed. Exit codes are `0` for `pass` or policy-accepted `warn`, `1` for blocking readiness failure, and `2` for invalid arguments or unresolved changes.
+
+Stable JSON fields:
+
+```json
+{
+  "schema_version": 1,
+  "gate": "done-readiness",
+  "change_id": "add-oauth-login",
+  "status": "pass",
+  "blocking": false,
+  "checks": {
+    "openspec_validate": "pass",
+    "openspec_status": "pass",
+    "artifact_contract": "pass",
+    "generated_rules": "pass",
+    "rules_gate": "pass",
+    "coverage": "pass",
+    "verify_gate": "pass",
+    "dirty_workspace": "pass"
+  },
+  "diagnostics": [],
+  "suggested_next": null
+}
+```
+
+Each diagnostic includes `check`, `level`, `blocking`, `code`, `message`, optional `path`, and optional `suggested_next`.
+
+Readiness checks:
+
+| Check | Blocking behavior |
+|---|---|
+| `openspec_validate` | blocks when required OpenSpec validation fails or done policy requires an unavailable CLI |
+| `openspec_status` | blocks only when status is unavailable or warning and `allowWarnOnDone.openspecStatus` is false |
+| `artifact_contract` | requires aggregate artifact contract `pass` before archive |
+| `generated_rules` | blocks stale or missing generated rules when `requireGeneratedRulesForDone` is true |
+| `rules_gate` | blocks missing, failed, or disallowed warning rules evidence when `requireRulesPassForDone` is true |
+| `coverage` | blocks missing, stale, failed, or disallowed warning coverage when `requireSpecCoverageForDone` is true |
+| `verify_gate` | blocks missing, invalid, failed, or ambiguous final verify gate evidence |
+| `dirty_workspace` | blocks uncommitted changes unless explicit dirty-state recording is enabled |
+
+Policy is intentionally stricter for done than verify. Verify can run degraded when CLI, generated rules, rules gate, or coverage evidence is unavailable unless the matching verify flag is true. Done requires archive readiness and applies `allowWarnOnDone` before accepting warning-only rules, coverage, or OpenSpec status.
 
 ## Read-Only Boundary
 

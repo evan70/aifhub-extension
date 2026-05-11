@@ -530,6 +530,7 @@ describe('Full OpenSpec v1 mocked paths', () => {
       rootDir,
       changeId: 'add-oauth',
       detectOpenSpec: async () => availableCliDetection(),
+      validateOpenSpecChange: async () => validationResult('add-oauth'),
       getOpenSpecStatus: async () => statusResult('add-oauth'),
       gitStatus: async () => ({ exitCode: 0, stdout: '', stderr: '' }),
       archiveOpenSpecChange: async (changeId, options) => {
@@ -618,7 +619,8 @@ describe('Full OpenSpec v1 mocked paths', () => {
     assert.ok(verification.warnings.some((warning) => warning.code === 'openspec-cli-unavailable'));
     assert.equal(finalized.ok, false);
     assert.equal(finalized.errors[0].code, 'openspec-cli-required-for-done');
-    assert.equal(finalized.archive.warnings[0].code, 'context-failed');
+    assert.equal(finalized.readiness.status, 'fail');
+    assert.equal(finalized.archive.warnings[0].code, 'done-readiness-failed');
     assert.deepEqual(canonicalAfter, canonicalBefore);
     assert.equal(await pathExists(rootDir, 'openspec/specs/archive'), false);
   });
