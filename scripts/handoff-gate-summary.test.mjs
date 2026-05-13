@@ -55,6 +55,15 @@ async function writeGate(rootDir, changeId, fileName, gate, status) {
       status,
       blockers: status === 'fail'
         ? [{ id: `${gate}-failed`, severity: 'error', summary: `${gate} failed.` }]
+          .map((blocker) => gate === 'rules'
+            ? {
+                ...blocker,
+                source: {
+                  path: 'openspec/changes/add-oauth-login/specs/auth/spec.md',
+                  requirement: 'Generated rule traceability'
+                }
+              }
+            : blocker)
         : [],
       suggestedNext: status === 'fail'
         ? { command: '/aif-fix', reason: `${gate} failed.` }
@@ -217,7 +226,7 @@ describe('Handoff gate summary', () => {
     assert.equal(summary.suggested_next, '/aif-mode sync --change add-oauth-login');
   });
 
-  it('reports missing optional gate evidence as warnings without blocking', async () => {
+  it('keeps missing non-required planning gate evidence as warnings without blocking', async () => {
     const rootDir = await createTempRoot();
     await createOpenSpecChange(rootDir);
     await writeGate(rootDir, 'add-oauth-login', 'verify.md', 'verify', 'pass');
@@ -226,6 +235,7 @@ describe('Handoff gate summary', () => {
     const summary = await buildHandoffGateSummary({
       rootDir,
       changeId: 'add-oauth-login',
+      stage: 'planning',
       collectGeneratedRules: async () => generatedRulesPass()
     });
 
@@ -234,6 +244,155 @@ describe('Handoff gate summary', () => {
     assert.equal(summary.gates.security, 'warn');
     assert.equal(summary.blocking, false);
     assert.equal(summary.diagnostics.some((diagnostic) => diagnostic.code === 'rules-evidence-missing'), true);
+  });
+
+  it('blocks review routing when required review evidence is missing', async () => {
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir);
+    await writeGate(rootDir, 'add-oauth-login', 'rules.md', 'rules', 'pass');
+    await writeGate(rootDir, 'add-oauth-login', 'aif-security-checklist.md', 'security', 'pass');
+    await writeGate(rootDir, 'add-oauth-login', 'verify.md', 'verify', 'pass');
+    await writeCoverage(rootDir, 'add-oauth-login', 'pass');
+
+    const summary = await buildHandoffGateSummary({
+      rootDir,
+      changeId: 'add-oauth-login',
+      stage: 'review',
+      collectGeneratedRules: async () => generatedRulesPass()
+    });
+
+    assert.equal(summary.gates.review, 'warn');
+    assert.equal(summary.blocking, true);
+    assert.equal(summary.next_stage, 'review');
+    assert.equal(summary.suggested_next, '/aif-review add-oauth-login');
+  });
+
+  it('blocks review routing when required security or rules evidence is missing', async () => {
+    const securityRoot = await createTempRoot();
+    await createOpenSpecChange(securityRoot);
+    await writeGate(securityRoot, 'add-oauth-login', 'rules.md', 'rules', 'pass');
+    await writeGate(securityRoot, 'add-oauth-login', 'aif-review.md', 'review', 'pass');
+    await writeGate(securityRoot, 'add-oauth-login', 'verify.md', 'verify', 'pass');
+    await writeCoverage(securityRoot, 'add-oauth-login', 'pass');
+
+    const missingSecurity = await buildHandoffGateSummary({
+      rootDir: securityRoot,
+      changeId: 'add-oauth-login',
+      stage: 'review',
+      collectGeneratedRules: async () => generatedRulesPass()
+    });
+    assert.equal(missingSecurity.blocking, true);
+    assert.equal(missingSecurity.next_stage, 'review');
+    assert.equal(missingSecurity.suggested_next, '/aif-security-checklist add-oauth-login');
+
+    const rulesRoot = await createTempRoot();
+    await createOpenSpecChange(rulesRoot);
+    await writeGate(rulesRoot, 'add-oauth-login', 'aif-review.md', 'review', 'pass');
+    await writeGate(rulesRoot, 'add-oauth-login', 'aif-security-checklist.md', 'security', 'pass');
+    await writeGate(rulesRoot, 'add-oauth-login', 'verify.md', 'verify', 'pass');
+    await writeCoverage(rulesRoot, 'add-oauth-login', 'pass');
+
+    const missingRules = await buildHandoffGateSummary({
+      rootDir: rulesRoot,
+      changeId: 'add-oauth-login',
+      stage: 'review',
+      collectGeneratedRules: async () => generatedRulesPass()
+    });
+    assert.equal(missingRules.blocking, true);
+    assert.equal(missingRules.next_stage, 'review');
+    assert.equal(missingRules.suggested_next, '/aif-rules-check');
+  });
+
+  it('blocks done routing when required final evidence is missing', async () => {
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir);
+    await writeGate(rootDir, 'add-oauth-login', 'rules.md', 'rules', 'pass');
+
+    const summary = await buildHandoffGateSummary({
+      rootDir,
+      changeId: 'add-oauth-login',
+      stage: 'done',
+      collectGeneratedRules: async () => generatedRulesPass()
+    });
+
+    assert.equal(summary.blocking, true);
+    assert.equal(summary.next_stage, 'done');
+    assert.equal(summary.suggested_next, '/aif-verify add-oauth-login');
+  });
+
+  it('keeps parsed review warnings non-blocking when required evidence is present', async () => {
+    const rootDir = await createTempRoot();
+    await createPassingReviewEvidence(rootDir);
+
+    const summary = await buildHandoffGateSummary({
+      rootDir,
+      changeId: 'add-oauth-login',
+      stage: 'review',
+      collectGeneratedRules: async () => generatedRulesPass()
+    });
+
+    assert.equal(summary.gates.review, 'warn');
+    assert.equal(summary.blocking, false);
+    assert.equal(summary.next_stage, 'done');
+  });
+
+  it('blocks required invalid gate evidence at the current stage', async () => {
+    const rootDir = await createTempRoot();
+    await createPassingReviewEvidence(rootDir);
+    await writeFixture(rootDir, '.ai-factory/qa/add-oauth-login/aif-review.md', [
+      '# Review',
+      '',
+      '```aif-gate-result',
+      '{"schema_version":1,"gate":"review"',
+      '```'
+    ].join('\n'));
+
+    const summary = await buildHandoffGateSummary({
+      rootDir,
+      changeId: 'add-oauth-login',
+      stage: 'review',
+      collectGeneratedRules: async () => generatedRulesPass()
+    });
+
+    assert.equal(summary.gates.review, 'warn');
+    assert.equal(summary.blocking, true);
+    assert.equal(summary.next_stage, 'review');
+    assert.equal(summary.suggested_next, '/aif-review add-oauth-login');
+  });
+
+  it('blocks stale required coverage while keeping parsed coverage warnings non-blocking', async () => {
+    const staleRoot = await createTempRoot();
+    await createPassingReviewEvidence(staleRoot);
+
+    const staleCoverage = await buildHandoffGateSummary({
+      rootDir: staleRoot,
+      changeId: 'add-oauth-login',
+      stage: 'done',
+      collectGeneratedRules: async () => generatedRulesPass(),
+      readOpenSpecCoverageMatrix: async () => ({
+        exists: true,
+        ok: true,
+        stale: true,
+        relativePath: '.ai-factory/qa/add-oauth-login/coverage.json',
+        coverage: { status: 'pass' },
+        diagnostics: [{ code: 'coverage-source-stale', message: 'Coverage source changed.' }]
+      })
+    });
+    assert.equal(staleCoverage.gates.coverage, 'warn');
+    assert.equal(staleCoverage.blocking, true);
+    assert.equal(staleCoverage.next_stage, 'done');
+    assert.equal(staleCoverage.suggested_next, '/aif-verify add-oauth-login');
+
+    const warnRoot = await createTempRoot();
+    await createPassingReviewEvidence(warnRoot);
+    const parsedWarn = await buildHandoffGateSummary({
+      rootDir: warnRoot,
+      changeId: 'add-oauth-login',
+      stage: 'review',
+      collectGeneratedRules: async () => generatedRulesPass()
+    });
+    assert.equal(parsedWarn.gates.coverage, 'warn');
+    assert.equal(parsedWarn.blocking, false);
   });
 
   it('continues scanning fallback gate evidence after narrative markdown without a gate result', async () => {
@@ -285,6 +444,9 @@ describe('Handoff gate summary', () => {
     });
 
     assert.equal(summary.gates.rules, 'warn');
+    assert.equal(summary.blocking, true);
+    assert.equal(summary.next_stage, 'review');
+    assert.equal(summary.suggested_next, '/aif-rules-check');
     assert.equal(summary.diagnostics.some((diagnostic) => diagnostic.code === 'rules-gate-result-invalid'), true);
   });
 

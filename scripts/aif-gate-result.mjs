@@ -10,10 +10,10 @@ export const SUPPORTED_STATUSES = Object.freeze(['pass', 'warn', 'fail']);
 
 const BLOCKING_STATUS = 'fail';
 const SUGGESTED_COMMANDS_BY_GATE = Object.freeze({
-  verify: ['/aif-fix'],
-  review: ['/aif-fix'],
-  security: ['/aif-fix'],
-  rules: ['/aif-rules', '/aif-fix']
+  verify: ['/aif-fix', '/aif-verify'],
+  review: ['/aif-fix', '/aif-review'],
+  security: ['/aif-fix', '/aif-security-checklist'],
+  rules: ['/aif-rules', '/aif-rules-check', '/aif-fix', '/aif-mode']
 });
 
 export function createGateResult(input = {}) {
@@ -197,6 +197,7 @@ export function validateGateResult(value, options = {}) {
     for (const [index, blocker] of normalized.blockers.entries()) {
       errors.push(...validateBlocker(blocker, index));
     }
+    errors.push(...validateRulesFailProvenance(normalized));
   }
 
   if (!Array.isArray(normalized.affected_files)) {
@@ -216,14 +217,18 @@ export function validateGateResult(value, options = {}) {
 
 function normalizeBlockers(blockers) {
   return Array.from(blockers ?? []).map((blocker) => {
+    const source = blocker !== null && typeof blocker === 'object' && !Array.isArray(blocker)
+      ? blocker
+      : {};
     const normalized = {
-      id: String(blocker?.id ?? '').trim(),
-      severity: normalizeLowerString(blocker?.severity),
-      summary: String(blocker?.summary ?? '').trim()
+      ...source,
+      id: String(source.id ?? '').trim(),
+      severity: normalizeLowerString(source.severity),
+      summary: String(source.summary ?? '').trim()
     };
 
-    if (blocker?.file !== undefined && blocker.file !== null) {
-      normalized.file = normalizePathString(blocker.file);
+    if (source.file !== undefined && source.file !== null) {
+      normalized.file = normalizePathString(source.file);
     }
 
     return normalized;
@@ -257,6 +262,47 @@ function validateBlocker(blocker, index) {
   return errors;
 }
 
+function validateRulesFailProvenance(result) {
+  if (result.gate !== 'rules' || result.status !== 'fail') {
+    return [];
+  }
+
+  if (result.blockers.length === 0) {
+    return [diagnostic(
+      'invalid-rules-fail-provenance',
+      'rules fail results must include at least one trace-backed blocker.'
+    )];
+  }
+
+  return result.blockers.flatMap((blocker, index) => {
+    if (hasRulesBlockerProvenance(blocker)) {
+      return [];
+    }
+
+    return [diagnostic(
+      'invalid-rules-fail-provenance',
+      `blockers[${index}] for rules fail must include rule_id, rule_source, evidence_path, or source.path plus source.requirement.`
+    )];
+  });
+}
+
+function hasRulesBlockerProvenance(blocker) {
+  return hasNonEmptyString(blocker?.rule_id)
+    || hasNonEmptyString(blocker?.rule_source)
+    || hasNonEmptyString(blocker?.evidence_path)
+    || (
+      blocker?.source !== null
+      && typeof blocker?.source === 'object'
+      && !Array.isArray(blocker.source)
+      && hasNonEmptyString(blocker.source.path)
+      && hasNonEmptyString(blocker.source.requirement)
+    );
+}
+
+function hasNonEmptyString(value) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
 function normalizeSuggestedNext(value) {
   if (value === null || value === undefined) {
     return null;
@@ -280,10 +326,10 @@ function validateSuggestedNext(value, gate) {
   const errors = [];
   if (typeof value.command !== 'string' || value.command.trim().length === 0) {
     errors.push(diagnostic('invalid-suggested-next-command', 'suggested_next.command must be a non-empty string.'));
-  } else if (SUPPORTED_GATES.includes(gate) && !SUGGESTED_COMMANDS_BY_GATE[gate].includes(value.command)) {
+  } else if (SUPPORTED_GATES.includes(gate) && !isAllowedSuggestedCommand(value.command, gate)) {
     errors.push(diagnostic(
       'invalid-suggested-next-command',
-      `suggested_next.command for ${gate} must be one of: ${SUGGESTED_COMMANDS_BY_GATE[gate].join(', ')}.`
+      `suggested_next.command for ${gate} must start with one of: ${SUGGESTED_COMMANDS_BY_GATE[gate].join(', ')}.`
     ));
   }
 
@@ -292,6 +338,13 @@ function validateSuggestedNext(value, gate) {
   }
 
   return errors;
+}
+
+function isAllowedSuggestedCommand(command, gate) {
+  const value = String(command ?? '').trim();
+  return SUGGESTED_COMMANDS_BY_GATE[gate].some((allowed) => (
+    value === allowed || value.startsWith(`${allowed} `)
+  ));
 }
 
 function createParsedBlock({ ok, result, raw, startLine, endLine, errors }) {

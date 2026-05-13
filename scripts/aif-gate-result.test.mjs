@@ -43,7 +43,11 @@ describe('aif-gate-result helper', () => {
           id: 'rules-1',
           severity: 'error',
           file: 'src/example.ts',
-          summary: 'Required generated rules are missing.'
+          summary: 'Required generated rules are missing.',
+          source: {
+            path: 'openspec/changes/add-oauth/specs/auth/spec.md',
+            requirement: 'Generated rule traceability'
+          }
         }
       ],
       affectedFiles: ['src/example.ts'],
@@ -63,7 +67,11 @@ describe('aif-gate-result helper', () => {
           id: 'rules-1',
           severity: 'error',
           file: 'src/example.ts',
-          summary: 'Required generated rules are missing.'
+          summary: 'Required generated rules are missing.',
+          source: {
+            path: 'openspec/changes/add-oauth/specs/auth/spec.md',
+            requirement: 'Generated rule traceability'
+          }
         }
       ],
       affected_files: ['src/example.ts'],
@@ -130,7 +138,11 @@ describe('aif-gate-result helper', () => {
           id: 'rules-blocker',
           severity: 'error',
           file: 'src/rules.ts',
-          summary: 'Rule blocker.'
+          summary: 'Rule blocker.',
+          source: {
+            path: 'openspec/changes/add-oauth/specs/auth/spec.md',
+            requirement: 'Generated rule traceability'
+          }
         }
       ],
       affectedFiles: ['src/rules.ts'],
@@ -241,13 +253,144 @@ describe('aif-gate-result helper', () => {
       gate: 'rules',
       status: 'fail',
       blocking: true,
-      blockers: [],
+      blockers: [{
+        id: 'rules-blocker',
+        severity: 'error',
+        summary: 'Rule blocker.',
+        source: {
+          path: 'openspec/changes/add-oauth/specs/auth/spec.md',
+          requirement: 'Generated rule traceability'
+        }
+      }],
       affected_files: [],
       suggested_next: {
         command: '/aif-verify',
         reason: 'Wrong gate follow-up.'
       }
     }).errors[0].code, 'invalid-suggested-next-command');
+  });
+
+  it('accepts owned suggested commands with arguments and rejects near matches', () => {
+    const validRulesSync = validateGateResult({
+      schema_version: 1,
+      gate: 'rules',
+      status: 'warn',
+      blocking: false,
+      blockers: [],
+      affected_files: [],
+      suggested_next: {
+        command: '/aif-mode sync --change add-oauth-login',
+        reason: 'Generated rules are stale.'
+      }
+    });
+    assert.equal(validRulesSync.ok, true);
+
+    const validRulesCheck = validateGateResult({
+      schema_version: 1,
+      gate: 'rules',
+      status: 'warn',
+      blocking: false,
+      blockers: [],
+      affected_files: [],
+      suggested_next: {
+        command: '/aif-rules-check',
+        reason: 'Rerun the rules gate.'
+      }
+    });
+    assert.equal(validRulesCheck.ok, true);
+
+    const validVerifyFix = validateGateResult({
+      schema_version: 1,
+      gate: 'verify',
+      status: 'fail',
+      blocking: true,
+      blockers: [{ id: 'verify-failed', severity: 'error', summary: 'Verify failed.' }],
+      affected_files: [],
+      suggested_next: {
+        command: '/aif-fix add-oauth-login',
+        reason: 'Fix the failing verification finding.'
+      }
+    });
+    assert.equal(validVerifyFix.ok, true);
+
+    for (const command of ['/aif-mode-extra sync --change add-oauth-login', '/aif-fixup add-oauth-login', '/aif-commit']) {
+      const invalid = validateGateResult({
+        schema_version: 1,
+        gate: 'rules',
+        status: 'warn',
+        blocking: false,
+        blockers: [],
+        affected_files: [],
+        suggested_next: {
+          command,
+          reason: 'Not an allowed rules remediation command.'
+        }
+      });
+      assert.equal(invalid.errors[0].code, 'invalid-suggested-next-command');
+    }
+  });
+
+  it('preserves blocker provenance and requires provenance for rules failures', () => {
+    const result = createGateResult({
+      gate: 'rules',
+      status: 'fail',
+      blockers: [{
+        id: ' rules-provenance ',
+        severity: 'ERROR',
+        file: 'src/example.ts',
+        summary: 'Trace-backed generated rule failed.',
+        rule_id: 'openspec-generated-rule-1',
+        rule_source: '.ai-factory/rules/generated/openspec-merged-add-oauth-login.md',
+        evidence_path: 'src/example.ts',
+        source: {
+          path: 'openspec/changes/add-oauth-login/specs/auth/spec.md',
+          requirement: 'OAuth login'
+        }
+      }],
+      affectedFiles: [],
+      suggestedNext: {
+        command: '/aif-fix add-oauth-login',
+        reason: 'Fix the trace-backed rule failure.'
+      }
+    });
+
+    assert.equal(result.blockers[0].id, 'rules-provenance');
+    assert.equal(result.blockers[0].severity, 'error');
+    assert.equal(result.blockers[0].rule_id, 'openspec-generated-rule-1');
+    assert.equal(result.blockers[0].rule_source, '.ai-factory/rules/generated/openspec-merged-add-oauth-login.md');
+    assert.equal(result.blockers[0].evidence_path, 'src/example.ts');
+    assert.deepEqual(result.blockers[0].source, {
+      path: 'openspec/changes/add-oauth-login/specs/auth/spec.md',
+      requirement: 'OAuth login'
+    });
+
+    const missingBlocker = validateGateResult({
+      schema_version: 1,
+      gate: 'rules',
+      status: 'fail',
+      blocking: true,
+      blockers: [],
+      affected_files: [],
+      suggested_next: {
+        command: '/aif-fix add-oauth-login',
+        reason: 'Fix the rule failure.'
+      }
+    });
+    assert.equal(missingBlocker.errors.some((error) => error.code === 'invalid-rules-fail-provenance'), true);
+
+    const missingProvenance = validateGateResult({
+      schema_version: 1,
+      gate: 'rules',
+      status: 'fail',
+      blocking: true,
+      blockers: [{ id: 'rules-failed', severity: 'error', summary: 'Rule failed.' }],
+      affected_files: [],
+      suggested_next: {
+        command: '/aif-fix add-oauth-login',
+        reason: 'Fix the rule failure.'
+      }
+    });
+    assert.equal(missingProvenance.errors.some((error) => error.code === 'invalid-rules-fail-provenance'), true);
   });
 });
 

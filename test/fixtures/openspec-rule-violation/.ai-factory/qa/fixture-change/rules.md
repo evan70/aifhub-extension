@@ -11,7 +11,11 @@
       "id": "fixture-rule-violation",
       "severity": "error",
       "file": "src/auth/login.ts",
-      "summary": "Fixture intentionally violates generated rule guidance."
+      "summary": "Fixture intentionally violates generated rule guidance.",
+      "source": {
+        "path": "openspec/changes/fixture-change/specs/auth/spec.md",
+        "requirement": "Fixture rule violation"
+      }
     }
   ],
   "affected_files": [

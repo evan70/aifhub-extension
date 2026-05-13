@@ -70,7 +70,11 @@ async function writeRulesGateEvidence(rootDir, changeId = 'add-oauth', status = 
         ? [{
           id: 'rules-failed',
           severity: 'error',
-          summary: 'Rules failed.'
+          summary: 'Rules failed.',
+          source: {
+            path: `openspec/changes/${changeId}/specs/auth/spec.md`,
+            requirement: 'Rules gate evidence'
+          }
         }]
         : [],
       affectedFiles: [],
