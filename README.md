@@ -76,11 +76,37 @@ Implement, check optional gates, verify, fix if needed, finalize, sync, commit, 
 /aif-evolve
 ```
 
+Core AI Factory workflow:
+
+```text
+/aif-explore
+/aif-plan full "..."
+/aif-improve <change-id>
+/aif-implement <change-id>
+/aif-verify <change-id>
+/aif-commit
+/aif-evolve
+```
+
+OpenSpec validation overlay:
+
+```text
+/aif-mode sync --change <change-id>
+/aif-rules-check
+/aif-review
+/aif-security-checklist
+/aif-mode doctor --change <change-id>
+/aif-done <change-id>
+```
+
 `/aif-done` finalizes the OpenSpec lifecycle. It archives the accepted OpenSpec change through the OpenSpec CLI when archive is required and writes final evidence under `.ai-factory/qa/<change-id>/` plus final summaries under `.ai-factory/state/<change-id>/`.
 
 It does not replace `/aif-commit`. After `/aif-done`, run `/aif-commit` or your normal git workflow to commit implementation changes, OpenSpec archive/spec changes, QA evidence, and final summaries.
 
-Optional gates:
+Validation gates:
+
+- Optional before verify in relaxed/manual workflow.
+- Required before `/aif-done` when done policy requires durable gate evidence.
 
 - `/aif-rules-check` - read-only rules compliance.
 - `/aif-review` - read-only code review.

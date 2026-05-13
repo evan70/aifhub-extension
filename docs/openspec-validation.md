@@ -88,6 +88,21 @@ Doctor also reports `effectivePolicy` from `scripts/openspec-policy.mjs`, includ
 
 `/aif-done` runs `scripts/openspec-done-readiness.mjs` before archive and writes `.ai-factory/qa/<change-id>/done-readiness.json`. The readiness gate checks OpenSpec validate, OpenSpec status, artifact contract, generated rules freshness, rules gate evidence, coverage, verify gate evidence, and dirty workspace state. Blocking failures refuse archive and include an exact suggested next command, such as `/aif-mode sync --change <change-id>`, `/aif-rules-check`, or `/aif-verify <change-id>`.
 
+When `requireRulesPassForDone` is true, save the final `/aif-rules-check` output, or at least its final `aif-gate-result` block, to `.ai-factory/qa/<change-id>/rules.md` before `/aif-done`:
+
+```bash
+node scripts/write-gate-evidence.mjs \
+  --change add-oauth-login \
+  --gate rules \
+  --from /tmp/aif-rules-check-output.md
+```
+
+```bash
+node scripts/write-gate-evidence.mjs --change add-oauth-login --gate rules
+```
+
+The second form reads Markdown from stdin.
+
 The readiness gate runs the artifact validator with verification evidence required and refuses to archive when the validator returns `fail` or blocking `warn`.
 
 `/aif-verify` still writes validation/status/verify evidence under `.ai-factory/qa/<change-id>/` and does not archive. It also writes the separate OpenSpec coverage matrix described in [OpenSpec Coverage Matrix](spec-coverage.md).
