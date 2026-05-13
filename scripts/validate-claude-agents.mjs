@@ -108,12 +108,18 @@ async function validate() {
     // Check name matches aifhub-* namespace
     const name = frontmatter.name || '';
     if (name && !name.startsWith('aifhub-')) {
-      log('WARN', `Agent name does not use aifhub-* namespace`, { file: relPath, name });
+      log('ERROR', `Agent name does not use aifhub-* namespace`, { file: relPath, name });
+      hasErrors = true;
     }
 
     if (!hasErrors) {
       log('INFO', `Agent OK`, { file: relPath });
     }
+  }
+
+  const manifestResult = await validateManifestTargets(repoRoot);
+  if (!manifestResult.ok) {
+    hasErrors = true;
   }
 
   if (hasErrors) {
@@ -123,6 +129,47 @@ async function validate() {
 
   log('INFO', 'All agent files passed');
   return 0;
+}
+
+async function validateManifestTargets(repoRoot) {
+  let manifest;
+  try {
+    manifest = JSON.parse(await readFile(join(repoRoot, 'extension.json'), 'utf-8'));
+  } catch (err) {
+    if (err?.code === 'ENOENT') {
+      log('DEBUG', 'extension.json not found; skipping manifest target validation');
+      return { ok: true };
+    }
+
+    log('ERROR', `Cannot read extension.json: ${err.message}`);
+    return { ok: false };
+  }
+
+  let ok = true;
+  const agentFiles = Array.isArray(manifest.agentFiles) ? manifest.agentFiles : [];
+  for (const [index, entry] of agentFiles.entries()) {
+    if (!isClaudeMarkdownAgentFile(entry)) {
+      continue;
+    }
+
+    const target = String(entry?.target ?? '').trim();
+    if (!target.startsWith('aifhub-') || !target.endsWith('.md')) {
+      log('ERROR', 'Claude agent target must use aifhub-*.md namespace', {
+        index,
+        target
+      });
+      ok = false;
+    }
+  }
+
+  return { ok };
+}
+
+function isClaudeMarkdownAgentFile(entry) {
+  const source = String(entry?.source ?? '').replace(/\\/g, '/');
+  const target = String(entry?.target ?? '').replace(/\\/g, '/');
+  return (source.includes('agent-files/claude/') && source.endsWith('.md'))
+    || (source.endsWith('.md') && target.endsWith('.md') && entry?.runtime === 'claude');
 }
 
 process.exit(await validate());

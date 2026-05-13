@@ -79,7 +79,7 @@ Gate Markdown files are parsed through the existing `aif-gate-result` contract. 
 | Status | Meaning |
 |---|---|
 | `pass` | The signal is present and acceptable. |
-| `warn` | Evidence is missing, optional, invalid, stale, or non-blocking. |
+| `warn` | A completed gate or evidence source reported warnings, or non-required evidence is missing/invalid/stale. |
 | `fail` | A gate reports a blocking failure. |
 | `stale` | Generated rules are missing, stale, or have missing/invalid trace metadata. |
 
@@ -87,18 +87,35 @@ Gate `fail` values set `blocking: true`.
 
 `generatedRules: "stale"` also sets `blocking: true` and has routing priority over gate failures. Handoff should run `/aif-mode sync --change <change-id>`, rebuild the summary, and then act on any remaining gate failures.
 
+Warnings are not treated equally for routing. A parsed gate result with `status: "warn"` is completed evidence and does not block by itself. Missing, unreadable, invalid, or stale evidence blocks only when that signal is required for the current stage.
+
+## Required Evidence By Stage
+
+| Stage | Required evidence |
+|---|---|
+| `planning` | none |
+| `implementing` | `verify` |
+| `review` | `review`, `security`, `rules`, `coverage` |
+| `done` | `verify`, `rules`, `coverage` |
+
+When required evidence is missing, unreadable, invalid, or stale, the summary keeps `next_stage` at the current stage and returns the owning command as `suggested_next`.
+
 ## Routing
 
 | Condition | `next_stage` | `suggested_next` |
 |---|---|---|
 | `generatedRules` is `stale` | current stage | `/aif-mode sync --change <change-id>` |
+| required review evidence is missing/invalid at review stage | `review` | `/aif-review <change-id>` |
+| required security evidence is missing/invalid at review stage | `review` | `/aif-security-checklist <change-id>` |
+| required rules evidence is missing/invalid | current stage | `/aif-rules-check` |
+| required verify or coverage evidence is missing/invalid/stale | current stage | `/aif-verify <change-id>` |
 | any gate is `fail` and generated rules are current | `implementing` | `/aif-fix <change-id>` |
 | review stage has no blockers | `done` | `/aif-done <change-id>` |
 | planning stage has no blockers | `implementing` | `/aif-implement <change-id>` |
 | implementing stage has no blockers | `review` | `/aif-verify <change-id>` |
 | done stage has no blockers | `done` | `/aif-done <change-id>` |
 
-Warnings do not block by themselves. Handoff can still display them or require a stricter policy outside this profile.
+Completed warnings do not block by themselves. Handoff can still display them or require a stricter policy outside this profile.
 
 ## CLI Exit Codes
 

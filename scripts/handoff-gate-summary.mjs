@@ -31,6 +31,13 @@ const GATE_CANDIDATES = Object.freeze({
   verify: ['verify.md']
 });
 
+const REQUIRED_GATES_BY_STAGE = Object.freeze({
+  planning: [],
+  implementing: ['verify'],
+  review: ['review', 'security', 'rules', 'coverage'],
+  done: ['verify', 'rules', 'coverage']
+});
+
 export function parseHandoffGateSummaryArgs(argv = []) {
   const result = {
     ok: true,
@@ -115,6 +122,7 @@ export async function buildHandoffGateSummary(options = {}) {
   const changeId = resolved.changeId;
   const qaPath = resolved.qaPath ?? path.join(rootDir, '.ai-factory', 'qa', changeId);
   const gateResults = {};
+  const gateSignals = {};
   const diagnostics = normalizeDiagnostics(resolved.warnings, 'warning');
   const evidence = {
     generatedRules: '.ai-factory/rules/generated'
@@ -127,6 +135,7 @@ export async function buildHandoffGateSummary(options = {}) {
       readFile: options.readFile ?? readFile
     });
     gateResults[gate] = result.status;
+    gateSignals[gate] = result;
     if (result.evidencePath) {
       evidence[gate] = result.evidencePath;
     }
@@ -139,6 +148,7 @@ export async function buildHandoffGateSummary(options = {}) {
     qaPath
   });
   gateResults.coverage = coverage.status;
+  gateSignals.coverage = coverage;
   evidence.coverage = coverage.evidencePath;
   diagnostics.push(...coverage.diagnostics);
 
@@ -152,6 +162,7 @@ export async function buildHandoffGateSummary(options = {}) {
     changeId,
     stage,
     gates: gateResults,
+    signals: gateSignals,
     generatedRules: generatedRules.status
   });
 
@@ -249,6 +260,7 @@ async function readGateStatus(gate, options) {
     } catch (err) {
       return {
         status: 'warn',
+        issue: 'unreadable',
         evidencePath,
         diagnostics: [...fallbackDiagnostics, diagnostic({
           code: `${gate}-evidence-unreadable`,
@@ -274,6 +286,7 @@ async function readGateStatus(gate, options) {
     if (!latest.ok) {
       return {
         status: 'warn',
+        issue: 'invalid',
         evidencePath,
         diagnostics: [
           ...fallbackDiagnostics,
@@ -290,6 +303,7 @@ async function readGateStatus(gate, options) {
 
     return {
       status: latest.result.status,
+      issue: null,
       evidencePath,
       diagnostics: fallbackDiagnostics
     };
@@ -298,6 +312,7 @@ async function readGateStatus(gate, options) {
   if (firstExistingEvidencePath !== null) {
     return {
       status: 'warn',
+      issue: 'missing',
       evidencePath: firstExistingEvidencePath,
       diagnostics: fallbackDiagnostics
     };
@@ -305,6 +320,7 @@ async function readGateStatus(gate, options) {
 
   return {
     status: 'warn',
+    issue: 'missing',
     evidencePath: expectedPath,
     diagnostics: [diagnostic({
       code: `${gate}-evidence-missing`,
@@ -323,9 +339,11 @@ async function readCoverageStatus(changeId, options) {
     qaPath: options.qaPath
   });
   const status = normalizeCoverageStatus(coverage);
+  const issue = normalizeCoverageIssue(coverage);
 
   return {
     status,
+    issue,
     evidencePath: coverage?.relativePath ?? relativePath(options.rootDir, path.join(options.qaPath, 'coverage.json')),
     diagnostics: normalizeDiagnostics(coverage?.diagnostics ?? [], 'warning')
   };
@@ -367,7 +385,23 @@ function normalizeCoverageStatus(coverage) {
   return 'warn';
 }
 
-function routeSummary({ changeId, stage, gates, generatedRules }) {
+function normalizeCoverageIssue(coverage) {
+  if (coverage?.exists === false) {
+    return 'missing';
+  }
+
+  if (coverage?.exists === true && coverage.ok === false) {
+    return 'invalid';
+  }
+
+  if (coverage?.stale === true) {
+    return 'stale';
+  }
+
+  return null;
+}
+
+function routeSummary({ changeId, stage, gates, signals, generatedRules }) {
   const gateFailure = Object.entries(gates).find(([, status]) => status === 'fail');
 
   if (generatedRules === 'stale') {
@@ -375,6 +409,15 @@ function routeSummary({ changeId, stage, gates, generatedRules }) {
       blocking: true,
       nextStage: stage,
       suggestedNext: `/aif-mode sync --change ${changeId}`
+    };
+  }
+
+  const requiredEvidenceBlocker = findRequiredEvidenceBlocker(changeId, stage, signals);
+  if (requiredEvidenceBlocker) {
+    return {
+      blocking: true,
+      nextStage: stage,
+      suggestedNext: requiredEvidenceBlocker.suggestedNext
     };
   }
 
@@ -405,6 +448,38 @@ function routeSummary({ changeId, stage, gates, generatedRules }) {
     nextStage: mapping[stage].nextStage,
     suggestedNext: mapping[stage].suggestedNext
   };
+}
+
+function findRequiredEvidenceBlocker(changeId, stage, signals = {}) {
+  const requiredGates = REQUIRED_GATES_BY_STAGE[stage] ?? [];
+  for (const gate of requiredGates) {
+    const issue = signals[gate]?.issue ?? null;
+    if (issue === null) {
+      continue;
+    }
+
+    if (['missing', 'unreadable', 'invalid', 'stale'].includes(issue)) {
+      return {
+        gate,
+        issue,
+        suggestedNext: suggestedNextForRequiredGate(gate, changeId)
+      };
+    }
+  }
+
+  return null;
+}
+
+function suggestedNextForRequiredGate(gate, changeId) {
+  const mapping = {
+    review: (changeId) => `/aif-review ${changeId}`,
+    security: (changeId) => `/aif-security-checklist ${changeId}`,
+    rules: () => '/aif-rules-check',
+    coverage: (changeId) => `/aif-verify ${changeId}`,
+    verify: (changeId) => `/aif-verify ${changeId}`
+  };
+
+  return mapping[gate]?.(changeId) ?? `/aif-verify ${changeId}`;
 }
 
 function createUnresolvedSummary({ stage, diagnostics }) {

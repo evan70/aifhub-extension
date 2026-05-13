@@ -106,7 +106,7 @@ fail -> /aif-fix -> /aif-verify -> /aif-done
 | **Planning** | `/aif-plan full`, `/aif-improve`; optional: `aifhub-plan-polisher` | — | Configurable stage mapping в Handoff orchestrator |
 | **Plan Ready** | no worker; gate/status only | — | Stage status tracking API |
 | **Implementing** | `/aif-implement`, `/aif-verify --check-only`; if fail: `/aif-fix` -> `/aif-verify --check-only` | — | Если позже понадобится отдельный handoff binding для verify/fix, это должен быть отдельный scope поверх core workflow |
-| **Review** | `/aif-review`, `/aif-security-checklist`, `/aif-rules-check`; if any gate fails: return to Implementing | `aif-review-handoff-gate.md`, `aif-security-checklist-handoff-gate.md`, `aif-rules-check-handoff-gate.md` | Multi-gate aggregation и conditional return |
+| **Review** | `/aif-review`, `/aif-security-checklist`, `/aif-rules-check`; if any required gate evidence is missing/invalid, stay in Review and run the owning command; if any completed gate fails, return to Implementing | `aif-review-handoff-gate.md`, `aif-security-checklist-handoff-gate.md`, `aif-rules-check-handoff-gate.md` | Multi-gate aggregation и conditional return |
 | **Done** | `/aif-done` | `aif-done-handoff-finalizer.md` | Explicit finalizer stage binding |
 
 ### Что работает сейчас вручную

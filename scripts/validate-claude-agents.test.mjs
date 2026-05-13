@@ -78,6 +78,22 @@ maxTurns: 6
 You are a generic agent.
 `;
 
+const VALID_EXTENSION_JSON = JSON.stringify({
+  agentFiles: [{
+    runtime: 'claude',
+    source: './agent-files/claude/aifhub-test-agent.md',
+    target: 'aifhub-test-agent.md'
+  }]
+}, null, 2);
+
+const NON_NAMESPACED_TARGET_EXTENSION_JSON = JSON.stringify({
+  agentFiles: [{
+    runtime: 'claude',
+    source: './agent-files/claude/aifhub-test-agent.md',
+    target: 'test-agent.md'
+  }]
+}, null, 2);
+
 async function writeFixture(dir, relPath, content) {
   const fullPath = join(dir, relPath);
   await mkdir(join(fullPath, '..'), { recursive: true });
@@ -109,10 +125,24 @@ describe('validate-claude-agents.mjs', () => {
     assert.equal(code, 1);
   });
 
-  it('passes with warning for non-namespaced agent', async () => {
+  it('fails for non-namespaced agent frontmatter', async () => {
     await writeFixture(tmpDir, 'agent-files/claude/generic.md', NON_NAMESPACED_MD);
     const code = await runValidatorExitCode(tmpDir);
+    assert.equal(code, 1);
+  });
+
+  it('validates namespaced Claude manifest targets when extension.json exists', async () => {
+    await writeFixture(tmpDir, 'agent-files/claude/valid.md', VALID_MD);
+    await writeFixture(tmpDir, 'extension.json', VALID_EXTENSION_JSON);
+    const code = await runValidatorExitCode(tmpDir);
     assert.equal(code, 0);
+  });
+
+  it('fails for non-namespaced Claude manifest targets', async () => {
+    await writeFixture(tmpDir, 'agent-files/claude/valid.md', VALID_MD);
+    await writeFixture(tmpDir, 'extension.json', NON_NAMESPACED_TARGET_EXTENSION_JSON);
+    const code = await runValidatorExitCode(tmpDir);
+    assert.equal(code, 1);
   });
 
   it('fails when claude directory does not exist', async () => {
