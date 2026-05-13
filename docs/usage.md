@@ -23,7 +23,7 @@ planning:
 implementation:
   /aif-implement <change-id>                        # required
 
-optional gates:
+validation gates:
   /aif-mode sync --change <change-id>               # optional if specs/rules changed
   /aif-rules-check                                  # optional/recommended rules gate
   /aif-review                                       # optional read-only review gate
@@ -350,7 +350,20 @@ Writes:
 
 `/aif-rules-check` is optional after implementation or fixes and useful for strict/high-risk changes. In OpenSpec-native mode it uses generated rules first, loads trace JSON when present, returns a final `aif-gate-result` with `gate: "rules"`, and does not regenerate generated rules.
 
-When done policy requires a rules pass, persist the final rules gate block under `.ai-factory/qa/<change-id>/rules.md`. Generated rules freshness and rules gate pass are separate signals.
+When `requireRulesPassForDone` is true, save the final `/aif-rules-check` output, or at least its final `aif-gate-result` block, to `.ai-factory/qa/<change-id>/rules.md`. Generated rules freshness and rules gate pass are separate signals.
+
+```bash
+node scripts/write-gate-evidence.mjs \
+  --change add-oauth-login \
+  --gate rules \
+  --from /tmp/aif-rules-check-output.md
+```
+
+```bash
+node scripts/write-gate-evidence.mjs --change add-oauth-login --gate rules
+```
+
+In the stdin form, paste or pipe the Markdown gate output into the command.
 
 Generated-rule `FAIL` findings must cite trace-backed `source.path` and `source.requirement`. The generated trace includes output hashes for generated markdown, so status/doctor can warn when generated rule text is manually edited without source-spec changes. If the generated trace is missing or invalid, generated-rule findings are capped at `WARN`; rerun sync to regenerate trace metadata.
 
@@ -470,6 +483,8 @@ Does not write:
 - legacy `.ai-factory/specs` archives in OpenSpec-native mode
 
 Use `--skip-specs` for docs/tooling-only changes where no accepted spec update is expected. Archive-required finalization needs a compatible OpenSpec CLI when `aifhub.openspec.requireCliForDone` is true. `/aif-done` runs a pre-archive readiness gate and refuses archive on blocking OpenSpec validate, artifact contract, generated rules, rules gate, coverage, verify gate, or dirty workspace failures. The readiness output includes the exact next command to run.
+
+If `requireRulesPassForDone` is true and readiness reports missing rules gate evidence, rerun `/aif-rules-check` and persist the final output with `node scripts/write-gate-evidence.mjs --change add-oauth-login --gate rules --from /tmp/aif-rules-check-output.md`, or save at least the final `aif-gate-result` block to `.ai-factory/qa/<change-id>/rules.md`.
 
 Next steps after `/aif-done`:
 

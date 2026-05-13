@@ -83,6 +83,12 @@ describe('complete OpenSpec workflow documentation contract', () => {
 
     assertIncludes(quickStart, '/aif-done` finalizes the OpenSpec lifecycle', 'README.md Quick Start');
     assertIncludes(quickStart, 'It does not replace `/aif-commit`', 'README.md Quick Start');
+    assertIncludes(quickStart, 'Validation gates:', 'README.md Quick Start');
+    assertIncludes(quickStart, 'Optional before verify in relaxed/manual workflow.', 'README.md Quick Start');
+    assertIncludes(quickStart, 'Required before `/aif-done` when done policy requires durable gate evidence.', 'README.md Quick Start');
+    assertIncludes(quickStart, 'Core AI Factory workflow:', 'README.md Quick Start');
+    assertIncludes(quickStart, 'OpenSpec validation overlay:', 'README.md Quick Start');
+    assertNotIncludes(quickStart, 'Optional gates:', 'README.md Quick Start');
   });
 
   it('documents the complete manual workflow in docs/usage.md in workflow order', async () => {
@@ -114,6 +120,22 @@ describe('complete OpenSpec workflow documentation contract', () => {
       '/aif-commit',
       '/aif-evolve'
     ], 'docs/usage.md workflow');
+  });
+
+  it('documents durable rules gate evidence persistence for strict done readiness', async () => {
+    const usage = await readRepoFile('docs/usage.md');
+    const validation = await readRepoFile('docs/openspec-validation.md');
+
+    for (const [label, source] of [
+      ['docs/usage.md', usage],
+      ['docs/openspec-validation.md', validation]
+    ]) {
+      assertIncludes(source, 'requireRulesPassForDone', label);
+      assertIncludes(source, '.ai-factory/qa/<change-id>/rules.md', label);
+      assertIncludes(source, 'node scripts/write-gate-evidence.mjs --change add-oauth-login --gate rules', label);
+      assertIncludes(source, '--from /tmp/aif-rules-check-output.md', label);
+      assertIncludes(source, 'final `aif-gate-result` block', label);
+    }
   });
 
   it('documents planned bug fixes separately from post-verify fixes', async () => {
