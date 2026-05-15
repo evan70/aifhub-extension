@@ -19,6 +19,13 @@ function assertIncludes(source, expected, filePath) {
   );
 }
 
+function assertNotIncludes(source, unexpected, filePath) {
+  assert.ok(
+    !source.includes(unexpected),
+    `${filePath} should not include ${JSON.stringify(unexpected)}`
+  );
+}
+
 describe('aif-analyze OpenSpec-native bootstrap contract', () => {
   it('documents explicit mode selection and preserves legacy default config', async () => {
     const skill = await readRepoFile('skills/aif-analyze/SKILL.md');
@@ -108,6 +115,62 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
       'OpenSpec skills and slash commands are not installed by this extension'
     ]) {
       assertIncludes(combined, expected, 'OpenSpec bootstrap docs');
+    }
+  });
+
+  it('documents language technical terms policy and runtime-specific invocations', async () => {
+    const skill = await readRepoFile('skills/aif-analyze/SKILL.md');
+    const template = await readRepoFile('skills/aif-analyze/references/config-template.yaml');
+    const combined = [skill, template].join('\n');
+
+    for (const expected of [
+      'language.ui',
+      'language.artifacts',
+      'language.technical_terms',
+      'default it to `keep`',
+      'keep | translate | mixed',
+      'technical_terms: keep',
+      'first recommended command must use the selected runtime invocation style',
+      '$aif` for `codex-app`',
+      'codex-app',
+      '$aif-explore',
+      '$aif-plan full',
+      '$aif-verify',
+      '$aif-*',
+      'slash-command runtimes',
+      '/aif-explore',
+      '/aif-plan full',
+      '/aif-verify',
+      '/aif-*',
+      'runtime-specific plan command',
+      'selected runtime invocation for `aif-architecture` and `aif-roadmap`',
+      'suggest the selected runtime invocation for `aif` first',
+      'suggest or initiate the selected runtime invocation for `aif-architecture`',
+      'suggest or initiate the selected runtime invocation for `aif-roadmap`',
+      'core `aif`',
+      'suggests the selected runtime invocation (`$aif` for `codex-app`, `/aif` for slash-command runtimes) if missing',
+      'Canonical workflow entries are runtime-specific',
+      'codex-app: `$aif-explore`, `$aif-plan full`, `$aif-improve`, `$aif-implement`, `$aif-verify`, `$aif-fix`',
+      'slash-command runtimes: `/aif-explore`, `/aif-plan full`, `/aif-improve`, `/aif-implement`, `/aif-verify`, `/aif-fix`',
+      'using the selected runtime invocation style'
+    ]) {
+      assertIncludes(combined, expected, 'aif-analyze language/runtime policy');
+    }
+
+    for (const stale of [
+      'first recommended command must be `/aif`',
+      'After bootstrap describe the current public workflow as starting with `/aif-explore`',
+      'If DESCRIPTION is missing, suggest `/aif` first.',
+      'suggest running `/aif`',
+      'suggest or initiate `/aif-architecture`',
+      'suggest or initiate `/aif-roadmap`',
+      'core `/aif`',
+      'suggests `/aif` if missing',
+      'Canonical commands are now:',
+      '- /aif-explore\n- /aif-plan full',
+      '`/aif-done`'
+    ]) {
+      assertNotIncludes(skill, stale, 'skills/aif-analyze/SKILL.md');
     }
   });
 });

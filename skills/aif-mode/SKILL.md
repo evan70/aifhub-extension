@@ -28,6 +28,10 @@ node scripts/aif-mode.mjs doctor
 
 Use `--dry-run` before any switching or sync command when reviewing planned writes. Use `--json` when another tool needs structured output.
 
+## Invocation Style
+
+Use runtime-specific public invocations when instructing the user: selected `codex-app` runtime uses `$aif-mode` and other `$aif-*` skills, while slash-command runtimes use `/aif-mode` and other `/aif-*` commands.
+
 ## Workflow
 
 1. Read `.ai-factory/config.yaml` and resolve `aifhub.artifactProtocol`.
@@ -110,6 +114,14 @@ Refresh derived or compatibility artifacts without changing mode.
 ### `doctor`
 
 Read-only diagnostics for config marker, configured paths, OpenSpec CLI capability, Node compatibility, active change ambiguity, generated rules, coverage matrix status, legacy artifacts in OpenSpec-native mode, OpenSpec validation when available, and archive readiness for `/aif-done`.
+
+AI Factory 2.12+ also exposes an optional read-only artifact audit bridge:
+
+```bash
+ai-factory audit-artifacts openspec .ai-factory/qa .ai-factory/state --json
+```
+
+Use this only as supplemental diagnostic context when available. It is optional, not mandatory, not archive-blocking, and must not turn `/aif-mode doctor` into a write operation or a hard dependency on upstream AI Factory 2.12+.
 
 ## References
 

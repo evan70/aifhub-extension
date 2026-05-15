@@ -87,6 +87,12 @@ Action toggles such as `validateOnPlan`, `validateOnImprove`, `validateOnVerify`
 
 The defaults keep planning and verification degraded-friendly while making `/aif-done` strict: verify can warn on missing CLI, generated rules, rules gate evidence, or coverage evidence; done requires current generated rules, a passing durable rules gate, current passing coverage, and archive-capable CLI unless config relaxes those requirements.
 
+## Workflow Plan ID Policy
+
+OpenSpec-native mode uses OpenSpec `change-id` values and ignores AI Factory `workflow.plan_id_format` for canonical artifact names. The active change directory stays `openspec/changes/<change-id>/` whether upstream AI Factory is configured for `slug` or `sequential` legacy plan IDs.
+
+Legacy AI Factory-only mode follows upstream `workflow.plan_id_format`. Use `slug` for slug-named plan files, or `sequential` for upstream sequential filenames under `paths.plans`.
+
 ## AIFHub Wrapper Behavior
 
 | AIFHub command | OpenSpec CLI feature |
@@ -102,6 +108,16 @@ The defaults keep planning and verification degraded-friendly while making `/aif
 | `/aif-mode doctor` | CLI, Node, active change, effective policy, generated rules, latest verify gate, rules gate, coverage, AIFHub artifact contract, and archive readiness diagnostics |
 
 Do not route users to OpenSpec slash commands such as `/opsx:propose`, `/opsx:apply`, or `/opsx:archive`.
+
+## AI Factory 2.12 Optional Artifact Audit Bridge
+
+AI Factory 2.12+ provides an optional read-only artifact audit command that can inspect OpenSpec and AIFHub runtime evidence together:
+
+```bash
+ai-factory audit-artifacts openspec .ai-factory/qa .ai-factory/state --json
+```
+
+This audit bridge is diagnostic-only for AIFHub Extension. It may supplement `/aif-mode doctor` output when available, but it is not mandatory, not archive-blocking, and not a replacement for AIFHub generated rules, coverage, rules gate, verify gate, or OpenSpec archive readiness checks.
 
 ## Artifact Sync Points
 
