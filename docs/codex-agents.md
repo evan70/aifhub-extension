@@ -2,6 +2,17 @@
 
 # Codex Agents
 
+## Codex Runtime Matrix
+
+| Runtime | Skills path | Agent files | MCP/config path | AI Factory invocation |
+|---|---|---|---|---|
+| Codex CLI (`codex`) | `.codex/skills` | `.codex/agents` installed from extension `agentFiles` entries with `runtime: "codex"` | `.codex/config.toml` | `$aif-*` |
+| Codex app (`codex-app`) | `.agents/skills` | no extension `agentFiles` target yet | `.codex/config.toml` | `$aif-*` |
+
+The extension `agentFiles` cannot target `codex-app` yet. Codex app receives skills under `.agents/skills` and MCP config through `.codex/config.toml`; it does not receive AIFHub Codex CLI agent TOML files through the extension manifest.
+
+The `aifhub-*` Codex agents are extension helpers for bounded planning, implementation, review, verification, fixes, and finalization. They are not replacements for upstream bundled Codex CLI agents such as `plan-coordinator`, `implement-coordinator`, and `review-sidecar`.
+
 Эта страница описывает bundled Codex agents, которые extension публикует через `extension.json -> agentFiles`.
 
 ## Что именно ставится

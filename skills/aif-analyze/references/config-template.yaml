@@ -12,7 +12,7 @@ language:
   # Language for generated artifacts (DESCRIPTION.md, ARCHITECTURE.md, plans, etc.)
   artifacts: {{language_artifacts}}
   # Language for technical terms (usually english for consistency)
-  technical_terms: english
+  technical_terms: keep # keep | translate | mixed
 
 # ============================================================================
 # AIFHUB ARTIFACT PROTOCOL

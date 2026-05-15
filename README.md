@@ -15,7 +15,7 @@ AI Factory UX + OpenSpec artifact protocol
 - Keeps AI Factory runtime state, verification evidence, finalization evidence, and generated rules outside canonical OpenSpec changes.
 - Requests OpenSpec validation, status, instructions, and archive through the AIFHub wrapper and `scripts/openspec-runner.mjs` when a compatible CLI is available.
 - Preserves legacy AI Factory-only plan folders as compatibility and migration input only.
-- Publishes namespaced Codex and Claude agent files through the extension manifest for explicit user or orchestrator invocation.
+- Publishes namespaced Codex CLI and Claude agent files through the extension manifest for explicit user or orchestrator invocation.
 - Publishes an optional `aifhub` MCP server whose settings are rendered by AI Factory per runtime.
 - Does not install OpenSpec skills or slash commands.
 
@@ -303,7 +303,7 @@ Switching to AI Factory-only mode updates the legacy path profile and preserves 
 | [Active Change Resolver](docs/active-change-resolver.md) | Active change selection and runtime paths |
 | [ADR 0001](docs/adr/0001-openspec-native-artifact-protocol.md) | v1 artifact ownership decision |
 | [AIFHub MCP](docs/aifhub-mcp.md) | Optional MCP server tools and runtime-specific settings shapes |
-| [Codex Agents](docs/codex-agents.md) | Namespaced Codex agent files |
+| [Codex Agents](docs/codex-agents.md) | Namespaced Codex CLI agent files |
 | [Claude Agents](docs/claude-agents.md) | Namespaced Claude agent files |
 
 ## Validation

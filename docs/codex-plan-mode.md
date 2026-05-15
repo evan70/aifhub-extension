@@ -18,19 +18,21 @@ The extension does not switch modes automatically. The user controls the mode, a
 /plan-mode
 
 # 2. Planning and refinement (Plan mode)
-/aif-explore "task description"
-/aif-plan full "task description"
-/aif-improve
+$aif-explore "task description"
+$aif-plan full "task description"
+$aif-improve
 
 # 3. Exit Plan mode (user action)
 exit plan mode
 
 # 4. Execution and verification (Default mode)
-/aif-implement
-/aif-verify
+$aif-implement
+$aif-verify
 ```
 
-During `/aif-implement`, the OpenSpec `tasks.md` checklist remains canonical. Codex should mirror that checklist into runtime todo state with `update_plan` when available; otherwise it should show a task snapshot and continue from `tasks.md`.
+`/plan-mode` is a client-owned mode command, not an AI Factory skill invocation. In Codex app, AI Factory skills use `$aif-*`; slash-command runtimes keep `/aif-*`.
+
+During `$aif-implement`, the OpenSpec `tasks.md` checklist remains canonical. Codex should mirror that checklist into runtime todo state with `update_plan` when available; otherwise it should show a task snapshot and continue from `tasks.md`.
 
 ## Question Format by Mode
 
@@ -88,11 +90,11 @@ Open questions (parent to resolve):
 
 The extension prompts (`injections/core/aif-*-plan-folder.md`) include Codex runtime guidance that:
 
-- Recommends Plan mode specifically for `/aif-explore`, `/aif-plan full`, and `/aif-improve` when structured planning questions are needed.
+- Recommends Plan mode specifically for `$aif-explore`, `$aif-plan full`, and `$aif-improve` in Codex app when structured planning questions are needed.
 - Does not attempt or promise to switch the session mode.
 - Falls back to plain-text questions in Default mode and does not require `question(...)` or `questionnaire(...)` in Codex.
 - Avoids interactive questions in subagent context.
-- Hydrates `/aif-implement` runtime todo state from OpenSpec `tasks.md` when a todo or plan tool is available, or reports a task snapshot capability fallback.
+- Hydrates `$aif-implement` runtime todo state from OpenSpec `tasks.md` when a todo or plan tool is available, or reports a task snapshot capability fallback.
 
 This means the issue of automatic mode switching is **documented + prompt-safe**, not implemented as client automation.
 

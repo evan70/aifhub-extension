@@ -47,7 +47,7 @@ OpenSpec-native mode uses OpenSpec artifacts as canonical planning/spec artifact
 
 The `aifhub-extension` package repository stays artifact-light: root `openspec/`, `.ai-factory/state/`, `.ai-factory/qa/`, `.ai-factory/plans/`, and `.ai-factory/rules/generated/` are not extension package source. Root `.ai-factory/rules/generated/` is derived in user projects and safe to regenerate. OpenSpec examples may be committed only under fixture paths such as `test/fixtures/` or `scripts/fixtures/`.
 
-AIFHub commands request OpenSpec validation, status, instructions, and archive through `scripts/openspec-runner.mjs` when the CLI is available. Users should keep using `/aif-*` commands; this extension does not install or rely on OpenSpec slash commands.
+AIFHub commands request OpenSpec validation, status, instructions, and archive through `scripts/openspec-runner.mjs` when the CLI is available. Slash-command runtimes should keep using `/aif-*` commands. Codex app uses `$aif-*` skill invocations, as shown in the Recommended Codex App Flow. This extension does not install or rely on OpenSpec slash commands.
 
 ## Bug Fix Workflows
 
@@ -646,19 +646,21 @@ Codex cannot switch modes from extension prompts. The user controls the mode man
 
 ```text
 # Plan mode, user action
-/aif-explore "task description"
-/aif-plan full "task description"
-/aif-improve <change-id>
-/aif-mode sync --change <change-id>
+$aif-explore "task description"
+$aif-plan full "task description"
+$aif-improve <change-id>
+$aif-mode sync --change <change-id>
 
 # Default mode, user action
-/aif-implement <change-id>
-/aif-rules-check
-/aif-verify <change-id>
-/aif-done <change-id>
-/aif-mode sync
-/aif-commit
+$aif-implement <change-id>
+$aif-rules-check
+$aif-verify <change-id>
+$aif-done <change-id>
+$aif-mode sync
+$aif-commit
 ```
+
+Slash-command runtimes use the same workflow with `/aif-*` commands.
 
 In Codex Default mode, prompts must ask plain-text questions rather than using `request_user_input`.
 

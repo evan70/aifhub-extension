@@ -37,8 +37,18 @@ function extractSection(markdown, heading) {
   assert.notEqual(startIndex, -1, `Expected heading ${heading}`);
   const level = heading.match(/^#+/)?.[0].length ?? 1;
   let endIndex = lines.length;
+  let inFence = false;
 
   for (let index = startIndex + 1; index < lines.length; index += 1) {
+    if (lines[index].trim().startsWith('```')) {
+      inFence = !inFence;
+      continue;
+    }
+
+    if (inFence) {
+      continue;
+    }
+
     const match = lines[index].match(/^(#{1,6})\s+/);
     if (match && match[1].length <= level) {
       endIndex = index;
@@ -190,5 +200,127 @@ describe('complete OpenSpec workflow documentation contract', () => {
 
     assertNotIncludes(readmeBugFixes, '.ai-factory/plans/<id>/task.md', 'README.md Bug Fix Workflows');
     assertNotIncludes(usageBugFixes, '.ai-factory/plans/<id>/task.md', 'docs/usage.md Bug Fix Workflows');
+  });
+
+  it('documents the AI Factory 2.12.0 baseline and Codex runtime split', async () => {
+    const metadata = JSON.parse(await readRepoFile('aifhub-extension.json'));
+    const readme = await readRepoFile('README.md');
+    const codexAgents = await readRepoFile('docs/codex-agents.md');
+
+    assert.equal(metadata.compat['ai-factory'], '>=2.11.0 <3.0.0');
+    assert.equal(metadata.sources['ai-factory'].version, '2.12.0');
+    assert.equal(metadata.sources['ai-factory'].baselineVersion, '2.12.0');
+    assert.equal(metadata.sources['ai-factory'].lastSync, '2026-05-15');
+    assertIncludes(metadata.sources['ai-factory'].notes, 'AI Factory 2.12.0', 'aifhub-extension.json');
+    assertIncludes(metadata.sources['ai-factory'].notes, 'codex-app runtime', 'aifhub-extension.json');
+    assertIncludes(metadata.sources['ai-factory'].notes, 'audit-artifacts', 'aifhub-extension.json');
+
+    assertIncludes(readme, 'Codex CLI and Claude agent files', 'README.md');
+    assertIncludes(readme, 'Namespaced Codex CLI agent files', 'README.md');
+
+    for (const expected of [
+      'Codex CLI (`codex`)',
+      '.codex/skills',
+      '.codex/agents',
+      'runtime: "codex"',
+      'Codex app (`codex-app`)',
+      '.agents/skills',
+      'no extension `agentFiles` target yet',
+      '.codex/config.toml',
+      '$aif-*',
+      'The extension `agentFiles` cannot target `codex-app` yet',
+      'extension helpers',
+      'not replacements for upstream bundled Codex CLI agents',
+      'plan-coordinator',
+      'implement-coordinator',
+      'review-sidecar'
+    ]) {
+      assertIncludes(codexAgents, expected, 'docs/codex-agents.md');
+    }
+  });
+
+  it('documents Codex app flows with skill invocations and keeps slash commands runtime-specific', async () => {
+    const usage = await readRepoFile('docs/usage.md');
+    const planMode = await readRepoFile('docs/codex-plan-mode.md');
+    const usageCodexFlow = extractSection(usage, '## Recommended Codex App Flow');
+    const planModeCodexFlow = extractSection(planMode, '## Recommended Codex App Flow');
+
+    for (const expected of [
+      '$aif-explore "task description"',
+      '$aif-plan full "task description"',
+      '$aif-improve <change-id>',
+      '$aif-mode sync --change <change-id>',
+      '$aif-implement <change-id>',
+      '$aif-rules-check',
+      '$aif-verify <change-id>',
+      '$aif-done <change-id>',
+      '$aif-mode sync',
+      '$aif-commit'
+    ]) {
+      assertIncludes(usageCodexFlow, expected, 'docs/usage.md Recommended Codex App Flow');
+    }
+
+    for (const stale of [
+      '/aif-explore "task description"',
+      '/aif-plan full "task description"',
+      '/aif-improve <change-id>',
+      '/aif-mode sync --change <change-id>',
+      '/aif-implement <change-id>',
+      '/aif-verify <change-id>'
+    ]) {
+      assertNotIncludes(usageCodexFlow, stale, 'docs/usage.md Recommended Codex App Flow');
+    }
+
+    for (const expected of [
+      '/plan-mode',
+      '$aif-explore "task description"',
+      '$aif-plan full "task description"',
+      '$aif-improve',
+      '$aif-implement',
+      '$aif-verify',
+      'client-owned mode command',
+      'AI Factory skills use `$aif-*`',
+      'slash-command runtimes keep `/aif-*`'
+    ]) {
+      assertIncludes(planModeCodexFlow, expected, 'docs/codex-plan-mode.md Recommended Codex App Flow');
+    }
+
+    for (const stale of [
+      '/aif-explore "task description"',
+      '/aif-plan full "task description"',
+      '/aif-implement',
+      '/aif-verify'
+    ]) {
+      assertNotIncludes(planModeCodexFlow, stale, 'docs/codex-plan-mode.md Recommended Codex App Flow');
+    }
+  });
+
+  it('documents OpenSpec plan IDs and optional audit-artifacts bridge', async () => {
+    const compatibility = await readRepoFile('docs/openspec-compatibility.md');
+    const aifMode = await readRepoFile('skills/aif-mode/SKILL.md');
+
+    for (const expected of [
+      'OpenSpec-native mode uses OpenSpec `change-id` values and ignores AI Factory `workflow.plan_id_format`',
+      'Legacy AI Factory-only mode follows upstream `workflow.plan_id_format`',
+      'ai-factory audit-artifacts openspec .ai-factory/qa .ai-factory/state --json',
+      'optional read-only artifact audit command',
+      'diagnostic-only',
+      'not mandatory, not archive-blocking'
+    ]) {
+      assertIncludes(compatibility, expected, 'docs/openspec-compatibility.md');
+    }
+
+    for (const expected of [
+      'selected `codex-app` runtime uses `$aif-mode`',
+      'slash-command runtimes use `/aif-mode`',
+      'Read-only diagnostics',
+      'ai-factory audit-artifacts openspec .ai-factory/qa .ai-factory/state --json',
+      'optional',
+      'not mandatory',
+      'not archive-blocking',
+      'hard dependency'
+    ]) {
+      assertIncludes(aifMode, expected, 'skills/aif-mode/SKILL.md');
+    }
   });
 });

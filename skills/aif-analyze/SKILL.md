@@ -15,9 +15,9 @@ Bootstrap project context for AI Factory. This skill prepares configuration and 
 |----------|-------|------------|
 | `config.yaml` | **aif-analyze** | Creates/updates |
 | `rules/base.md` | **aif-analyze** | Creates if missing |
-| `DESCRIPTION.md` | core `/aif` | Checks existence, suggests `/aif` if missing |
-| `ARCHITECTURE.md` | core `/aif-architecture` | Initiates based on workflow flag |
-| `ROADMAP.md` | core `/aif-roadmap` | Initiates based on workflow flag |
+| `DESCRIPTION.md` | core `aif` | Checks existence, suggests the selected runtime invocation (`$aif` for `codex-app`, `/aif` for slash-command runtimes) if missing |
+| `ARCHITECTURE.md` | core `aif-architecture` | Initiates the selected runtime invocation based on workflow flag |
+| `ROADMAP.md` | core `aif-roadmap` | Initiates the selected runtime invocation based on workflow flag |
 
 ## Workflow
 
@@ -80,17 +80,13 @@ then emit a non-blocking migration note:
 ℹ️ Legacy Workflow Compatibility
 
 This project still contains legacy skill-context for `aif-*-plus`.
-Canonical commands are now:
-- /aif-explore
-- /aif-plan full
-- /aif-improve
-- /aif-implement
-- /aif-verify
-- /aif-fix
+Canonical workflow entries are runtime-specific:
+- codex-app: `$aif-explore`, `$aif-plan full`, `$aif-improve`, `$aif-implement`, `$aif-verify`, `$aif-fix`
+- slash-command runtimes: `/aif-explore`, `/aif-plan full`, `/aif-improve`, `/aif-implement`, `/aif-verify`, `/aif-fix`
 
-Если docs или handoff notes упоминают `Explore`, `New`, `Apply` или `Done`, трактуй их только как названия стадий.
-Не подавай `/aif-new` или `/aif-apply` как текущие public commands.
-`/aif-done` упоминай только как explicit post-verify AIFHub finalizer, а не как legacy alias или часть canonical public workflow.
+If docs or handoff notes mention `Explore`, `New`, `Apply`, or `Done`, treat them only as stage names.
+Do not present `/aif-new` or `/aif-apply` as current public commands.
+Mention `aif-done` only as the explicit post-verify AIFHub finalizer using the selected runtime invocation style, not as a legacy alias or part of the canonical public workflow.
 
 Backward-compatible fallback is still supported, but renaming the skill-context folders is recommended.
 ```
@@ -119,6 +115,7 @@ Resolve the bootstrap/config mode before creating directories:
 
 - If config.yaml is missing, create it with v1 schema.
 - If config.yaml exists, preserve existing values and add missing fields.
+- Preserve existing `language.ui`, `language.artifacts`, and `language.technical_terms` values. If `language.technical_terms` is missing, default it to `keep`; accepted values are `keep | translate | mixed`.
 - Keep schema consistent with nested sections: `language`, `aifhub`, `paths`, `rules`, `workflow`.
 - In legacy `ai-factory` mode:
   - Preserve the existing AI Factory-only path defaults.
@@ -248,9 +245,9 @@ openspec init --tools none
 ### Step 6: Check DESCRIPTION and Guide Core Skills
 
 - Check if `.ai-factory/DESCRIPTION.md` exists.
-- If missing: do not generate DESCRIPTION content in this skill; suggest running `/aif`.
-- If DESCRIPTION exists and `workflow.analyze_updates_architecture: true`, suggest or initiate `/aif-architecture`.
-- If `workflow.architecture_updates_roadmap: true`, suggest or initiate `/aif-roadmap`.
+- If missing: do not generate DESCRIPTION content in this skill; suggest the selected runtime invocation for `aif` first (`$aif` for `codex-app`, `/aif` for slash-command runtimes).
+- If DESCRIPTION exists and `workflow.analyze_updates_architecture: true`, suggest or initiate the selected runtime invocation for `aif-architecture`.
+- If `workflow.architecture_updates_roadmap: true`, suggest or initiate the selected runtime invocation for `aif-roadmap`.
 - If automatic invocation is not available in the current runtime, provide explicit next commands to the user in order.
 
 ### Step 7: Finish with Guided Handoff
@@ -263,11 +260,12 @@ openspec init --tools none
 - In `openspec-native` mode, include the OpenSpec capability object, degraded reason when present, created/preserved skeleton directories, and the statement that OpenSpec skill installation was skipped by design.
 - In `openspec-native` mode, explicitly report whether `.ai-factory/state`, `.ai-factory/qa`, and `.ai-factory/rules/generated` were created or preserved.
 - Report what was invoked automatically versus what remains as manual next command.
-- If DESCRIPTION is missing, first recommended command must be `/aif`.
-- После bootstrap описывай текущий public workflow как начинающийся с `/aif-explore` или `/aif-plan full`, а не с `/aif-new`.
-- Если нужен новый plan, рекомендуй `/aif-plan full` как canonical entrypoint.
-- Если упоминается handoff stage vocabulary, явно помечай её как naming layer, а не как slash commands.
-- Если упоминается `/aif-done`, явно описывай его как explicit post-verify finalizer, а не как legacy workflow alias.
+- If DESCRIPTION is missing, first recommended command must use the selected runtime invocation style: `$aif` for `codex-app`, `/aif` for slash-command runtimes.
+- When reporting next commands, use the selected runtime invocation style: `codex-app` runtime uses `$aif-explore`, `$aif-plan full`, `$aif-verify`, and other `$aif-*` skills; slash-command runtimes use `/aif-explore`, `/aif-plan full`, `/aif-verify`, and other `/aif-*` commands.
+- After bootstrap, describe the current public workflow as starting with the runtime-specific explore or plan invocation, not legacy `/aif-new`.
+- If a new plan is needed, recommend the runtime-specific plan command (`$aif-plan full` for `codex-app`, `/aif-plan full` for slash-command runtimes) as the canonical entrypoint.
+- If handoff stage vocabulary is mentioned, explicitly mark it as a naming layer, not as slash commands.
+- If `aif-done` is mentioned, describe it as the explicit post-verify finalizer using the selected runtime invocation style, not as a legacy workflow alias.
 
 ## Config v1 Schema
 
@@ -275,7 +273,7 @@ openspec init --tools none
 language:
   ui: russian                    # Communication language
   artifacts: russian             # Generated artifacts language
-  technical_terms: english       # Technical terms (always english)
+  technical_terms: keep          # keep | translate | mixed
 
 aifhub:
   artifactProtocol: ai-factory   # ai-factory | openspec
@@ -346,8 +344,8 @@ agent_profile: default
 - Never install OpenSpec skills, slash commands, dependencies, or manifest entries.
 - Never treat missing OpenSpec validate/archive capability as bootstrap failure; report it as degraded OpenSpec capability and continue with the configured runtime/generated path layout.
 - Never generate DESCRIPTION directly in this skill.
-- If DESCRIPTION is missing, suggest `/aif` first.
-- Follow workflow flags to suggest or initiate `/aif-architecture` and `/aif-roadmap`.
+- If DESCRIPTION is missing, suggest the selected runtime invocation for `aif` first (`$aif` for `codex-app`, `/aif` for slash-command runtimes).
+- Follow workflow flags to suggest or initiate the selected runtime invocation for `aif-architecture` and `aif-roadmap`.
 - Create `rules/base.md` with project-specific rules, not generic advice.
 - Do NOT create optional area rules — planning owns those when needed.
 - Ensure all directories from config paths exist.
