@@ -83,6 +83,10 @@ paths:
 
 `installSkills: false` is intentional. AIFHub Extension uses OpenSpec artifacts and `scripts/openspec-runner.mjs` as the optional CLI adapter, not OpenSpec-installed skills or slash commands.
 
+On first bootstrap, `/aif-analyze` may create the OpenSpec marker after asking for the artifact protocol. If `.ai-factory/config.yaml` is missing and the user did not explicitly request OpenSpec-native mode, interactive runtimes ask the user to choose `legacy AI Factory-only` or `OpenSpec-native` before writing the config. Existing configs are preserved without prompting. Autonomous/subagent runs do not ask; they default to legacy AI Factory-only and report OpenSpec-native mode as an open question.
+
+Localization preferences collected before this choice are carried as pending config values and written only after the artifact protocol is resolved.
+
 Action toggles such as `validateOnPlan`, `validateOnImprove`, `validateOnVerify`, `statusOnVerify`, `archiveOnDone`, `compileRulesOnSync`, and `validateOnSync` decide which operations are attempted. Policy flags such as `require*` and `allowWarnOnDone` decide whether missing, stale, failed, or warning-only evidence blocks a command.
 
 The defaults keep planning and verification degraded-friendly while making `/aif-done` strict: verify can warn on missing CLI, generated rules, rules gate evidence, or coverage evidence; done requires current generated rules, a passing durable rules gate, current passing coverage, and archive-capable CLI unless config relaxes those requirements.
@@ -240,6 +244,8 @@ When the OpenSpec CLI is missing or unsupported:
 - `/aif-done` fails archive-required finalization because archive requires a compatible CLI
 
 When Node is below `>=20.19.0`, the CLI is treated as unavailable for validate/archive capabilities even if an `openspec` command exists.
+
+When `detectOpenSpec()` reports `reason: unsupported-version`, update or reinstall OpenSpec CLI to `>=1.3.1 <2.0.0`. This remains degraded capability for bootstrap and planning unless a command-specific policy requires CLI availability.
 
 ## Prompt Assets and Runtime Integration
 

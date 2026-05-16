@@ -186,6 +186,15 @@ aifhub:
   artifactProtocol: openspec
 ```
 
+When `.ai-factory/config.yaml` is missing and the user did not explicitly ask for a protocol, `/aif-analyze` asks one artifact protocol question before writing config or creating mode-specific directories:
+
+- `legacy AI Factory-only`
+- `OpenSpec-native`
+
+Existing configs are not prompted again. Codex Default mode asks this as plain text; Codex Plan mode may use `request_user_input`; autonomous/subagent runs default to legacy AI Factory-only and report OpenSpec-native mode as an open question.
+
+If localization questions run first, `/aif-analyze` carries those answers forward and writes them only after the artifact protocol is selected, so language persistence does not accidentally lock in the legacy default.
+
 ### `/aif-plan full`
 
 Reads:

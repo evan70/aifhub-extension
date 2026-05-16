@@ -17,9 +17,11 @@ language:
 # ============================================================================
 # AIFHUB ARTIFACT PROTOCOL
 # ============================================================================
-# Legacy default is AI Factory-only. Use artifactProtocol: openspec only when
-# the user explicitly requests OpenSpec-native mode or existing config already
-# uses aifhub.artifactProtocol: openspec.
+# Legacy default is AI Factory-only.
+# First bootstrap may ask for artifact protocol before this value is written.
+# Use artifactProtocol: openspec only when the user explicitly requests or
+# selects OpenSpec-native mode, or existing config already uses
+# aifhub.artifactProtocol: openspec.
 aifhub:
   # ai-factory | openspec
   artifactProtocol: ai-factory

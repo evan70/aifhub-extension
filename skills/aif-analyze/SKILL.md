@@ -39,6 +39,7 @@ Bootstrap project context for AI Factory. This skill prepares configuration and 
 - Add one context-derived language option only when strong evidence exists.
 - Ask question 2 exactly as the translation-scope selector with these options: `communication only`, `communication and artifacts`, `artifacts only`.
 - Persist answers to config.yaml (preferred) or bridge file if present.
+- If `.ai-factory/config.yaml` is missing, do not create a full config only to persist localization answers before bootstrap mode is resolved. Keep localization answers as pending config values until bootstrap mode is resolved.
 - If the translation scope excludes artifacts, keep generated artifacts in the original project language.
 - If the translation scope includes artifacts, generate them in the preferred language.
 - Keep file names, commands, and identifiers in English.
@@ -107,16 +108,24 @@ Resolve the bootstrap/config mode before creating directories:
 
 - Use `openspec-native` mode when the user explicitly asks for `openspec-native`, `OpenSpec-native`, or OpenSpec artifact protocol bootstrap.
 - Use `openspec-native` mode when an existing `.ai-factory/config.yaml` has `aifhub.artifactProtocol: openspec`.
-- Otherwise use legacy `ai-factory` mode.
+- Preserve legacy `ai-factory` mode when an existing `.ai-factory/config.yaml` does not declare `aifhub.artifactProtocol: openspec`.
+- If `.ai-factory/config.yaml` is missing and no artifact protocol was explicitly requested, ask one artifact protocol question before writing config or creating mode-specific directories.
+  - Options must be exactly `legacy AI Factory-only` and `OpenSpec-native`.
+  - Codex Default mode: ask a short plain-text artifact protocol question; do not use `question(...)`, `questionnaire(...)`, or `request_user_input`.
+  - Codex Plan mode: use one `request_user_input` question only when the user already switched the session into Plan mode.
+  - Claude Code / Kilo CLI / OpenCode: use `question(questions: [...])`.
+  - Autonomous / subagent mode: do not ask; choose legacy `ai-factory` mode by default and report OpenSpec-native mode as an open question/blocker.
+- Use the selected first-bootstrap answer to choose legacy `ai-factory` mode or `openspec-native` mode.
 - Do not silently migrate a legacy AI Factory-only project to OpenSpec-native mode.
 - Preserve existing config values. Add only missing keys required by the resolved mode.
-- Record the resolved mode for the final handoff.
+- Record the resolved mode and selection source for the final handoff: existing config, explicit user request, first-bootstrap answer, or autonomous default.
 
 ### Step 3: Create or Update config.yaml
 
-- If config.yaml is missing, create it with v1 schema.
+- If config.yaml is missing, create it with v1 schema only after bootstrap mode is resolved.
 - If config.yaml exists, preserve existing values and add missing fields.
 - Preserve existing `language.ui`, `language.artifacts`, and `language.technical_terms` values. If `language.technical_terms` is missing, default it to `keep`; accepted values are `keep | translate | mixed`.
+- If localization answers were collected while config was missing, write those pending config values into the selected legacy `ai-factory` or `openspec-native` config shape.
 - Keep schema consistent with nested sections: `language`, `aifhub`, `paths`, `rules`, `workflow`.
 - In legacy `ai-factory` mode:
   - Preserve the existing AI Factory-only path defaults.
@@ -201,6 +210,8 @@ openspec:
 - If the OpenSpec CLI is compatible, prefer or recommend `openspec init --tools none`.
 - If the OpenSpec CLI is missing or unsupported, continue bootstrap with `canValidate: false` and `canArchive: false`.
 - Missing or unsupported OpenSpec CLI is a degraded capability state, not a bootstrap failure.
+- If `reason` is `unsupported-version`, recommend installing or updating OpenSpec CLI to `>=1.3.1 <2.0.0`.
+- If `reason` is `unsupported-node`, recommend using Node `>=20.19.0` for OpenSpec validation/archive.
 - If `scripts/openspec-runner.mjs` is missing, report that capability detection is unavailable and continue with degraded capability values.
 
 ### Step 4: Create rules/base.md
@@ -256,7 +267,9 @@ openspec init --tools none
 - Use the saved scope plus preferred language for the reply.
 - Mention created/updated files: `config.yaml`, `rules/base.md`, and artifact status (`DESCRIPTION.md`, `ARCHITECTURE.md`, `ROADMAP.md`).
 - Report the resolved bootstrap mode.
+- Report the bootstrap mode selection source: existing config, explicit user request, first-bootstrap answer, or autonomous default.
 - Report whether config values were created or preserved.
+- If autonomous/subagent mode defaulted to legacy `ai-factory` because the artifact protocol question could not be asked, report OpenSpec-native mode selection as an open question/blocker.
 - Report the active path set.
 - In `openspec-native` mode, include the OpenSpec capability object, degraded reason when present, created/preserved skeleton directories, and the statement that OpenSpec skill installation was skipped by design.
 - In `openspec-native` mode, explicitly report whether `.ai-factory/state`, `.ai-factory/qa`, and `.ai-factory/rules/generated` were created or preserved.
@@ -338,7 +351,8 @@ agent_profile: default
 
 - Use evidence over assumptions.
 - Create/update `config.yaml` and `rules/base.md` first.
-- Use OpenSpec-native mode only when explicitly requested or when existing config has `aifhub.artifactProtocol: openspec`.
+- Use OpenSpec-native mode only when explicitly requested, when existing config has `aifhub.artifactProtocol: openspec`, or when the user selects `OpenSpec-native` in the first-bootstrap artifact protocol question.
+- Do not write a missing config with a default artifact protocol before first-bootstrap artifact protocol resolution completes.
 - In OpenSpec-native mode, use `detectOpenSpec()` from `scripts/openspec-runner.mjs` when available and treat missing or unsupported CLI as degraded capability, not failure.
 - In OpenSpec-native mode, AIFHub skills may request OpenSpec validation, status, instructions, and archive through `scripts/openspec-runner.mjs`; never install or depend on OpenSpec slash commands.
 - In OpenSpec-native mode, use or recommend `openspec init --tools none` only for compatible CLI environments.
