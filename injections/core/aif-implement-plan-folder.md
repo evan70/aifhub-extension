@@ -42,8 +42,8 @@ Resolve the active change using `scripts/active-change-resolver.mjs` when availa
 Found legacy AI Factory plan artifacts for `<change-id>` but no OpenSpec change at `openspec/changes/<change-id>`.
 Run the legacy migration script with:
 
-node scripts/migrate-legacy-plans.mjs <change-id> --dry-run
-node scripts/migrate-legacy-plans.mjs <change-id>
+ai-factory aifhub-migrate-legacy-plans <change-id> --dry-run
+ai-factory aifhub-migrate-legacy-plans <change-id>
 ```
 
 Read canonical OpenSpec artifacts before editing implementation files:

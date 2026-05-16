@@ -638,8 +638,8 @@ export async function detectMigrationNeed(options = {}) {
     legacyPlan,
     commands: migrationSuggested
       ? [
-          `node scripts/migrate-legacy-plans.mjs ${normalized.planId} --dry-run`,
-          `node scripts/migrate-legacy-plans.mjs ${normalized.planId}`
+          `ai-factory aifhub-migrate-legacy-plans ${normalized.planId} --dry-run`,
+          `ai-factory aifhub-migrate-legacy-plans ${normalized.planId}`
         ]
       : [],
     warnings: discovery.warnings,

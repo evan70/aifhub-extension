@@ -353,14 +353,14 @@ Writes:
 When `requireRulesPassForDone` is true, save the final `/aif-rules-check` output, or at least its final `aif-gate-result` block, to `.ai-factory/qa/<change-id>/rules.md`. Generated rules freshness and rules gate pass are separate signals.
 
 ```bash
-node scripts/write-gate-evidence.mjs \
+ai-factory aifhub-write-gate-evidence \
   --change add-oauth-login \
   --gate rules \
   --from /tmp/aif-rules-check-output.md
 ```
 
 ```bash
-node scripts/write-gate-evidence.mjs --change add-oauth-login --gate rules
+ai-factory aifhub-write-gate-evidence --change add-oauth-login --gate rules
 ```
 
 In the stdin form, paste or pipe the Markdown gate output into the command.
@@ -484,7 +484,7 @@ Does not write:
 
 Use `--skip-specs` for docs/tooling-only changes where no accepted spec update is expected. Archive-required finalization needs a compatible OpenSpec CLI when `aifhub.openspec.requireCliForDone` is true. `/aif-done` runs a pre-archive readiness gate and refuses archive on blocking OpenSpec validate, artifact contract, generated rules, rules gate, coverage, verify gate, or dirty workspace failures. The readiness output includes the exact next command to run.
 
-If `requireRulesPassForDone` is true and readiness reports missing rules gate evidence, rerun `/aif-rules-check` and persist the final output with `node scripts/write-gate-evidence.mjs --change add-oauth-login --gate rules --from /tmp/aif-rules-check-output.md`, or save at least the final `aif-gate-result` block to `.ai-factory/qa/<change-id>/rules.md`.
+If `requireRulesPassForDone` is true and readiness reports missing rules gate evidence, rerun `/aif-rules-check` and persist the final output with `ai-factory aifhub-write-gate-evidence --change add-oauth-login --gate rules --from /tmp/aif-rules-check-output.md`, or save at least the final `aif-gate-result` block to `.ai-factory/qa/<change-id>/rules.md`.
 
 Next steps after `/aif-done`:
 
@@ -584,8 +584,8 @@ Legacy planning writes:
 Use the explicit migration command when existing legacy artifacts need to enter the OpenSpec-native workflow:
 
 ```bash
-node scripts/migrate-legacy-plans.mjs <change-id> --dry-run
-node scripts/migrate-legacy-plans.mjs <change-id>
+ai-factory aifhub-migrate-legacy-plans <change-id> --dry-run
+ai-factory aifhub-migrate-legacy-plans <change-id>
 ```
 
 After migration, run:
@@ -604,6 +604,13 @@ Use `/aif-mode status` before changing modes:
 /aif-mode status
 ```
 
+For installed-project automation, call the stable extension wrappers:
+
+```bash
+ai-factory aifhub-mode sync --change <change-id> --json
+ai-factory aifhub-mode doctor --change <change-id> --json
+```
+
 Switch to OpenSpec-native mode:
 
 ```text
@@ -614,8 +621,8 @@ Switch to OpenSpec-native mode:
 If legacy plans exist, review migration first:
 
 ```bash
-node scripts/migrate-legacy-plans.mjs --all --dry-run
-node scripts/migrate-legacy-plans.mjs --all
+ai-factory aifhub-migrate-legacy-plans --all --dry-run
+ai-factory aifhub-migrate-legacy-plans --all
 ```
 
 Switch to legacy AI Factory-only mode without deleting OpenSpec artifacts:

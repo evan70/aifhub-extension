@@ -522,8 +522,8 @@ describe('migrateAllLegacyPlans and detectMigrationNeed', () => {
     assert.equal(needed.changeExists, false);
     assert.equal(needed.legacyPlan.id, 'add-oauth');
     assert.deepEqual(needed.commands, [
-      'node scripts/migrate-legacy-plans.mjs add-oauth --dry-run',
-      'node scripts/migrate-legacy-plans.mjs add-oauth'
+      'ai-factory aifhub-migrate-legacy-plans add-oauth --dry-run',
+      'ai-factory aifhub-migrate-legacy-plans add-oauth'
     ]);
 
     await writeFixture(rootDir, 'openspec/changes/add-oauth/proposal.md', '# Existing\n');
@@ -623,9 +623,9 @@ describe('migrate-legacy-plans CLI', () => {
         assert.equal(err.code, 1);
         assert.match(err.stdout, /Status: FAILED/);
         assert.match(err.stdout, /target-exists/);
-        assert.match(err.stdout, /Preview a safe merge: node scripts\/migrate-legacy-plans\.mjs --all --on-collision merge-safe --dry-run/);
-        assert.match(err.stdout, /Apply a safe merge: node scripts\/migrate-legacy-plans\.mjs --all --on-collision merge-safe/);
-        assert.match(err.stdout, /Create separate migrated targets: node scripts\/migrate-legacy-plans\.mjs --all --on-collision suffix/);
+        assert.match(err.stdout, /Preview a safe merge: ai-factory aifhub-migrate-legacy-plans --all --on-collision merge-safe --dry-run/);
+        assert.match(err.stdout, /Apply a safe merge: ai-factory aifhub-migrate-legacy-plans --all --on-collision merge-safe/);
+        assert.match(err.stdout, /Create separate migrated targets: ai-factory aifhub-migrate-legacy-plans --all --on-collision suffix/);
         return true;
       }
     );

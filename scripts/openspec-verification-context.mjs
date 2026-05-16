@@ -571,6 +571,21 @@ async function runValidationPipeline(changeId, options) {
   }
 
   const rawStatus = await getOpenSpecStatus(changeId, createRunOptions(options));
+  if (isUnsupportedStatusChangeId(rawStatus, changeId)) {
+    return {
+      openspec,
+      validation,
+      status: createSkippedCommand({
+        ok: true,
+        reason: 'openspec-status-unsupported-change-id',
+        message: `OpenSpec status skipped because the OpenSpec CLI rejects numeric-leading change id '${changeId}' while validation accepts it.`
+      }),
+      shouldRunCodeVerification: true,
+      warnings: [],
+      errors: []
+    };
+  }
+
   const status = normalizeCommandResult(rawStatus);
   const statusWarnings = status.ok ? [] : [
     {
@@ -587,6 +602,13 @@ async function runValidationPipeline(changeId, options) {
     warnings: statusWarnings,
     errors: []
   };
+}
+
+function isUnsupportedStatusChangeId(result, changeId) {
+  return !result?.ok
+    && /^[0-9]/.test(String(changeId ?? ''))
+    && /Invalid change name/i.test(normalizeOutput(result?.stderr))
+    && /Change name must start with a letter/i.test(normalizeOutput(result?.stderr));
 }
 
 async function readVerificationConfig(rootDir) {
@@ -898,6 +920,10 @@ function summarizeValidationState(validation) {
 
 function summarizeStatusState(status) {
   if (status === null) {
+    return 'SKIPPED';
+  }
+
+  if (status.skipped) {
     return 'SKIPPED';
   }
 

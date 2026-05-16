@@ -11,34 +11,34 @@ Migration is explicit. It does not run automatically from `/aif-improve`, `/aif-
 List discovered legacy plans:
 
 ```bash
-node scripts/migrate-legacy-plans.mjs --list
+ai-factory aifhub-migrate-legacy-plans --list
 ```
 
 Dry-run one migration:
 
 ```bash
-node scripts/migrate-legacy-plans.mjs <change-id> --dry-run
+ai-factory aifhub-migrate-legacy-plans <change-id> --dry-run
 ```
 
 Migrate one plan:
 
 ```bash
-node scripts/migrate-legacy-plans.mjs <change-id>
+ai-factory aifhub-migrate-legacy-plans <change-id>
 ```
 
 Dry-run all discovered plans:
 
 ```bash
-node scripts/migrate-legacy-plans.mjs --all --dry-run
+ai-factory aifhub-migrate-legacy-plans --all --dry-run
 ```
 
 Migrate all discovered plans:
 
 ```bash
-node scripts/migrate-legacy-plans.mjs --all
+ai-factory aifhub-migrate-legacy-plans --all
 ```
 
-Use the package wrapper when preferred:
+Use the package script only for repository-local development:
 
 ```bash
 npm run migrate:legacy-plans -- <change-id> --dry-run
@@ -47,7 +47,7 @@ npm run migrate:legacy-plans -- <change-id> --dry-run
 Use JSON output for automation:
 
 ```bash
-node scripts/migrate-legacy-plans.mjs <change-id> --json
+ai-factory aifhub-migrate-legacy-plans <change-id> --json
 ```
 
 ## Collision Behavior
@@ -57,10 +57,10 @@ The default collision mode is `fail`: if `openspec/changes/<change-id>/` already
 Supported collision modes:
 
 ```bash
-node scripts/migrate-legacy-plans.mjs <change-id> --on-collision fail
-node scripts/migrate-legacy-plans.mjs <change-id> --on-collision merge-safe
-node scripts/migrate-legacy-plans.mjs <change-id> --on-collision suffix
-node scripts/migrate-legacy-plans.mjs <change-id> --on-collision overwrite
+ai-factory aifhub-migrate-legacy-plans <change-id> --on-collision fail
+ai-factory aifhub-migrate-legacy-plans <change-id> --on-collision merge-safe
+ai-factory aifhub-migrate-legacy-plans <change-id> --on-collision suffix
+ai-factory aifhub-migrate-legacy-plans <change-id> --on-collision overwrite
 ```
 
 | Mode | Behavior |
@@ -73,13 +73,13 @@ node scripts/migrate-legacy-plans.mjs <change-id> --on-collision overwrite
 If `--all` reports `target-exists` for every discovered plan, the project already has canonical OpenSpec change directories. Preview the non-destructive merge path first:
 
 ```bash
-node scripts/migrate-legacy-plans.mjs --all --on-collision merge-safe --dry-run
+ai-factory aifhub-migrate-legacy-plans --all --on-collision merge-safe --dry-run
 ```
 
 Then apply it only when the dry-run output is acceptable:
 
 ```bash
-node scripts/migrate-legacy-plans.mjs --all --on-collision merge-safe
+ai-factory aifhub-migrate-legacy-plans --all --on-collision merge-safe
 ```
 
 Use `--on-collision suffix` instead when existing OpenSpec changes must remain completely untouched.

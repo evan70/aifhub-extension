@@ -3,7 +3,7 @@ name: aif-mode
 description: Switches AIFHub Extension projects between OpenSpec-native and legacy AI Factory artifact modes, synchronizes derived artifacts, checks mode drift, and reports migration/export actions. Use when changing artifactProtocol, syncing OpenSpec and AI Factory artifacts, or diagnosing mode/config drift.
 argument-hint: "[status|openspec|ai-factory|sync|doctor] [--dry-run] [--all] [--change <id>] [--yes]"
 disable-model-invocation: true
-allowed-tools: Read Write Grep Glob Bash(node scripts/aif-mode.mjs *) Bash(node scripts/migrate-legacy-plans.mjs *) Bash(npm run validate) Bash(npm test)
+allowed-tools: Read Write Grep Glob Bash(ai-factory aifhub-mode *) Bash(ai-factory aifhub-migrate-legacy-plans *) Bash(npm run validate) Bash(npm test)
 metadata:
   author: aifhub-extension
   version: "1.0.0"
@@ -16,17 +16,24 @@ Switch or inspect the artifact protocol for an AIFHub Extension project. This sk
 
 ## Commands
 
-Run the deterministic CLI from the repository root:
+Run the deterministic CLI through stable installed-project wrappers:
 
 ```bash
-node scripts/aif-mode.mjs status
-node scripts/aif-mode.mjs openspec
-node scripts/aif-mode.mjs ai-factory
-node scripts/aif-mode.mjs sync
-node scripts/aif-mode.mjs doctor
+ai-factory aifhub-mode status
+ai-factory aifhub-mode openspec
+ai-factory aifhub-mode ai-factory
+ai-factory aifhub-mode sync
+ai-factory aifhub-mode doctor
 ```
 
 Use `--dry-run` before any switching or sync command when reviewing planned writes. Use `--json` when another tool needs structured output.
+
+For installed-project automation, prefer explicit wrapper commands:
+
+```bash
+ai-factory aifhub-mode sync --change <change-id> --json
+ai-factory aifhub-mode doctor --change <change-id> --json
+```
 
 ## Invocation Style
 
@@ -35,7 +42,7 @@ Use runtime-specific public invocations when instructing the user: selected `cod
 ## Workflow
 
 1. Read `.ai-factory/config.yaml` and resolve `aifhub.artifactProtocol`.
-2. Run the matching CLI subcommand through `scripts/aif-mode.mjs`; do not hand-edit mode artifacts.
+2. Run the matching CLI subcommand through `ai-factory aifhub-mode`; do not hand-edit mode artifacts.
 3. For OpenSpec-native operations, use AIFHub orchestration plus `scripts/openspec-runner.mjs` as the OpenSpec CLI adapter. Do not install or invoke OpenSpec slash commands.
 4. Write reports only through the CLI under `.ai-factory/state/mode-switches/`.
 5. After a switching or sync command, report the status, report path, migration/export suggestions, and any degraded OpenSpec capability.
@@ -92,8 +99,8 @@ paths:
 If legacy plans exist, suggest these commands unless `--yes` is explicitly passed:
 
 ```bash
-node scripts/migrate-legacy-plans.mjs --all --dry-run
-node scripts/migrate-legacy-plans.mjs --all
+ai-factory aifhub-migrate-legacy-plans --all --dry-run
+ai-factory aifhub-migrate-legacy-plans --all
 ```
 
 ### `ai-factory`

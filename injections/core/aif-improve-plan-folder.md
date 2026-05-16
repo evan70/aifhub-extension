@@ -41,8 +41,8 @@ Resolve the active change using the shared vocabulary from `scripts/active-chang
 Found legacy AI Factory plan artifacts for `<change-id>` but no OpenSpec change at `openspec/changes/<change-id>`.
 Run the legacy migration script with:
 
-node scripts/migrate-legacy-plans.mjs <change-id> --dry-run
-node scripts/migrate-legacy-plans.mjs <change-id>
+ai-factory aifhub-migrate-legacy-plans <change-id> --dry-run
+ai-factory aifhub-migrate-legacy-plans <change-id>
 ```
 
 Refine only these canonical OpenSpec artifacts for the active change:

@@ -133,8 +133,8 @@ When resolution returns `current-pointer-not-found`, update or remove `.ai-facto
 When a legacy plan exists but no OpenSpec change exists, run explicit migration instead of expecting automatic fallback:
 
 ```bash
-node scripts/migrate-legacy-plans.mjs <change-id> --dry-run
-node scripts/migrate-legacy-plans.mjs <change-id>
+ai-factory aifhub-migrate-legacy-plans <change-id> --dry-run
+ai-factory aifhub-migrate-legacy-plans <change-id>
 ```
 
 ## See Also

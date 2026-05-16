@@ -1201,8 +1201,8 @@ async function maybeMigrateLegacyPlans(options = {}) {
   }
 
   const commands = [
-    'node scripts/migrate-legacy-plans.mjs --all --dry-run',
-    'node scripts/migrate-legacy-plans.mjs --all'
+    'ai-factory aifhub-migrate-legacy-plans --all --dry-run',
+    'ai-factory aifhub-migrate-legacy-plans --all'
   ];
 
   if (!options.yes) {

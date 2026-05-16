@@ -457,8 +457,8 @@ describe('OpenSpec-native prompt asset contract', () => {
         'scripts/legacy-plan-migration.mjs',
         'do not auto-migrate',
         'Found legacy AI Factory plan artifacts for `<change-id>` but no OpenSpec change at `openspec/changes/<change-id>`.',
-        'node scripts/migrate-legacy-plans.mjs <change-id> --dry-run',
-        'node scripts/migrate-legacy-plans.mjs <change-id>'
+        'ai-factory aifhub-migrate-legacy-plans <change-id> --dry-run',
+        'ai-factory aifhub-migrate-legacy-plans <change-id>'
       ]) {
         assertIncludes(openspec, expected, `${relativePath} OpenSpec-native mode`);
       }

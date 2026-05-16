@@ -206,6 +206,64 @@ describe('OpenSpec verification context API', () => {
     assert.match(verifySummary, /## Coverage/);
   });
 
+  it('skips OpenSpec status warning for numeric-leading change ids rejected by status CLI', async () => {
+    const rootDir = await createTempRoot();
+    const changeId = '81-command-wrappers';
+    await createOpenSpecChange(rootDir, changeId);
+    await createGeneratedRules(rootDir, changeId);
+    await writeFixture(rootDir, `.ai-factory/qa/${changeId}/rules.md`, renderGateResultBlock(createGateResult({
+      gate: 'rules',
+      status: 'pass',
+      blockers: [],
+      affectedFiles: [],
+      suggestedNext: null
+    })));
+
+    const result = await buildVerificationContext({
+      rootDir,
+      changeId,
+      detectOpenSpec: async () => availableCliDetection(),
+      validateOpenSpecChange: async () => validationResult({
+        args: [
+          'validate',
+          changeId,
+          '--type',
+          'change',
+          '--strict',
+          '--json',
+          '--no-interactive',
+          '--no-color'
+        ]
+      }),
+      getOpenSpecStatus: async (id) => ({
+        ok: false,
+        command: 'openspec',
+        args: ['status', '--change', id, '--json', '--no-color'],
+        exitCode: 1,
+        stdout: '\n',
+        stderr: `× Error: Invalid change name '${id}': Change name must start with a letter\n`,
+        json: null,
+        jsonParseError: null,
+        error: {
+          code: 'non-zero-exit',
+          message: 'OpenSpec command failed with exit code 1.'
+        }
+      })
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.shouldRunCodeVerification, true);
+    assert.equal(result.openspec.status.skipped, true);
+    assert.equal(result.openspec.status.reason, 'openspec-status-unsupported-change-id');
+    assert.deepEqual(result.warnings.filter((item) => item.code === 'openspec-status-unavailable'), []);
+
+    const verifySummary = await readFile(path.join(rootDir, '.ai-factory', 'qa', changeId, 'verify.md'), 'utf8');
+    assert.match(verifySummary, /OpenSpec status: SKIPPED/);
+    const gate = getLatestGateResult(verifySummary, { gate: 'verify' });
+    assert.equal(gate.ok, true);
+    assert.deepEqual(gate.result.blockers.filter((item) => item.id === 'openspec-status-unavailable'), []);
+  });
+
   it('uses injected active-change resolver and runtime layout hooks', async () => {
     const rootDir = await createTempRoot();
     const cwd = path.join(rootDir, 'workspace');
