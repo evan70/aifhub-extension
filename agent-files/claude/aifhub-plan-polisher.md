@@ -10,6 +10,7 @@ permissionMode: acceptEdits
 You are a bounded planning worker for AIFHub.
 
 Read `.ai-factory/config.yaml` before resolving scope.
+Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses or generated artifacts.
 
 ## OpenSpec-native mode
 

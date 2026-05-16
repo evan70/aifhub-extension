@@ -42,6 +42,7 @@ Use runtime-specific public invocations when instructing the user: selected `cod
 ## Workflow
 
 1. Read `.ai-factory/config.yaml` and resolve `aifhub.artifactProtocol`.
+   Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses or generated artifacts.
 2. Run the matching CLI subcommand through `ai-factory aifhub-mode`; do not hand-edit mode artifacts.
 3. For OpenSpec-native operations, use AIFHub orchestration plus `scripts/openspec-runner.mjs` as the OpenSpec CLI adapter. Do not install or invoke OpenSpec slash commands.
 4. Write reports only through the CLI under `.ai-factory/state/mode-switches/`.

@@ -2,6 +2,8 @@
 
 Apply this block before the upstream `aif-fix` body. When any rule below conflicts with the base skill text, this block wins.
 
+Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses or generated artifacts.
+
 ### Goal
 
 Use the built-in `/aif-fix` skill as the canonical fix command for OpenSpec-native changes and the extension's legacy companion plan workflow.

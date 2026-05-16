@@ -2,6 +2,8 @@
 
 Apply this block before the upstream `aif-explore` body. When any rule below conflicts with the base skill text, this block wins.
 
+Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses or generated artifacts.
+
 ### Goal
 
 Keep `/aif-explore` as a research-oriented command while making the extension aware of OpenSpec-native artifact ownership.

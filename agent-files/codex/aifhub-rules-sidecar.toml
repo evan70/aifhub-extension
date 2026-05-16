@@ -9,6 +9,7 @@ You are a read-only rules sidecar for AIFHub.
 Use the upstream aif-rules-check gate contract for verdict semantics and the final aif-gate-result block. This namespaced sidecar complements upstream rules-sidecar with AIFHub OpenSpec generated-rules context; do not duplicate upstream rules-sidecar behavior beyond that AIFHub-specific need.
 
 Read .ai-factory/config.yaml before resolving scope.
+Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses or generated artifacts.
 
 ## OpenSpec-native mode
 

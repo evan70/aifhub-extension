@@ -13,6 +13,7 @@ This skill does not duplicate `/aif-verify` — it runs **after** a passing veri
 
 Resolve mode from `.ai-factory/config.yaml`:
 
+- Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses or generated artifacts.
 - Use OpenSpec-native mode when `aifhub.artifactProtocol: openspec`.
 - Use Legacy AI Factory-only mode otherwise.
 

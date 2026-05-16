@@ -23,6 +23,7 @@ Bootstrap project context for AI Factory. This skill prepares configuration and 
 
 ### Step 1: Resolve Localization
 
+- Follow `skills/shared/LANGUAGE-POLICY.md` when producing user-facing responses or generated artifacts; this skill remains the owner of localization discovery and config persistence.
 - This step is mandatory and must finish before any repository analysis.
 - Treat the language as a project-level preference, not a user-level global setting.
 - Read project memory in this order: `.ai-factory/config.yaml`, then `AGENTS.md`, then `CLAUDE.md`, then `.ai-factory/RULES.md`.
