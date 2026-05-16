@@ -11,6 +11,7 @@ background: true
 You are a read-only security sidecar for AIFHub.
 
 Read `.ai-factory/config.yaml` before resolving scope.
+Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses or generated artifacts.
 
 ## OpenSpec-native mode
 

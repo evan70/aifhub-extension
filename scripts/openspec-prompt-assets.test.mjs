@@ -8,7 +8,10 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..');
 
+const SHARED_LANGUAGE_POLICY_ASSET = 'skills/shared/LANGUAGE-POLICY.md';
+
 const EXPLICIT_REFERENCE_ASSETS = [
+  SHARED_LANGUAGE_POLICY_ASSET,
   'skills/aif-analyze/references/config-template.yaml',
   'skills/aif-done/references/finalization-contract.md',
   'injections/references/aif-roadmap/roadmap-template.md',
@@ -132,6 +135,25 @@ async function activePromptAssets() {
   return [...assets].sort();
 }
 
+async function activeManifestPromptAssets() {
+  const manifest = await loadManifest();
+  const assets = new Set();
+
+  for (const skillPath of manifest.skills ?? []) {
+    assets.add(`${normalizeManifestPath(skillPath)}/SKILL.md`);
+  }
+
+  for (const injection of manifest.injections ?? []) {
+    assets.add(normalizeManifestPath(injection.file));
+  }
+
+  for (const agentFile of manifest.agentFiles ?? []) {
+    assets.add(normalizeManifestPath(agentFile.source));
+  }
+
+  return [...assets].sort();
+}
+
 function stripFencedBlocks(markdown) {
   const lines = markdown.split(/\r?\n/);
   const kept = [];
@@ -217,6 +239,7 @@ describe('OpenSpec-native prompt asset contract', () => {
     for (const expected of [
       'skills/aif-analyze/SKILL.md',
       'skills/aif-done/SKILL.md',
+      SHARED_LANGUAGE_POLICY_ASSET,
       'injections/core/aif-rules-check-openspec-generated-rules.md',
       ROADMAP_PROMPT_ASSET,
       ...ROADMAP_REFERENCE_ASSETS,
@@ -231,6 +254,45 @@ describe('OpenSpec-native prompt asset contract', () => {
       assert.ok(!asset.startsWith('injections/handoff/'), `active discovery should exclude dormant handoff stub ${asset}`);
       assert.ok(!asset.startsWith('.ai-factory/extensions/'), `active discovery should exclude installed snapshot ${asset}`);
       assert.ok(!asset.startsWith('skills/aif-rules-check/'), `active discovery should exclude retired fallback ${asset}`);
+    }
+  });
+
+  it('requires active prompt assets to reference the shared language policy', async () => {
+    const policy = await readRepoFile(SHARED_LANGUAGE_POLICY_ASSET);
+
+    for (const expected of [
+      'language.ui',
+      'language.artifacts',
+      'language.technical_terms',
+      'user-facing responses',
+      'generated or updated artifacts',
+      'commands, filenames, file paths, code identifiers, JSON keys, YAML keys',
+      'current conversation language',
+      'Do not persist inferred language guesses',
+      'preserve its established language',
+      'does not expand ownership boundaries'
+    ]) {
+      assertIncludes(policy, expected, SHARED_LANGUAGE_POLICY_ASSET);
+    }
+
+    const assets = await activeManifestPromptAssets();
+    for (const relativePath of assets) {
+      const asset = await readRepoFile(relativePath);
+      assertIncludes(asset, `\`${SHARED_LANGUAGE_POLICY_ASSET}\``, relativePath);
+      assert.doesNotMatch(
+        asset,
+        /\[[^\]]*LANGUAGE-POLICY[^\]]*\]\([^)]*LANGUAGE-POLICY\.md[^)]*\)/,
+        `${relativePath} should reference the language policy as inline code, not as a markdown link`
+      );
+    }
+
+    for (const excluded of [
+      'skills/aif-analyze/references/config-template.yaml',
+      'skills/aif-done/references/finalization-contract.md',
+      'injections/references/aif-roadmap/roadmap-template.md',
+      'injections/references/aif-roadmap/slice-checklist.md'
+    ]) {
+      assert.ok(!assets.includes(excluded), `language policy coverage should not require reference asset ${excluded}`);
     }
   });
 

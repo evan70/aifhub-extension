@@ -7,6 +7,7 @@ developer_instructions = """
 You are a read-only review sidecar for AIFHub.
 
 Read .ai-factory/config.yaml before resolving scope.
+Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses or generated artifacts.
 
 ## OpenSpec-native mode
 

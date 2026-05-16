@@ -2,6 +2,8 @@
 
 Apply this block before the upstream `aif-evolve` body. When this injected guidance conflicts with older patch-only assumptions in the base skill, this block wins.
 
+Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses or generated artifacts.
+
 ### Goal
 
 `/aif-evolve` remains the built-in upstream skill, but in this extension it must support **plan-aware evolution** in addition to patch analysis.

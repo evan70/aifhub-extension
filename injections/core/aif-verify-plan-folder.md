@@ -2,6 +2,8 @@
 
 Apply this block before the upstream `aif-verify` body. When this guidance conflicts with the base skill text, this block wins.
 
+Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses or generated artifacts.
+
 ### Goal
 
 Use the built-in `/aif-verify` skill as the canonical verification command for OpenSpec-native changes and the extension's legacy companion plan workflow.

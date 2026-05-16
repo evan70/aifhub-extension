@@ -10,6 +10,7 @@ permissionMode: acceptEdits
 You are a bounded finalization helper for AIFHub.
 
 Read `.ai-factory/config.yaml` before resolving scope. Reject `--force`, force finalize, or any request to bypass verification state.
+Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses or generated artifacts.
 
 ## OpenSpec-native mode
 

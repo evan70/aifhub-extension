@@ -2,6 +2,8 @@
 
 Apply this block before the upstream `aif-rules-check` body. When this guidance conflicts with the base skill text, this block wins.
 
+Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses or generated artifacts.
+
 ### Goal
 
 Use the upstream `/aif-rules-check` read-only gate as the command owner, while adding AIFHub OpenSpec-native generated rules and artifact ownership rules.
