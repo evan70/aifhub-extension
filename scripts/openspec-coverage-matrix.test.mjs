@@ -164,6 +164,62 @@ describe('OpenSpec coverage matrix', () => {
     assert.match(summarizeOpenSpecCoverage(latest.coverage), /Coverage matrix: PASS/);
   });
 
+  it('counts active prompt source assets as implementation evidence', async () => {
+    const rootDir = await createTempRoot();
+    const changeId = 'shared-language-policy';
+    await writeFixture(rootDir, `openspec/changes/${changeId}/proposal.md`, '# Proposal\n');
+    await writeFixture(rootDir, `openspec/changes/${changeId}/design.md`, '# Design\n');
+    await writeFixture(rootDir, `openspec/changes/${changeId}/tasks.md`, [
+      '# Tasks',
+      '',
+      '- [x] 1.1 Make active prompt assets follow the shared language policy in skills/shared/LANGUAGE-POLICY.md, skills/aif-mode/SKILL.md, injections/core/aif-verify-plan-folder.md, agent-files/codex/aifhub-verifier.toml, and agent-files/claude/aifhub-verifier.md.',
+      '- [x] 1.2 Add regression coverage in scripts/openspec-prompt-assets.test.mjs.',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, `openspec/changes/${changeId}/specs/prompt-localization/spec.md`, [
+      '# Prompt Localization Delta',
+      '',
+      '## ADDED Requirements',
+      '',
+      '### Requirement: Active prompt assets follow shared language policy',
+      '',
+      'AIFHub active prompt assets MUST follow the shared language policy.',
+      '',
+      '#### Scenario: Active prompts reference policy',
+      '',
+      '- GIVEN active prompt assets are packaged',
+      '- WHEN the prompt contract test runs',
+      '- THEN each prompt follows the shared language policy',
+      ''
+    ].join('\n'));
+    const generatedRules = await createGeneratedRules(rootDir, changeId);
+
+    const matrix = await buildOpenSpecCoverageMatrix({
+      rootDir,
+      changeId,
+      policy: 'strict',
+      generatedRules
+    });
+
+    assert.equal(matrix.status, 'pass');
+    assert.deepEqual(matrix.summary, {
+      covered: 1,
+      partial: 0,
+      missing: 0,
+      not_applicable: 0
+    });
+    assert.deepEqual(matrix.requirements[0].implementation_evidence, [
+      'agent-files/claude/aifhub-verifier.md',
+      'agent-files/codex/aifhub-verifier.toml',
+      'injections/core/aif-verify-plan-folder.md',
+      'skills/aif-mode/SKILL.md',
+      'skills/shared/LANGUAGE-POLICY.md'
+    ]);
+    assert.deepEqual(matrix.requirements[0].test_evidence, [
+      'scripts/openspec-prompt-assets.test.mjs'
+    ]);
+  });
+
   it('fails missing requirements in strict mode and warns in normal mode', async () => {
     const rootDir = await createTempRoot();
     await writeFixture(rootDir, 'openspec/changes/add-oauth/proposal.md', '# Proposal\n');

@@ -24,6 +24,7 @@ const POLICIES = new Set(['strict', 'normal']);
 const REQUIREMENT_STATUS_ORDER = ['covered', 'partial', 'missing', 'not-applicable'];
 const TEST_PATH_PATTERN = /(^|\/)(test|tests|__tests__)\/|[._-](test|spec)\.[A-Za-z0-9]+$/i;
 const SOURCE_FILE_PATTERN = /\.[cm]?[jt]sx?$|\.mjs$|\.cjs$|\.py$|\.go$|\.rs$|\.java$|\.kt$|\.cs$|\.php$|\.rb$|\.sh$|\.ps1$/i;
+const PROMPT_SOURCE_FILE_PATTERN = /^(?:skills\/(?:[^/]+\/SKILL\.md|shared\/[A-Z0-9_-]+\.md)|injections\/(?:core|handoff)\/[^/]+\.md|agent-files\/(?:codex\/[^/]+\.toml|claude\/[^/]+\.md))$/i;
 const DOC_PATH_PATTERN = /(^|\/)(docs|documentation)\//i;
 const INTERNAL_ARTIFACT_PATTERN = /^(openspec|\.ai-factory)\//i;
 const STOPWORDS = new Set([
@@ -725,6 +726,9 @@ function classifyEvidencePaths(paths) {
 }
 
 function isImplementationEvidencePath(evidencePath) {
+  if (PROMPT_SOURCE_FILE_PATTERN.test(evidencePath)) {
+    return true;
+  }
   if (!SOURCE_FILE_PATTERN.test(evidencePath)) {
     return false;
   }
