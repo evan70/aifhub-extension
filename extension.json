@@ -8,6 +8,31 @@
       "name": "aifhub-mcp",
       "description": "Run the AIFHub MCP server over stdio.",
       "module": "./commands/aifhub-mcp.mjs"
+    },
+    {
+      "name": "aifhub-mode",
+      "description": "Run AIFHub artifact mode status, switch, sync, and doctor commands.",
+      "module": "./commands/aifhub-mode.mjs"
+    },
+    {
+      "name": "aifhub-migrate-legacy-plans",
+      "description": "Run AIFHub legacy AI Factory plan migration commands.",
+      "module": "./commands/aifhub-migrate-legacy-plans.mjs"
+    },
+    {
+      "name": "aifhub-write-gate-evidence",
+      "description": "Persist validated AIFHub gate evidence under QA paths.",
+      "module": "./commands/aifhub-write-gate-evidence.mjs"
+    },
+    {
+      "name": "aifhub-coverage",
+      "description": "Build and optionally write AIFHub OpenSpec coverage evidence.",
+      "module": "./commands/aifhub-coverage.mjs"
+    },
+    {
+      "name": "aifhub-done-readiness",
+      "description": "Run AIFHub OpenSpec done-readiness diagnostics.",
+      "module": "./commands/aifhub-done-readiness.mjs"
     }
   ],
   "skills": [

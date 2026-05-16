@@ -343,8 +343,8 @@ describe('mode switching', () => {
     assert.equal(result.ok, true);
     assert.equal(result.migration.skipped, true);
     assert.deepEqual(result.migration.commands, [
-      'node scripts/migrate-legacy-plans.mjs --all --dry-run',
-      'node scripts/migrate-legacy-plans.mjs --all'
+      'ai-factory aifhub-migrate-legacy-plans --all --dry-run',
+      'ai-factory aifhub-migrate-legacy-plans --all'
     ]);
     assert.equal(await pathExists(rootDir, 'openspec/changes/add-oauth/proposal.md'), false);
   });

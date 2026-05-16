@@ -15,14 +15,14 @@ The matrix is runtime QA evidence. It is written to `.ai-factory/qa/<change-id>/
 Build and write coverage for one change:
 
 ```bash
-node scripts/openspec-coverage-matrix.mjs --change <change-id> --write --json
+ai-factory aifhub-coverage --change <change-id> --write --json
 ```
 
 Policy can be selected explicitly:
 
 ```bash
-node scripts/openspec-coverage-matrix.mjs --change <change-id> --policy strict --write --json
-node scripts/openspec-coverage-matrix.mjs --change <change-id> --policy normal --write --json
+ai-factory aifhub-coverage --change <change-id> --policy strict --write --json
+ai-factory aifhub-coverage --change <change-id> --policy normal --write --json
 ```
 
 Exit codes:

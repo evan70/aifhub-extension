@@ -207,7 +207,7 @@ function renderTargetExistsHint(result, subjectArgs) {
     return [];
   }
 
-  const command = `node scripts/migrate-legacy-plans.mjs ${subjectArgs}`;
+  const command = `ai-factory aifhub-migrate-legacy-plans ${subjectArgs}`;
 
   return [
     '',

@@ -252,9 +252,9 @@ See [OpenSpec Compatibility](docs/openspec-compatibility.md) for supported versi
 Existing `.ai-factory/plans` artifacts are legacy AI Factory-only records. Migrate them explicitly before using the OpenSpec-native flow for that work:
 
 ```bash
-node scripts/migrate-legacy-plans.mjs --list
-node scripts/migrate-legacy-plans.mjs <change-id> --dry-run
-node scripts/migrate-legacy-plans.mjs <change-id>
+ai-factory aifhub-migrate-legacy-plans --list
+ai-factory aifhub-migrate-legacy-plans <change-id> --dry-run
+ai-factory aifhub-migrate-legacy-plans <change-id>
 ```
 
 The migration writes canonical artifacts under `openspec/changes/<change-id>/`, preserves runtime material under `.ai-factory/state/<change-id>/`, preserves QA material under `.ai-factory/qa/<change-id>/`, and never silently deletes legacy source files.

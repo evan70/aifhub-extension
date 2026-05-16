@@ -91,14 +91,14 @@ Doctor also reports `effectivePolicy` from `scripts/openspec-policy.mjs`, includ
 When `requireRulesPassForDone` is true, save the final `/aif-rules-check` output, or at least its final `aif-gate-result` block, to `.ai-factory/qa/<change-id>/rules.md` before `/aif-done`:
 
 ```bash
-node scripts/write-gate-evidence.mjs \
+ai-factory aifhub-write-gate-evidence \
   --change add-oauth-login \
   --gate rules \
   --from /tmp/aif-rules-check-output.md
 ```
 
 ```bash
-node scripts/write-gate-evidence.mjs --change add-oauth-login --gate rules
+ai-factory aifhub-write-gate-evidence --change add-oauth-login --gate rules
 ```
 
 The second form reads Markdown from stdin.
@@ -112,7 +112,7 @@ The readiness gate runs the artifact validator with verification evidence requir
 Run the pre-archive gate directly when diagnosing `/aif-done` refusal:
 
 ```bash
-node scripts/openspec-done-readiness.mjs --change <change-id> --json
+ai-factory aifhub-done-readiness --change <change-id> --json
 ```
 
 It writes `.ai-factory/qa/<change-id>/done-readiness.json` unless `--no-write` is passed. Exit codes are `0` for `pass` or policy-accepted `warn`, `1` for blocking readiness failure, and `2` for invalid arguments or unresolved changes.

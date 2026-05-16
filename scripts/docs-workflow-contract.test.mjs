@@ -142,7 +142,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
     ]) {
       assertIncludes(source, 'requireRulesPassForDone', label);
       assertIncludes(source, '.ai-factory/qa/<change-id>/rules.md', label);
-      assertIncludes(source, 'node scripts/write-gate-evidence.mjs --change add-oauth-login --gate rules', label);
+      assertIncludes(source, 'ai-factory aifhub-write-gate-evidence --change add-oauth-login --gate rules', label);
       assertIncludes(source, '--from /tmp/aif-rules-check-output.md', label);
       assertIncludes(source, 'final `aif-gate-result` block', label);
     }
