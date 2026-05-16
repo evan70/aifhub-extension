@@ -11,6 +11,31 @@ Create `.ai-factory/ROADMAP.md` with this structure:
 
 ---
 
+## GitHub Milestone Phase Audit
+
+**Milestone evidence:** [used/unavailable/partial]
+
+### Phase: [Milestone title]
+
+**Milestone:** [#number if available, open/closed, open_issues/closed_issues, closed date if closed]
+
+**Local evidence status:** [done/partial/missing, based on repository artifacts]
+
+**Linked GitHub evidence:**
+- [Issue/PR/milestone link or "not available"]
+
+**Phase audit:**
+- [Closed milestone audit summary, or open milestone progress/drift summary]
+
+**Drift:**
+- [phase-completion drift, local evidence gap, stale GitHub linkage, or "none found"]
+
+### Unphased backlog/drift
+
+- [Unmilestoned issue/PR link, local evidence status, and required action]
+
+---
+
 ## Slice: Launch / Runtime
 
 **Status:** [done/partial/missing]
@@ -62,6 +87,10 @@ Create `.ai-factory/ROADMAP.md` with this structure:
 - In check mode, mention slices whose status changed and explain why.
 - Make next steps concrete enough to become implementation tasks later.
 - GitHub evidence may include milestones, issues, PRs, labels, linked branches, and current git tree state when available.
+- Treat GitHub milestones as roadmap phases when milestone evidence is available.
+- Closed milestones produce phase audit sections with linked issues/PRs and local evidence status.
+- Open milestones with `open_issues = 0` produce `phase-completion drift`; do not present them as closed phases.
+- Milestone-bound issues/PRs attach to their phase; unmilestoned issues/PRs remain in `unphased backlog/drift`.
 - GitHub links are optional; do not require them for every roadmap entry.
 - local artifact evidence remains required for `done` status decisions.
 - Do not include tokens, authorization headers, raw credential helper output, or private authentication diagnostics.

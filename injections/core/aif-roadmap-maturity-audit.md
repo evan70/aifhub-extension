@@ -51,11 +51,25 @@ GitHub context may come from `gh`, a GitHub connector, explicit issue/PR URLs, o
 
 GitHub state must never replace local proof. A closed issue, completed milestone, or merged PR must never be the sole reason to mark a slice or roadmap item `done`; require local evidence from OpenSpec artifacts, source files, tests, CI, runtime state, QA evidence, generated rules, or other repository artifacts.
 
+Treat GitHub milestones as roadmap phases when milestone evidence is available. Read both open and closed milestones when possible, and state in normal roadmap output whether GitHub milestone evidence was used, unavailable, or partial.
+
+Milestone phase audit rules:
+
+- Closed milestones must produce a phase audit section instead of only disconnected checklist points. Include the milestone title, milestone number when available, closed date when available, linked issues/PRs, and local evidence status.
+- Open milestones with `open_issues = 0` are not closed phases. Report `phase-completion drift` with the milestone title, number when available, open/closed issue counts, and the exact reason the phase still needs closure or local evidence.
+- Issues and PRs assigned to a milestone attach to that roadmap phase.
+- Issues and PRs without a milestone remain in an explicit `unphased backlog/drift` section. For issue #88, keep it unphased unless GitHub assigns it a milestone.
+- local artifact evidence remains required before marking a phase, slice, or roadmap item `done`.
+- Closed milestone phase audits still require local artifact evidence before any phase or linked roadmap item is marked `done`.
+
 Detect and report drift when material:
 
 - GitHub says done, but local evidence is missing
 - local implementation exists, but GitHub is stale
 - OpenSpec change exists, but no linked roadmap/milestone/issue is visible
+- closed milestone is missing a phase audit
+- open milestone has `open_issues = 0`, but the roadmap does not report `phase-completion drift`
+- issue or PR milestone linkage is missing from the corresponding phase
 - merged PR exists, but current git tree does not contain the expected local evidence
 
 GitHub-aware roadmap output must be credential-safe. It may include public or user-provided identifiers such as issue numbers, PR numbers, milestone names, titles, states, and URLs. It must not write tokens, authorization headers, raw credential helper output, or private authentication diagnostics into `.ai-factory/ROADMAP.md` or normal responses.
@@ -106,6 +120,8 @@ Evidence priority is strict:
 - Treat the roadmap as an audit artifact, not as a generic task list.
 - In check mode, call out regressions explicitly.
 - Link to GitHub milestones, issues, or PRs where useful, but keep local artifact evidence as the basis for status decisions.
+- When GitHub milestones are present, include milestone phase audit output before or alongside slice status output.
+- Keep unmilestoned GitHub issues and PRs visible in `unphased backlog/drift` instead of silently folding them into a phase.
 - Summarize strongest areas, critical gaps, and any status changes.
 
 ### Reference Assets

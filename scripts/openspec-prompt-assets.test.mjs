@@ -72,6 +72,7 @@ const SIDECAR_PROMPT_ASSETS = [
 ];
 
 const ROADMAP_PROMPT_ASSET = 'injections/core/aif-roadmap-maturity-audit.md';
+const COMMIT_PROMPT_ASSET = 'injections/core/aif-commit-roadmap-freshness.md';
 
 const ROADMAP_REFERENCE_ASSETS = [
   'injections/references/aif-roadmap/roadmap-template.md',
@@ -242,6 +243,7 @@ describe('OpenSpec-native prompt asset contract', () => {
       SHARED_LANGUAGE_POLICY_ASSET,
       'injections/core/aif-rules-check-openspec-generated-rules.md',
       ROADMAP_PROMPT_ASSET,
+      COMMIT_PROMPT_ASSET,
       ...ROADMAP_REFERENCE_ASSETS,
       'injections/core/aif-implement-plan-folder.md',
       'agent-files/codex/aifhub-verifier.toml',
@@ -255,6 +257,16 @@ describe('OpenSpec-native prompt asset contract', () => {
       assert.ok(!asset.startsWith('.ai-factory/extensions/'), `active discovery should exclude installed snapshot ${asset}`);
       assert.ok(!asset.startsWith('skills/aif-rules-check/'), `active discovery should exclude retired fallback ${asset}`);
     }
+  });
+
+  it('registers the commit roadmap freshness injection in the manifest', async () => {
+    const manifest = await loadManifest();
+    const injection = manifest.injections.find((entry) => entry.target === 'aif-commit');
+
+    assert.ok(injection, 'extension.json should include an aif-commit injection');
+    assert.equal(injection.position, 'prepend');
+    assert.equal(normalizeManifestPath(injection.file), COMMIT_PROMPT_ASSET);
+    await readRepoFile(COMMIT_PROMPT_ASSET);
   });
 
   it('requires active prompt assets to reference the shared language policy', async () => {
@@ -688,6 +700,27 @@ describe('OpenSpec-native prompt asset contract', () => {
     }
   });
 
+  it('defines GitHub milestones as roadmap phases with explicit drift handling', async () => {
+    for (const relativePath of [
+      ROADMAP_PROMPT_ASSET,
+      ...ROADMAP_REFERENCE_ASSETS
+    ]) {
+      const asset = stripFencedBlocks(await readRepoFile(relativePath));
+
+      for (const expected of [
+        'Treat GitHub milestones as roadmap phases',
+        'Closed milestones',
+        'phase audit',
+        'open_issues = 0',
+        'phase-completion drift',
+        'unphased backlog/drift',
+        'local artifact evidence remains required'
+      ]) {
+        assertIncludes(asset, expected, relativePath);
+      }
+    }
+  });
+
   it('keeps GitHub-aware roadmap output owner-bounded and credential-safe', async () => {
     const asset = stripFencedBlocks(await readRepoFile(ROADMAP_PROMPT_ASSET));
 
@@ -702,6 +735,39 @@ describe('OpenSpec-native prompt asset contract', () => {
       'OpenSpec change exists, but no linked roadmap/milestone/issue is visible'
     ]) {
       assertIncludes(asset, expected, ROADMAP_PROMPT_ASSET);
+    }
+  });
+
+  it('defines the commit roadmap freshness gate as read-only and mode-aware', async () => {
+    const asset = stripFencedBlocks(await readRepoFile(COMMIT_PROMPT_ASSET));
+
+    for (const expected of [
+      'skills/shared/LANGUAGE-POLICY.md',
+      'Read `.ai-factory/config.yaml` first',
+      'OpenSpec-native mode',
+      'Legacy AI Factory-only mode',
+      'Missing config mode',
+      'do not fabricate OpenSpec context',
+      'staged changes and current diff',
+      '.ai-factory/qa/<change-id>/done.md',
+      '.ai-factory/state/<change-id>/final-summary.md',
+      'openspec/specs/**',
+      'openspec/changes/archive/**',
+      'optional GitHub issue, PR, milestone',
+      'WARN',
+      'ERROR',
+      'no implicit strict mode',
+      'closed GitHub milestone exists but `.ai-factory/ROADMAP.md` has no matching phase audit',
+      'open GitHub milestone has `open_issues = 0` but roadmap lacks `phase-completion drift`',
+      'unphased backlog/drift',
+      '/aif-roadmap',
+      'It must not edit `.ai-factory/ROADMAP.md`',
+      '.ai-factory/rules/generated/**',
+      'canonical OpenSpec artifacts',
+      'GitHub issues, milestones, PRs, labels, or linked branches',
+      'Keep the upstream conventional commit message flow unchanged'
+    ]) {
+      assertIncludes(asset, expected, COMMIT_PROMPT_ASSET);
     }
   });
 

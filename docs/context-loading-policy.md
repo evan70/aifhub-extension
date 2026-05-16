@@ -101,6 +101,8 @@ OpenSpec-native bug fixes have two context shapes:
 
 This context is supporting evidence only. Closed GitHub issues, completed milestones, and merged PRs do not by themselves make roadmap items `done`; local evidence from OpenSpec artifacts, source files, tests, CI, runtime state, QA evidence, or generated rules remains required.
 
+When GitHub milestones are available, `/aif-roadmap` treats milestones as roadmap phases. Closed milestones produce phase audit sections with linked issues/PRs and local evidence status. Open milestones with `open_issues = 0` produce `phase-completion drift` instead of being treated as closed. Milestone-bound issues/PRs attach to their phase, while unmilestoned issues/PRs remain in `unphased backlog/drift`.
+
 GitHub access is non-blocking. If `gh`, connector data, network access, authentication, or rate limits prevent complete GitHub evidence loading, `/aif-roadmap` should continue from local evidence and summarize whether GitHub evidence was unavailable or partial.
 
 `/aif-roadmap` may update only the configured roadmap artifact. It must not mutate GitHub issues, milestones, PRs, labels, linked branches, canonical OpenSpec artifacts, runtime state, QA evidence, generated rules, or implementation files. It must not write tokens, authorization headers, raw credential helper output, or private authentication diagnostics into roadmap output.
@@ -143,7 +145,7 @@ OpenSpec-native quality gates:
 
 `/aif-done` owns OpenSpec lifecycle finalization. `/aif-commit` owns git commit creation. `/aif-evolve` owns learning/evolution.
 
-After `/aif-done`, `/aif-commit` may read finalization evidence and OpenSpec archive/spec mutations, but must not mutate OpenSpec lifecycle artifacts manually.
+After `/aif-done`, `/aif-commit` may read finalization evidence, OpenSpec archive/spec mutations, the configured roadmap artifact, and optional GitHub issue/PR/milestone freshness context. It must not mutate OpenSpec lifecycle artifacts, `.ai-factory/ROADMAP.md`, runtime state, QA evidence, generated rules, or GitHub objects manually. If the roadmap is stale, `/aif-commit` reports a read-only freshness warning and hands off to `/aif-roadmap`; it still writes only the git commit after user confirmation.
 
 ## Legacy Artifact Boundaries
 

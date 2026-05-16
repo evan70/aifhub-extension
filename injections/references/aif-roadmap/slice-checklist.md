@@ -83,3 +83,14 @@ Mark a slice `done` only when the repository shows comprehensive evidence. When 
 - If local implementation exists but GitHub or roadmap linkage is stale, report drift instead of discarding local evidence.
 - Do not include tokens, authorization headers, raw credential helper output, or private authentication diagnostics.
 - If a slice is unclear, explain what is missing instead of guessing.
+
+## Milestone Phase Notes
+
+- Treat GitHub milestones as roadmap phases when milestone evidence is available.
+- Read open and closed milestones when possible, then state whether milestone evidence was used, unavailable, or partial.
+- Closed milestones produce a phase audit with milestone title, number when available, closed date when available, linked issues/PRs, and local artifact evidence status.
+- Open milestones with `open_issues = 0` produce `phase-completion drift`; do not treat them as closed milestones.
+- Milestone-bound issues and PRs attach to their phase.
+- Unmilestoned issues and PRs remain in an explicit `unphased backlog/drift` section.
+- For issue #88, keep it in `unphased backlog/drift` unless GitHub assigns it a milestone.
+- local artifact evidence remains required before marking a phase, slice, or roadmap item `done`.

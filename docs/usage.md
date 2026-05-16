@@ -265,6 +265,8 @@ Does not write:
 
 GitHub state is supporting evidence only. Closed issues, completed milestones, and merged PRs are useful signals, but local artifact evidence remains required before marking roadmap items `done`. If GitHub evidence is unavailable, unauthenticated, rate-limited, offline, or partial, `/aif-roadmap` continues from local evidence and summarizes the limitation without writing credentials or private authentication diagnostics.
 
+When GitHub milestones are available, `/aif-roadmap` treats milestones as roadmap phases. Closed milestones produce phase audit sections with linked issues/PRs and local evidence status. Open milestones with `open_issues = 0` produce `phase-completion drift` instead of being treated as closed. Milestone-bound issues/PRs attach to their phase, while unmilestoned issues/PRs remain in `unphased backlog/drift`.
+
 ### `/aif-improve`
 
 Reads:
@@ -503,6 +505,8 @@ Reads:
 - `.ai-factory/qa/<change-id>/openspec-archive.json` when present
 - `.ai-factory/state/<change-id>/final-summary.md` when present
 - OpenSpec archive/spec changes produced by `/aif-done`
+- configured roadmap artifact, `.ai-factory/ROADMAP.md` by default
+- optional GitHub issue, PR, milestone, label, and linked branch freshness context when available
 
 Writes:
 
@@ -510,11 +514,14 @@ Writes:
 
 Does not write:
 
+- `.ai-factory/ROADMAP.md`
+- GitHub issues, milestones, PRs, labels, or linked branches
 - OpenSpec lifecycle artifacts manually
 - `.ai-factory/qa/<change-id>/`
 - `.ai-factory/state/<change-id>/`
+- `.ai-factory/rules/generated/**`
 
-In OpenSpec-native mode, `/aif-commit` normally runs after `/aif-done`.
+In OpenSpec-native mode, `/aif-commit` normally runs after `/aif-done`. It performs a read-only roadmap/GitHub freshness gate before the upstream commit prompt. Stale roadmap findings are warning-first unless strict checking was explicitly requested, and each stale finding should hand off to `/aif-roadmap`. The command still writes only the git commit after user confirmation.
 
 ### `/aif-evolve`
 

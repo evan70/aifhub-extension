@@ -132,6 +132,62 @@ describe('complete OpenSpec workflow documentation contract', () => {
     ], 'docs/usage.md workflow');
   });
 
+  it('documents milestone-aware roadmap phase audits', async () => {
+    const usage = await readRepoFile('docs/usage.md');
+    const contextPolicy = await readRepoFile('docs/context-loading-policy.md');
+    const usageRoadmap = extractSection(usage, '### `/aif-roadmap`');
+    const contextRoadmap = extractSection(contextPolicy, '## GitHub-Aware Roadmap Context');
+
+    for (const [label, section] of [
+      ['docs/usage.md /aif-roadmap', usageRoadmap],
+      ['docs/context-loading-policy.md GitHub-Aware Roadmap Context', contextRoadmap]
+    ]) {
+      for (const expected of [
+        'milestones as roadmap phases',
+        'Closed milestones produce phase audit sections',
+        'local evidence status',
+        'open_issues = 0',
+        'phase-completion drift',
+        'unphased backlog/drift',
+        'supporting evidence only'
+      ]) {
+        assertIncludes(section, expected, label);
+      }
+    }
+  });
+
+  it('documents commit roadmap freshness as read-only handoff context', async () => {
+    const usage = await readRepoFile('docs/usage.md');
+    const contextPolicy = await readRepoFile('docs/context-loading-policy.md');
+    const usageCommit = extractSection(usage, '### `/aif-commit`');
+    const commandOwnership = extractSection(contextPolicy, '## Command Ownership');
+    const qualityTail = extractSection(contextPolicy, '## Quality Gates and Finalization Tail');
+
+    for (const expected of [
+      'configured roadmap artifact',
+      'optional GitHub issue, PR, milestone',
+      'read-only roadmap/GitHub freshness gate',
+      '/aif-roadmap',
+      'still writes only the git commit after user confirmation',
+      '.ai-factory/ROADMAP.md',
+      'GitHub issues, milestones, PRs, labels, or linked branches'
+    ]) {
+      assertIncludes(usageCommit, expected, 'docs/usage.md /aif-commit');
+    }
+
+    assertIncludes(commandOwnership, '| `/aif-commit` | no | git commit only |', 'docs/context-loading-policy.md Command Ownership');
+
+    for (const expected of [
+      'the configured roadmap artifact',
+      'optional GitHub issue/PR/milestone freshness context',
+      'must not mutate OpenSpec lifecycle artifacts, `.ai-factory/ROADMAP.md`, runtime state, QA evidence, generated rules, or GitHub objects manually',
+      '/aif-roadmap',
+      'still writes only the git commit after user confirmation'
+    ]) {
+      assertIncludes(qualityTail, expected, 'docs/context-loading-policy.md Quality Gates and Finalization Tail');
+    }
+  });
+
   it('documents durable rules gate evidence persistence for strict done readiness', async () => {
     const usage = await readRepoFile('docs/usage.md');
     const validation = await readRepoFile('docs/openspec-validation.md');

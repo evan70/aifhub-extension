@@ -151,6 +151,11 @@
       "file": "./injections/core/aif-roadmap-maturity-audit.md"
     },
     {
+      "target": "aif-commit",
+      "position": "prepend",
+      "file": "./injections/core/aif-commit-roadmap-freshness.md"
+    },
+    {
       "target": "aif-fix",
       "position": "prepend",
       "file": "./injections/core/aif-fix-plan-folder.md"
