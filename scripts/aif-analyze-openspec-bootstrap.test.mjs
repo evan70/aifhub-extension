@@ -38,6 +38,29 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
     assertIncludes(template, 'artifactProtocol: ai-factory', 'skills/aif-analyze/references/config-template.yaml');
   });
 
+  it('documents first-bootstrap artifact protocol prompts without preselecting mode', async () => {
+    const skill = await readRepoFile('skills/aif-analyze/SKILL.md');
+    const template = await readRepoFile('skills/aif-analyze/references/config-template.yaml');
+
+    for (const expected of [
+      'If `.ai-factory/config.yaml` is missing and no artifact protocol was explicitly requested, ask one artifact protocol question before writing config or creating mode-specific directories.',
+      '`legacy AI Factory-only`',
+      '`OpenSpec-native`',
+      'Codex Default mode: ask a short plain-text artifact protocol question; do not use `question(...)`, `questionnaire(...)`, or `request_user_input`.',
+      'Codex Plan mode: use one `request_user_input` question only when the user already switched the session into Plan mode.',
+      'Autonomous / subagent mode: do not ask; choose legacy `ai-factory` mode by default and report OpenSpec-native mode as an open question/blocker.',
+      'Keep localization answers as pending config values until bootstrap mode is resolved.'
+    ]) {
+      assertIncludes(skill, expected, 'skills/aif-analyze/SKILL.md first-bootstrap prompt contract');
+    }
+
+    assertIncludes(
+      template,
+      'First bootstrap may ask for artifact protocol before this value is written.',
+      'skills/aif-analyze/references/config-template.yaml'
+    );
+  });
+
   it('defines the OpenSpec-native config shape and canonical runtime paths', async () => {
     const combined = [
       await readRepoFile('skills/aif-analyze/SKILL.md'),
@@ -91,7 +114,8 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
       'requiresNode: ">=20.19.0"',
       'nodeSupported: boolean',
       'versionSupported: boolean',
-      'Missing or unsupported OpenSpec CLI is a degraded capability state, not a bootstrap failure'
+      'Missing or unsupported OpenSpec CLI is a degraded capability state, not a bootstrap failure',
+      'If `reason` is `unsupported-version`, recommend installing or updating OpenSpec CLI to `>=1.3.1 <2.0.0`.'
     ]) {
       assertIncludes(skill, expected, 'skills/aif-analyze/SKILL.md');
     }
