@@ -548,6 +548,80 @@ describe('artifact sync and export', () => {
     assert.ok(result.validation.warnings.some((warning) => warning.code === 'no-delta-specs'));
   });
 
+  it('treats numeric-leading OpenSpec status rejection as non-blocking during sync', async () => {
+    const rootDir = await createTempRoot();
+    const changeId = '81-command-wrappers';
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: openspec',
+      '  openspec:',
+      '    compileRulesOnSync: false',
+      'paths:',
+      '  plans: openspec/changes',
+      '  specs: openspec/specs',
+      '  state: .ai-factory/state',
+      '  qa: .ai-factory/qa',
+      '  generated_rules: .ai-factory/rules/generated',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'openspec/config.yaml', 'project: test\n');
+    await writeFixture(rootDir, `openspec/changes/${changeId}/proposal.md`, '# Proposal\n');
+    await writeFixture(rootDir, `openspec/changes/${changeId}/specs/commands/spec.md`, [
+      '# Commands',
+      '',
+      '## ADDED Requirements',
+      '',
+      '### Requirement: Command Wrappers',
+      '',
+      'The system MUST expose command wrappers.',
+      '',
+      '#### Scenario: wrapper is invoked',
+      '',
+      '- GIVEN an installed helper command',
+      '- WHEN the wrapper runs',
+      '- THEN it delegates to the helper',
+      ''
+    ].join('\n'));
+
+    const result = await syncOpenSpecArtifacts({
+      rootDir,
+      changeId,
+      detectOpenSpec: async () => availableCliDetection(),
+      validateOpenSpecChange: async () => ({
+        ok: true,
+        exitCode: 0,
+        stdout: '{"valid":true}',
+        stderr: '',
+        json: { valid: true },
+        error: null
+      }),
+      getOpenSpecStatus: async (id) => ({
+        ok: false,
+        exitCode: 1,
+        command: 'openspec',
+        args: ['status', '--change', id, '--json', '--no-color'],
+        stdout: '\n',
+        stderr: `Error: Invalid change name '${id}': Change name must start with a letter\n`,
+        json: null,
+        jsonParseError: null,
+        error: {
+          code: 'non-zero-exit',
+          message: 'OpenSpec command failed with exit code 1.'
+        }
+      }),
+      timestamp: '2026-05-17T00-00-00-000Z'
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.validation.ok, true);
+    assert.equal(result.validation.results[0].ok, true);
+    assert.equal(result.validation.results[0].status.ok, false);
+    assert.equal(result.validation.results[0].statusWarning.code, 'openspec-status-unsupported-change-id');
+    assert.deepEqual(result.validation.errors, []);
+    assert.ok(result.validation.warnings.some((warning) => warning.code === 'openspec-status-unsupported-change-id'));
+    assert.ok(result.warnings.some((warning) => warning.code === 'openspec-status-unsupported-change-id'));
+  });
+
   it('does not skip no-delta validation for targeted sync', async () => {
     const rootDir = await createTempRoot();
     const validated = [];

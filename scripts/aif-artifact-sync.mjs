@@ -910,14 +910,24 @@ async function validateOpenSpecChanges(options = {}) {
     const status = validation.ok
       ? await getOpenSpecStatus(changeId, createRunOptions(rootDir, options))
       : null;
+    const statusWarning = isUnsupportedOpenSpecStatusChangeId(status, changeId)
+      ? {
+        code: 'openspec-status-unsupported-change-id',
+        message: `OpenSpec status skipped because the OpenSpec CLI rejects numeric-leading change id '${changeId}' while validation accepts it.`
+      }
+      : null;
 
     results.push({
       changeId,
       validation,
       status,
-      ok: Boolean(validation.ok && (status === null || status.ok))
+      statusWarning,
+      ok: Boolean(validation.ok && (status === null || status.ok || statusWarning !== null))
     });
   }
+  const statusWarnings = results
+    .map((result) => result.statusWarning)
+    .filter((warning) => warning !== null);
 
   return {
     ok: results.every((result) => result.ok),
@@ -925,7 +935,10 @@ async function validateOpenSpecChanges(options = {}) {
     detection: summarizeOpenSpecDetection(detection),
     results,
     skippedChanges: selected.skippedChanges,
-    warnings: selected.warnings,
+    warnings: dedupeDiagnostics([
+      ...selected.warnings,
+      ...statusWarnings
+    ]),
     errors: results
       .filter((result) => !result.ok)
       .map((result) => ({
@@ -933,6 +946,25 @@ async function validateOpenSpecChanges(options = {}) {
         message: `OpenSpec validation/status failed for '${result.changeId}'.`
       }))
   };
+}
+
+function isUnsupportedOpenSpecStatusChangeId(result, changeId) {
+  const output = normalizeCommandText(result);
+  return !result?.ok
+    && /^[0-9]/.test(String(changeId ?? ''))
+    && /Invalid change name/i.test(output)
+    && /Change name must start with a letter/i.test(output);
+}
+
+function normalizeCommandText(result) {
+  return [
+    result?.stderr,
+    result?.stdout,
+    result?.error?.message
+  ]
+    .filter((value) => value !== undefined && value !== null)
+    .map((value) => String(value))
+    .join('\n');
 }
 
 async function selectValidatableChanges(rootDir, changeIds) {

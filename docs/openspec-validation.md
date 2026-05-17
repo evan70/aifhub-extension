@@ -8,16 +8,16 @@ It does not replace the OpenSpec CLI. The OpenSpec CLI validates OpenSpec syntax
 
 ## Usage
 
-Run the validator directly:
+Run the validator from an installed project:
 
 ```bash
-node scripts/openspec-artifact-validator.mjs --change <change-id> --json
+ai-factory aifhub-validate-artifacts --change <change-id> --json
 ```
 
 Require verification evidence for finalization readiness:
 
 ```bash
-node scripts/openspec-artifact-validator.mjs --change <change-id> --require-verification-evidence --json
+ai-factory aifhub-validate-artifacts --change <change-id> --require-verification-evidence --json
 ```
 
 Exit codes:

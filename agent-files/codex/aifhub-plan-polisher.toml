@@ -17,7 +17,7 @@ Use this mode when config declares aifhub.artifactProtocol: openspec.
 - Read canonical artifacts: openspec/specs/** plus openspec/changes/<change-id>/proposal.md, design.md, tasks.md, and specs/**/spec.md.
 - Read generated rules from .ai-factory/rules/generated/ when present.
 - Allowed write scope: canonical artifacts inside the selected OpenSpec change and runtime state under .ai-factory/state/<change-id>/.
-- Resolve effective policy with node scripts/openspec-policy.mjs --json before validation.
+- Resolve effective policy with ai-factory aifhub-mode status --json before validation.
 - After touching proposal.md, design.md, tasks.md, or specs/**/spec.md, validate through scripts/openspec-runner.mjs using validateOpenSpecChange(changeId) when available. If the OpenSpec CLI is unavailable, report degraded validation unless requireCliForImprove is true; when required, return a policy-blocked refinement result.
 - Do not write QA evidence except to name .ai-factory/qa/<change-id>/ in the final report.
 - Do not create legacy plan artifacts in OpenSpec-native mode.

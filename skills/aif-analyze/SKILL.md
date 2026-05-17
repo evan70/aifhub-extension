@@ -184,6 +184,14 @@ Use [references/config-template.yaml](references/config-template.yaml) as refere
 
 Run this step only in `openspec-native` mode, after config mode is resolved and before directory creation.
 
+- Installed-project capability reads should prefer the AIFHub mode wrapper:
+
+```bash
+ai-factory aifhub-mode status --json
+```
+
+- Read `openspecCli` from the JSON output and report equivalent capability fields.
+- Source-repo direct runner detection is allowed only when working inside the extension package source tree.
 - If `scripts/openspec-runner.mjs` exists, use `detectOpenSpec()` from that file.
 - In Node-capable runtimes, a valid detection command is:
 

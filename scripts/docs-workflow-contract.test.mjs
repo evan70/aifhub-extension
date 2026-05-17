@@ -204,6 +204,35 @@ describe('complete OpenSpec workflow documentation contract', () => {
     }
   });
 
+  it('documents installed-project helper execution through AIFHub wrappers', async () => {
+    const validation = await readRepoFile('docs/openspec-validation.md');
+    const handoffProfile = await readRepoFile('docs/handoff-validation-profile.md');
+
+    for (const expected of [
+      'ai-factory aifhub-validate-artifacts --change <change-id> --json',
+      'ai-factory aifhub-validate-artifacts --change <change-id> --require-verification-evidence --json'
+    ]) {
+      assertIncludes(validation, expected, 'docs/openspec-validation.md');
+    }
+
+    assertIncludes(
+      handoffProfile,
+      'ai-factory aifhub-handoff-gate-summary --change <change-id> --stage review --json',
+      'docs/handoff-validation-profile.md'
+    );
+
+    for (const [label, source] of [
+      ['docs/openspec-validation.md', validation],
+      ['docs/handoff-validation-profile.md', handoffProfile]
+    ]) {
+      assert.doesNotMatch(
+        source,
+        /\bnode\s+scripts\/[A-Za-z0-9_.-]+\.mjs\b/,
+        `${label} should not expose root scripts as installed-project helper commands`
+      );
+    }
+  });
+
   it('documents planned bug fixes separately from post-verify fixes', async () => {
     const readme = await readRepoFile('README.md');
     const usage = await readRepoFile('docs/usage.md');
