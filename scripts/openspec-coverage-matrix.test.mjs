@@ -228,7 +228,7 @@ describe('OpenSpec coverage matrix', () => {
     await writeFixture(rootDir, `openspec/changes/${changeId}/tasks.md`, [
       '# Tasks',
       '',
-      '- [x] 1.1 Configure Testo PHP tooling in composer.json, testo.php, and .github/workflows/tests.yml.',
+      '- [x] 1.1 Configure Testo PHP tooling in composer.json, testo.php, .github/workflows/tests.yml, and src/v1.2/auth/login.ts.',
       '- [x] 1.2 Keep non-implementation references out of implementation evidence: docs/testo.md, openspec/changes/tooling-config-evidence/tasks.md, and .ai-factory/state/tooling-config-evidence/implementation/run-001.md.',
       '- [x] 1.3 Add regression coverage in tests/Testo/SmokeTest.php.',
       ''
@@ -256,6 +256,7 @@ describe('OpenSpec coverage matrix', () => {
       '- composer.json',
       '- testo.php',
       '- .github/workflows/tests.yml',
+      '- src/v1.2/auth/login.ts',
       '- docs/testo.md',
       '- openspec/changes/tooling-config-evidence/tasks.md',
       '- .ai-factory/state/tooling-config-evidence/implementation/run-001.md',
@@ -280,6 +281,7 @@ describe('OpenSpec coverage matrix', () => {
     assert.deepEqual(matrix.requirements[0].implementation_evidence, [
       '.github/workflows/tests.yml',
       'composer.json',
+      'src/v1.2/auth/login.ts',
       'testo.php'
     ]);
     assert.deepEqual(matrix.requirements[0].test_evidence, [

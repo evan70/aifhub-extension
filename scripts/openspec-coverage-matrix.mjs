@@ -1034,7 +1034,7 @@ function isWithinDirectory(targetPath, directoryPath) {
 function extractEvidencePaths(text) {
   const paths = new Set();
   const source = String(text ?? '');
-  const pathPattern = /(?:^|[\s`"'(])((?:(?:\.?[A-Za-z0-9_@-]+[\\/])+)?\.?[A-Za-z0-9_@()-][A-Za-z0-9_.@()-]*\.[A-Za-z][A-Za-z0-9]{1,})(?=$|[\s`"',).:\]])/g;
+  const pathPattern = /(?:^|[\s`"'(])((?:(?:\.?[A-Za-z0-9_.@-]+[\\/])+)?\.?[A-Za-z0-9_@()-][A-Za-z0-9_.@()-]*\.[A-Za-z][A-Za-z0-9]{1,})(?=$|[\s`"',).:\]])/g;
   for (const match of source.matchAll(pathPattern)) {
     const normalized = normalizeEvidencePath(match[1]);
     if (normalized) {
