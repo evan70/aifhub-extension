@@ -68,7 +68,7 @@ Preservation rules:
 Validation and runtime state:
 
 - Read base specs from `openspec/specs/**` and generated rules from `.ai-factory/rules/generated/` when they are needed to preserve canonical requirement intent.
-- Before validation, resolve the effective OpenSpec policy through `node scripts/openspec-policy.mjs --json`.
+- Before validation, resolve the effective OpenSpec policy through `ai-factory aifhub-mode status --json`.
 - Run or recommend OpenSpec validation through `validateOpenSpecChange(changeId)` from `scripts/openspec-runner.mjs`, or equivalent shared-runner behavior.
 - Validation should correspond to `openspec validate <change-id> --type change --strict --json --no-interactive --no-color`.
 - Missing or unsupported OpenSpec CLI is degraded validation unless the effective policy has `requireCliForImprove: true`; when required, treat the missing CLI as a refinement blocker and do not report the change as validation-ready.

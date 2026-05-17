@@ -33,6 +33,16 @@
       "name": "aifhub-done-readiness",
       "description": "Run AIFHub OpenSpec done-readiness diagnostics.",
       "module": "./commands/aifhub-done-readiness.mjs"
+    },
+    {
+      "name": "aifhub-validate-artifacts",
+      "description": "Run AIFHub OpenSpec artifact contract validation.",
+      "module": "./commands/aifhub-validate-artifacts.mjs"
+    },
+    {
+      "name": "aifhub-handoff-gate-summary",
+      "description": "Run AIFHub Handoff gate summary diagnostics.",
+      "module": "./commands/aifhub-handoff-gate-summary.mjs"
     }
   ],
   "skills": [

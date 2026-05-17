@@ -114,6 +114,9 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
       'requiresNode: ">=20.19.0"',
       'nodeSupported: boolean',
       'versionSupported: boolean',
+      'ai-factory aifhub-mode status --json',
+      'Installed-project capability reads should prefer the AIFHub mode wrapper',
+      'Source-repo direct runner detection is allowed only when working inside the extension package source tree',
       'Missing or unsupported OpenSpec CLI is a degraded capability state, not a bootstrap failure',
       'If `reason` is `unsupported-version`, recommend installing or updating OpenSpec CLI to `>=1.3.1 <2.0.0`.'
     ]) {

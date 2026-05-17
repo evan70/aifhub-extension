@@ -144,10 +144,10 @@ Runtime QA output belongs under `.ai-factory/qa/<change-id>/`.
 Before validation, resolve the effective OpenSpec policy through:
 
 ```bash
-node scripts/openspec-policy.mjs --json
+ai-factory aifhub-mode status --json
 ```
 
-When a compatible OpenSpec CLI is available, validate through `scripts/openspec-runner.mjs` using `validateOpenSpecChange(changeId)` or equivalent runner behavior.
+Read `effectivePolicy` from the JSON output. When a compatible OpenSpec CLI is available, validate through `scripts/openspec-runner.mjs` using `validateOpenSpecChange(changeId)` or equivalent runner behavior.
 
 The runner command corresponds to:
 

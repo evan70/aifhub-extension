@@ -45,10 +45,24 @@ const WRAPPER_COMMANDS = [
     module: './commands/aifhub-done-readiness.mjs',
     script: 'openspec-done-readiness.mjs',
     args: ['--change', 'add-oauth', '--json']
+  },
+  {
+    name: 'aifhub-validate-artifacts',
+    description: 'Run AIFHub OpenSpec artifact contract validation.',
+    module: './commands/aifhub-validate-artifacts.mjs',
+    script: 'openspec-artifact-validator.mjs',
+    args: ['--change', 'add-oauth', '--json']
+  },
+  {
+    name: 'aifhub-handoff-gate-summary',
+    description: 'Run AIFHub Handoff gate summary diagnostics.',
+    module: './commands/aifhub-handoff-gate-summary.mjs',
+    script: 'handoff-gate-summary.mjs',
+    args: ['--change', 'add-oauth', '--stage', 'review', '--json']
   }
 ];
 
-const WRAPPED_ROOT_SCRIPT_RE = /\bnode\s+scripts\/(?:aif-mode|migrate-legacy-plans|write-gate-evidence|openspec-coverage-matrix|openspec-done-readiness)\.mjs\b/;
+const INSTALLED_FACING_ROOT_SCRIPT_RE = /\bnode\s+scripts\/[A-Za-z0-9_.-]+\.mjs\b/;
 
 let tmpDir;
 
@@ -268,10 +282,14 @@ describe('AIFHub wrapper guidance contract', () => {
       ]],
       ['docs/openspec-validation.md', [
         'ai-factory aifhub-write-gate-evidence --change add-oauth-login --gate rules',
-        'ai-factory aifhub-done-readiness --change <change-id> --json'
+        'ai-factory aifhub-done-readiness --change <change-id> --json',
+        'ai-factory aifhub-validate-artifacts --change <change-id> --json'
       ]],
       ['docs/spec-coverage.md', [
         'ai-factory aifhub-coverage --change <change-id> --write --json'
+      ]],
+      ['docs/handoff-validation-profile.md', [
+        'ai-factory aifhub-handoff-gate-summary --change <change-id> --stage review --json'
       ]],
       ['docs/legacy-plan-migration.md', [
         'ai-factory aifhub-migrate-legacy-plans --list',
@@ -292,6 +310,15 @@ describe('AIFHub wrapper guidance contract', () => {
       ]],
       ['injections/core/aif-verify-plan-folder.md', [
         'ai-factory aifhub-migrate-legacy-plans <change-id> --dry-run'
+      ]],
+      ['injections/core/aif-plan-plan-folder.md', [
+        'ai-factory aifhub-mode status --json'
+      ]],
+      ['agent-files/codex/aifhub-plan-polisher.toml', [
+        'ai-factory aifhub-mode status --json'
+      ]],
+      ['agent-files/claude/aifhub-plan-polisher.md', [
+        'ai-factory aifhub-mode status --json'
       ]]
     ];
 
@@ -302,8 +329,8 @@ describe('AIFHub wrapper guidance contract', () => {
       }
       assert.doesNotMatch(
         source,
-        WRAPPED_ROOT_SCRIPT_RE,
-        `${relativePath} should not require root scripts for installed-project helper commands`
+        INSTALLED_FACING_ROOT_SCRIPT_RE,
+        `${relativePath} should not expose root scripts as installed-project helper commands`
       );
     }
   });

@@ -233,6 +233,14 @@ function assertNoInstallGuidance(source, label) {
   );
 }
 
+function assertNoExecutableRootScriptGuidance(source, label) {
+  assert.doesNotMatch(
+    source,
+    /\bnode\s+scripts\/[A-Za-z0-9_.-]+\.mjs\b/,
+    `${label} should not expose root scripts as installed-project executable helper commands`
+  );
+}
+
 describe('OpenSpec-native prompt asset contract', () => {
   it('discovers active prompt assets from extension.json only', async () => {
     const assets = await activePromptAssets();
@@ -406,6 +414,13 @@ describe('OpenSpec-native prompt asset contract', () => {
     }
   });
 
+  it('does not expose root scripts as installed-project executable helper commands in active prompts', async () => {
+    for (const relativePath of await activePromptAssets()) {
+      const asset = await readRepoFile(relativePath);
+      assertNoExecutableRootScriptGuidance(asset, relativePath);
+    }
+  });
+
   it('requires verifier prompts to use fail-fast OpenSpec verification context', async () => {
     for (const relativePath of VERIFY_PROMPT_ASSETS) {
       const asset = stripFencedBlocks(await readRepoFile(relativePath));
@@ -478,6 +493,7 @@ describe('OpenSpec-native prompt asset contract', () => {
         'design.md',
         'tasks.md',
         'specs/**/spec.md',
+        'ai-factory aifhub-mode status --json',
         'scripts/openspec-runner.mjs',
         'validateOpenSpecChange(changeId)'
       ]) {

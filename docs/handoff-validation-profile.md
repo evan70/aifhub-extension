@@ -11,7 +11,7 @@ It lets a Handoff orchestrator read one JSON summary instead of parsing every ga
 The profile is produced by:
 
 ```bash
-node scripts/handoff-gate-summary.mjs --change <change-id> --stage review --json
+ai-factory aifhub-handoff-gate-summary --change <change-id> --stage review --json
 ```
 
 ## JSON Contract
