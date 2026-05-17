@@ -24,6 +24,7 @@ const POLICIES = new Set(['strict', 'normal']);
 const REQUIREMENT_STATUS_ORDER = ['covered', 'partial', 'missing', 'not-applicable'];
 const TEST_PATH_PATTERN = /(^|\/)(test|tests|__tests__)\/|[._-](test|spec)\.[A-Za-z0-9]+$/i;
 const SOURCE_FILE_PATTERN = /\.[cm]?[jt]sx?$|\.mjs$|\.cjs$|\.py$|\.go$|\.rs$|\.java$|\.kt$|\.cs$|\.php$|\.rb$|\.sh$|\.ps1$/i;
+const TOOLING_CONFIG_FILE_PATTERN = /\.(?:json|ya?ml|toml|xml)$/i;
 const PROMPT_SOURCE_FILE_PATTERN = /^(?:skills\/(?:[^/]+\/SKILL\.md|shared\/[A-Z0-9_-]+\.md)|injections\/(?:core|handoff)\/[^/]+\.md|agent-files\/(?:codex\/[^/]+\.toml|claude\/[^/]+\.md))$/i;
 const DOC_PATH_PATTERN = /(^|\/)(docs|documentation)\//i;
 const INTERNAL_ARTIFACT_PATTERN = /^(openspec|\.ai-factory)\//i;
@@ -726,12 +727,6 @@ function classifyEvidencePaths(paths) {
 }
 
 function isImplementationEvidencePath(evidencePath) {
-  if (PROMPT_SOURCE_FILE_PATTERN.test(evidencePath)) {
-    return true;
-  }
-  if (!SOURCE_FILE_PATTERN.test(evidencePath)) {
-    return false;
-  }
   if (TEST_PATH_PATTERN.test(evidencePath)) {
     return false;
   }
@@ -741,7 +736,9 @@ function isImplementationEvidencePath(evidencePath) {
   if (INTERNAL_ARTIFACT_PATTERN.test(evidencePath)) {
     return false;
   }
-  return true;
+  return PROMPT_SOURCE_FILE_PATTERN.test(evidencePath)
+    || SOURCE_FILE_PATTERN.test(evidencePath)
+    || TOOLING_CONFIG_FILE_PATTERN.test(evidencePath);
 }
 
 function matchEvidencePaths(requirement, paths, matchingTasks) {
@@ -1037,7 +1034,7 @@ function isWithinDirectory(targetPath, directoryPath) {
 function extractEvidencePaths(text) {
   const paths = new Set();
   const source = String(text ?? '');
-  const pathPattern = /(?:^|[\s`"'(])((?:[A-Za-z0-9_.@-]+[\\/])+[A-Za-z0-9_.@()-]+(?:\.[A-Za-z0-9]+)+)(?=$|[\s`"',).:\]])/g;
+  const pathPattern = /(?:^|[\s`"'(])((?:(?:\.?[A-Za-z0-9_.@-]+[\\/])+)?\.?[A-Za-z0-9_@()-][A-Za-z0-9_.@()-]*\.[A-Za-z][A-Za-z0-9]{1,})(?=$|[\s`"',).:\]])/g;
   for (const match of source.matchAll(pathPattern)) {
     const normalized = normalizeEvidencePath(match[1]);
     if (normalized) {
@@ -1050,7 +1047,7 @@ function extractEvidencePaths(text) {
 function normalizeEvidencePath(value) {
   let normalized = String(value ?? '').trim()
     .replace(/\\/g, '/')
-    .replace(/^[./]+/, '')
+    .replace(/^(?:\.\/|\/)+/, '')
     .replace(/[.,;:)]+$/g, '');
   if (!normalized || /^[a-z]+:\/\//i.test(normalized)) {
     return null;

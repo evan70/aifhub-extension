@@ -220,6 +220,75 @@ describe('OpenSpec coverage matrix', () => {
     ]);
   });
 
+  it('counts root-level tooling and config paths as implementation evidence', async () => {
+    const rootDir = await createTempRoot();
+    const changeId = 'tooling-config-evidence';
+    await writeFixture(rootDir, `openspec/changes/${changeId}/proposal.md`, '# Proposal\n');
+    await writeFixture(rootDir, `openspec/changes/${changeId}/design.md`, '# Design\n');
+    await writeFixture(rootDir, `openspec/changes/${changeId}/tasks.md`, [
+      '# Tasks',
+      '',
+      '- [x] 1.1 Configure Testo PHP tooling in composer.json, testo.php, .github/workflows/tests.yml, and src/v1.2/auth/login.ts.',
+      '- [x] 1.2 Keep non-implementation references out of implementation evidence: docs/testo.md, openspec/changes/tooling-config-evidence/tasks.md, and .ai-factory/state/tooling-config-evidence/implementation/run-001.md.',
+      '- [x] 1.3 Add regression coverage in tests/Testo/SmokeTest.php.',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, `openspec/changes/${changeId}/specs/testo/spec.md`, [
+      '# Testo Delta',
+      '',
+      '## ADDED Requirements',
+      '',
+      '### Requirement: Testo PHP tooling config',
+      '',
+      'The system MUST provide Testo PHP tooling config.',
+      '',
+      '#### Scenario: Tooling config is covered',
+      '',
+      '- GIVEN the change configures Testo PHP tooling',
+      '- WHEN the coverage matrix is built',
+      '- THEN root-level and workflow config files count as implementation evidence',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, `.ai-factory/state/${changeId}/implementation/run-001.md`, [
+      '# Implementation Trace',
+      '',
+      'Changed files:',
+      '- composer.json',
+      '- testo.php',
+      '- .github/workflows/tests.yml',
+      '- src/v1.2/auth/login.ts',
+      '- docs/testo.md',
+      '- openspec/changes/tooling-config-evidence/tasks.md',
+      '- .ai-factory/state/tooling-config-evidence/implementation/run-001.md',
+      '- tests/Testo/SmokeTest.php',
+      ''
+    ].join('\n'));
+
+    const matrix = await buildOpenSpecCoverageMatrix({
+      rootDir,
+      changeId,
+      policy: 'strict',
+      generatedRules: []
+    });
+
+    assert.equal(matrix.status, 'pass');
+    assert.deepEqual(matrix.summary, {
+      covered: 1,
+      partial: 0,
+      missing: 0,
+      not_applicable: 0
+    });
+    assert.deepEqual(matrix.requirements[0].implementation_evidence, [
+      '.github/workflows/tests.yml',
+      'composer.json',
+      'src/v1.2/auth/login.ts',
+      'testo.php'
+    ]);
+    assert.deepEqual(matrix.requirements[0].test_evidence, [
+      'tests/Testo/SmokeTest.php'
+    ]);
+  });
+
   it('fails missing requirements in strict mode and warns in normal mode', async () => {
     const rootDir = await createTempRoot();
     await writeFixture(rootDir, 'openspec/changes/add-oauth/proposal.md', '# Proposal\n');

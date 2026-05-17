@@ -108,6 +108,8 @@ The matrix uses:
 - generated rules state from `.ai-factory/rules/generated/`
 - optional existing verification evidence under `.ai-factory/qa/<change-id>/verify.md`
 
+Implementation evidence is extracted from explicit path references in those sources. It includes source files, active prompt source assets, and root-level or nested tooling/config files such as `composer.json`, `testo.php`, `.github/workflows/tests.yml`, `*.toml`, and `*.xml` when they are directly referenced. Test paths are recorded as `test_evidence`; docs paths, canonical OpenSpec artifacts, and `.ai-factory` runtime/QA artifacts are not counted as implementation evidence.
+
 Coverage includes a `rules_gate` field, but finalization policy still treats durable rules gate evidence separately. A passing generated-rules state or coverage-inferred rules status does not replace `.ai-factory/qa/<change-id>/rules.md` when `requireRulesPassForDone` is true.
 
 Each material source gets a SHA-256 fingerprint. If any fingerprint changes, the matrix is stale and `/aif-done` requires rerunning `/aif-verify <change-id>`.
