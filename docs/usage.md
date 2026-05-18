@@ -195,6 +195,8 @@ Existing configs are not prompted again. Codex Default mode asks this as plain t
 
 If localization questions run first, `/aif-analyze` carries those answers forward and writes them only after the artifact protocol is selected, so language persistence does not accidentally lock in the legacy default.
 
+The selected artifact protocol owns its config profile. Legacy `artifactProtocol: ai-factory` configs do not include `aifhub.openspec` settings or OpenSpec runtime path defaults; OpenSpec-native `artifactProtocol: openspec` configs include those settings and paths explicitly.
+
 ### `/aif-plan full`
 
 Reads:

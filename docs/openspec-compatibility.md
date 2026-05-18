@@ -40,6 +40,22 @@ OpenSpec skills and slash commands are not installed by this extension.
 
 This initialization is for user projects. The `aifhub-extension` package repository does not ship root `openspec/` or root `.ai-factory/rules/generated/` content; generated rules are derived in user projects and safe to regenerate. OpenSpec examples in this repo belong only under fixture paths, and extension behavior requirements are validated by prompt contracts and tests instead of committed root OpenSpec specs.
 
+## Artifact Protocol Profiles
+
+The selected `aifhub.artifactProtocol` owns its active config profile. Legacy AI Factory-only mode does not add OpenSpec settings or OpenSpec runtime paths:
+
+```yaml
+aifhub:
+  artifactProtocol: ai-factory
+
+paths:
+  plans: .ai-factory/plans
+  specs: .ai-factory/specs
+  rules: .ai-factory/rules
+```
+
+OpenSpec-native mode adds the OpenSpec settings and runtime path profile shown below.
+
 ## OpenSpec-Native Config
 
 OpenSpec-native mode is selected through `.ai-factory/config.yaml`:

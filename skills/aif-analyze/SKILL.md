@@ -128,9 +128,18 @@ Resolve the bootstrap/config mode before creating directories:
 - If localization answers were collected while config was missing, write those pending config values into the selected legacy `ai-factory` or `openspec-native` config shape.
 - Keep schema consistent with nested sections: `language`, `aifhub`, `paths`, `rules`, `workflow`.
 - In legacy `ai-factory` mode:
+  - Ensure this selected-protocol profile is present:
+
+```yaml
+aifhub:
+  artifactProtocol: ai-factory
+```
+
   - Preserve the existing AI Factory-only path defaults.
   - Keep `paths.plans` at `.ai-factory/plans` unless an existing value says otherwise.
   - Keep `paths.specs` at `.ai-factory/specs` unless an existing value says otherwise.
+  - Do not add `aifhub.openspec`, OpenSpec policy defaults, or OpenSpec runtime path defaults (`paths.state`, `paths.qa`, `paths.generated_rules`) unless OpenSpec-native mode is selected.
+  - Preserve existing user-authored config values unless the user explicitly requests mode cleanup or `/aif-mode` switching.
 - In `openspec-native` mode:
   - Ensure this config shape is present:
 
@@ -291,14 +300,49 @@ openspec init --tools none
 
 ## Config v1 Schema
 
+Common fields:
+
 ```yaml
 language:
   ui: russian                    # Communication language
   artifacts: russian             # Generated artifacts language
   technical_terms: keep          # keep | translate | mixed
 
+workflow:
+  auto_create_dirs: true
+  plan_id_format: slug
+  analyze_updates_architecture: true
+  architecture_updates_roadmap: true
+  verify_mode: normal
+
+rules:
+  base: .ai-factory/rules/base.md
+  # area rules added by planning when needed
+
+agent_profile: default
+```
+
+Legacy AI Factory-only profile:
+
+```yaml
 aifhub:
-  artifactProtocol: ai-factory   # ai-factory | openspec
+  artifactProtocol: ai-factory
+
+paths:
+  description: .ai-factory/DESCRIPTION.md
+  architecture: .ai-factory/ARCHITECTURE.md
+  roadmap: .ai-factory/ROADMAP.md
+  research: .ai-factory/RESEARCH.md
+  plans: .ai-factory/plans
+  specs: .ai-factory/specs
+  rules: .ai-factory/rules
+```
+
+OpenSpec-native profile:
+
+```yaml
+aifhub:
+  artifactProtocol: openspec
   openspec:
     root: openspec
     installSkills: false
@@ -330,29 +374,12 @@ paths:
   architecture: .ai-factory/ARCHITECTURE.md
   roadmap: .ai-factory/ROADMAP.md
   research: .ai-factory/RESEARCH.md
-  plans: .ai-factory/plans
-  specs: .ai-factory/specs
+  plans: openspec/changes
+  specs: openspec/specs
   rules: .ai-factory/rules
   state: .ai-factory/state
   qa: .ai-factory/qa
   generated_rules: .ai-factory/rules/generated
-
-# OpenSpec-native path profile:
-# paths.plans: openspec/changes
-# paths.specs: openspec/specs
-
-workflow:
-  auto_create_dirs: true
-  plan_id_format: slug
-  analyze_updates_architecture: true
-  architecture_updates_roadmap: true
-  verify_mode: normal
-
-rules:
-  base: .ai-factory/rules/base.md
-  # area rules added by planning when needed
-
-agent_profile: default
 ```
 
 ## Rules
