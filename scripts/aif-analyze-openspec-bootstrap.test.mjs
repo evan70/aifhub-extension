@@ -38,6 +38,43 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
     assertIncludes(template, 'artifactProtocol: ai-factory', 'skills/aif-analyze/references/config-template.yaml');
   });
 
+  it('keeps the legacy default template exclusive to the selected protocol', async () => {
+    const template = await readRepoFile('skills/aif-analyze/references/config-template.yaml');
+
+    assertIncludes(template, 'artifactProtocol: ai-factory', 'skills/aif-analyze/references/config-template.yaml');
+    assert.doesNotMatch(
+      template,
+      /^  openspec:\s*$/m,
+      'skills/aif-analyze/references/config-template.yaml should not include active aifhub.openspec in the legacy profile'
+    );
+
+    for (const unexpected of [
+      'requireGeneratedRulesForDone',
+      'requireRulesPassForDone',
+      'requireSpecCoverageForDone',
+      'allowWarnOnDone:',
+      'useInstructionsApply'
+    ]) {
+      assertNotIncludes(
+        template,
+        unexpected,
+        'skills/aif-analyze/references/config-template.yaml legacy profile'
+      );
+    }
+
+    for (const pattern of [
+      /^  state:\s*\.ai-factory\/state\s*$/m,
+      /^  qa:\s*\.ai-factory\/qa\s*$/m,
+      /^  generated_rules:\s*\.ai-factory\/rules\/generated\s*$/m
+    ]) {
+      assert.doesNotMatch(
+        template,
+        pattern,
+        `skills/aif-analyze/references/config-template.yaml should not include active OpenSpec path key ${pattern}`
+      );
+    }
+  });
+
   it('documents first-bootstrap artifact protocol prompts without preselecting mode', async () => {
     const skill = await readRepoFile('skills/aif-analyze/SKILL.md');
     const template = await readRepoFile('skills/aif-analyze/references/config-template.yaml');
@@ -62,10 +99,7 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
   });
 
   it('defines the OpenSpec-native config shape and canonical runtime paths', async () => {
-    const combined = [
-      await readRepoFile('skills/aif-analyze/SKILL.md'),
-      await readRepoFile('skills/aif-analyze/references/config-template.yaml')
-    ].join('\n');
+    const skill = await readRepoFile('skills/aif-analyze/SKILL.md');
 
     for (const expected of [
       'artifactProtocol: openspec',
@@ -96,7 +130,7 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
       '.ai-factory/qa',
       '.ai-factory/rules/generated'
     ]) {
-      assertIncludes(combined, expected, 'aif-analyze OpenSpec bootstrap artifacts');
+      assertIncludes(skill, expected, 'skills/aif-analyze/SKILL.md OpenSpec bootstrap artifacts');
     }
   });
 

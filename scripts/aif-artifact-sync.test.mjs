@@ -359,7 +359,12 @@ describe('mode switching', () => {
     });
 
     assert.equal(result.ok, true);
-    assert.match(await readFixture(rootDir, '.ai-factory/config.yaml'), /artifactProtocol: ai-factory/);
+    const config = await readFixture(rootDir, '.ai-factory/config.yaml');
+    assert.match(config, /artifactProtocol: ai-factory/);
+    assert.doesNotMatch(config, /^  openspec:\s*$/m);
+    assert.doesNotMatch(config, /^  state:\s*\.ai-factory\/state\s*$/m);
+    assert.doesNotMatch(config, /^  qa:\s*\.ai-factory\/qa\s*$/m);
+    assert.doesNotMatch(config, /^  generated_rules:\s*\.ai-factory\/rules\/generated\s*$/m);
     assert.equal(await pathExists(rootDir, '.ai-factory/plans'), true);
     assert.equal(await pathExists(rootDir, '.ai-factory/specs'), true);
     assert.equal(await pathExists(rootDir, '.ai-factory/rules'), true);
