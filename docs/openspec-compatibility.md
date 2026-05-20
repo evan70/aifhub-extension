@@ -52,6 +52,14 @@ paths:
   plans: .ai-factory/plans
   specs: .ai-factory/specs
   rules: .ai-factory/rules
+
+utilities:
+  graphify:
+    enabled: false
+    uv_check: uv --version
+    install: uv tool install graphifyy
+    activate: graphify install
+    report_command: graphify .
 ```
 
 OpenSpec-native mode adds the OpenSpec settings and runtime path profile shown below.
@@ -95,9 +103,19 @@ paths:
   state: .ai-factory/state
   qa: .ai-factory/qa
   generated_rules: .ai-factory/rules/generated
+
+utilities:
+  graphify:
+    enabled: false
+    uv_check: uv --version
+    install: uv tool install graphifyy
+    activate: graphify install
+    report_command: graphify .
 ```
 
 `installSkills: false` is intentional. AIFHub Extension uses OpenSpec artifacts and `scripts/openspec-runner.mjs` as the optional CLI adapter, not OpenSpec-installed skills or slash commands.
+
+The `utilities` section is protocol-neutral. It records optional tool preferences only; Graphify remains manually installed, activated, and run by the user.
 
 On first bootstrap, `/aif-analyze` may create the OpenSpec marker after asking for the artifact protocol. If `.ai-factory/config.yaml` is missing and the user did not explicitly request OpenSpec-native mode, interactive runtimes ask the user to choose `legacy AI Factory-only` or `OpenSpec-native` before writing the config. Existing configs are preserved without prompting. Autonomous/subagent runs do not ask; they default to legacy AI Factory-only and report OpenSpec-native mode as an open question.
 

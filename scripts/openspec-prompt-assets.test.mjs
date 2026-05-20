@@ -477,13 +477,20 @@ describe('OpenSpec-native prompt asset contract', () => {
     const usage = await readRepoFile('docs/usage.md');
 
     for (const expected of [
-      'python -m pip install graphifyy',
+      'uv --version',
+      'uv tool install graphifyy',
+      'graphify install',
       'graphify .',
       'do not prefix it as `/graphify .`',
       'graphify-out/graph.html',
       'graphify query',
       'graphify path',
       'graphify explain',
+      'utilities.graphify.enabled',
+      'uv_check: uv --version',
+      'install: uv tool install graphifyy',
+      'activate: graphify install',
+      'report_command: graphify .',
       'AIFHub Extension does not require Graphify',
       'does not add Graphify to extension dependencies'
     ]) {

@@ -53,10 +53,26 @@ AIFHub commands request OpenSpec validation, status, instructions, and archive t
 
 Graphify can be used as a manual, user-owned repository research aid before or during AIFHub work. AIFHub Extension does not require Graphify, does not install `graphifyy`, does not run `graphify`, does not add Graphify to extension dependencies, and does not start or register Graphify MCP automatically.
 
+`/aif-analyze` records the project preference under shared utility config. At the start of the optional Graphify check it should verify whether `uv` is available with `uv --version`. When Graphify is not enabled, analysis should show a non-blocking recommendation with the manual setup commands:
+
+```yaml
+utilities:
+  graphify:
+    enabled: false
+    uv_check: uv --version
+    install: uv tool install graphifyy
+    activate: graphify install
+    report_command: graphify .
+```
+
+Set `utilities.graphify.enabled: true` only after the project chooses to use manually generated Graphify reports.
+
 Manual usage, outside AIFHub command ownership:
 
 ```powershell
-python -m pip install graphifyy
+uv --version
+uv tool install graphifyy
+graphify install
 graphify .
 ```
 
@@ -228,6 +244,8 @@ Existing configs are not prompted again. Codex Default mode asks this as plain t
 If localization questions run first, `/aif-analyze` carries those answers forward and writes them only after the artifact protocol is selected, so language persistence does not accidentally lock in the legacy default.
 
 The selected artifact protocol owns its config profile. Legacy `artifactProtocol: ai-factory` configs do not include `aifhub.openspec` settings or OpenSpec runtime path defaults; OpenSpec-native `artifactProtocol: openspec` configs include those settings and paths explicitly.
+
+Shared protocol-neutral settings such as `utilities.graphify.enabled` may appear in either profile. They record optional tooling preferences and do not make that tool an AIFHub dependency.
 
 ### `/aif-plan full`
 

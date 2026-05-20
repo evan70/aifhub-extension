@@ -111,6 +111,21 @@ Graphify is an optional context/research provider. During repository inspection,
 - `.ai-factory/references/graphify/GRAPH_REPORT.md`
 - `.ai-factory/state/<change-id>/graphify/GRAPH_REPORT.md`
 
+At the beginning of this optional Graphify check, test whether `uv` is available:
+
+```powershell
+uv --version
+```
+
+Read `utilities.graphify.enabled` from `.ai-factory/config.yaml` when available. If it is missing or `false`, include a non-blocking analysis hint that Graphify is recommended for large or unfamiliar repositories and show the manual setup commands:
+
+```powershell
+uv tool install graphifyy
+graphify install
+```
+
+If `uv` is unavailable, report that Graphify setup should start by installing `uv` and rerunning `uv --version`. Also mention that the user may generate reports manually with `graphify .` and set `utilities.graphify.enabled: true` only after the project chooses to use Graphify. If `utilities.graphify.enabled: true`, report Graphify as enabled and still treat missing reports as degraded context rather than failure.
+
 Missing Graphify or missing reports are degraded context, not bootstrap failure. Do not install `graphifyy`, run `graphify`, add Graphify dependencies or manifest entries, or start/register Graphify MCP automatically.
 
 Treat Graphify findings as supporting context only. `GRAPH_REPORT.md` can contain extracted, inferred, ambiguous, or confidence-labeled relationships; use those claims as hypotheses for direct repository inspection. Bootstrap decisions, config content, rules/base.md content, and artifact status must still be grounded in manifests, source files, project docs, existing AIFHub artifacts, or other direct repository evidence.
@@ -143,7 +158,19 @@ Resolve the bootstrap/config mode before creating directories:
 - If config.yaml exists, preserve existing values and add missing fields.
 - Preserve existing `language.ui`, `language.artifacts`, and `language.technical_terms` values. If `language.technical_terms` is missing, default it to `keep`; accepted values are `keep | translate | mixed`.
 - If localization answers were collected while config was missing, write those pending config values into the selected legacy `ai-factory` or `openspec-native` config shape.
-- Keep schema consistent with nested sections: `language`, `aifhub`, `paths`, `rules`, `workflow`.
+- Keep schema consistent with nested sections: `language`, `aifhub`, `paths`, `utilities`, `rules`, `workflow`.
+- Ensure the shared optional utility config is present in both legacy `ai-factory` and `openspec-native` modes, preserving existing user values:
+
+```yaml
+utilities:
+  graphify:
+    enabled: false
+    uv_check: uv --version
+    install: uv tool install graphifyy
+    activate: graphify install
+    report_command: graphify .
+```
+
 - In legacy `ai-factory` mode:
   - Ensure this selected-protocol profile is present:
 
@@ -303,6 +330,7 @@ openspec init --tools none
 - Report the resolved bootstrap mode.
 - Report the bootstrap mode selection source: existing config, explicit user request, first-bootstrap answer, or autonomous default.
 - Report whether config values were created or preserved.
+- Report the Graphify utility setting and `uv` availability. If `utilities.graphify.enabled` is missing or `false`, include the optional recommendation `Graphify is recommended for large or unfamiliar repositories; check uv with: uv --version; install manually with: uv tool install graphifyy; activate manually with: graphify install`.
 - If autonomous/subagent mode defaulted to legacy `ai-factory` because the artifact protocol question could not be asked, report OpenSpec-native mode selection as an open question/blocker.
 - Report the active path set.
 - In `openspec-native` mode, include the OpenSpec capability object, degraded reason when present, created/preserved skeleton directories, and the statement that OpenSpec skill installation was skipped by design.
@@ -335,6 +363,14 @@ workflow:
 rules:
   base: .ai-factory/rules/base.md
   # area rules added by planning when needed
+
+utilities:
+  graphify:
+    enabled: false
+    uv_check: uv --version
+    install: uv tool install graphifyy
+    activate: graphify install
+    report_command: graphify .
 
 agent_profile: default
 ```

@@ -79,6 +79,8 @@ Runner output from OpenSpec CLI commands is runtime guidance or evidence. It doe
 
 Graphify is an optional context/research provider. AIFHub commands may use existing Graphify output as supporting context, but they must not make Graphify a required extension dependency, install `graphifyy`, run `graphify`, add Graphify manifest dependencies, start or register Graphify MCP automatically, or turn Graphify availability into a verification gate.
 
+Project preference is recorded in `.ai-factory/config.yaml` as `utilities.graphify.enabled`. At the beginning of the optional Graphify check, `/aif-analyze` should test `uv` availability with `uv --version`. If Graphify is missing, or if `utilities.graphify.enabled` is missing or `false`, `/aif-analyze` should report Graphify as optional and recommended for large or unfamiliar repositories, including the manual setup commands `uv tool install graphifyy` and `graphify install`. This recommendation is advisory only and must not trigger installation, execution, dependency changes, or MCP registration.
+
 Allowed Graphify inputs are existing local or copied outputs:
 
 - `graphify-out/GRAPH_REPORT.md`

@@ -628,7 +628,7 @@ export function renderConfigForMode(existingRaw, mode) {
   const parsed = parseSimpleYaml(existingRaw);
   const paths = parsed.paths ?? {};
   const blocks = parseTopLevelBlocks(existingRaw);
-  const used = new Set(['config_version', 'language', 'aifhub', 'paths']);
+  const used = new Set(['config_version', 'language', 'aifhub', 'paths', 'utilities']);
   const rendered = [];
 
   rendered.push(renderScalarOrDefault(blocks, 'config_version', 'config_version: 1'));
@@ -640,6 +640,7 @@ export function renderConfigForMode(existingRaw, mode) {
   ].join('\n')));
   rendered.push(renderAifhubBlock(mode));
   rendered.push(renderPathsBlock(mode, paths));
+  rendered.push(renderUtilitiesBlock(blocks));
 
   for (const block of blocks) {
     if (!used.has(block.key)) {
@@ -1632,6 +1633,37 @@ function renderScalarOrDefault(blocks, key, fallback) {
 
 function renderBlockOrDefault(blocks, key, fallback) {
   return blocks.find((block) => block.key === key)?.text.trimEnd() || fallback;
+}
+
+function renderUtilitiesBlock(blocks) {
+  const fallback = [
+    'utilities:',
+    '  graphify:',
+    '    enabled: false',
+    '    uv_check: uv --version',
+    '    install: uv tool install graphifyy',
+    '    activate: graphify install',
+    '    report_command: graphify .'
+  ].join('\n');
+  const existing = blocks.find((block) => block.key === 'utilities')?.text.trimEnd();
+
+  if (!existing) {
+    return fallback;
+  }
+
+  if (/^  graphify:\s*$/m.test(existing)) {
+    return existing;
+  }
+
+  return [
+    existing,
+    '  graphify:',
+    '    enabled: false',
+    '    uv_check: uv --version',
+    '    install: uv tool install graphifyy',
+    '    activate: graphify install',
+    '    report_command: graphify .'
+  ].join('\n');
 }
 
 function renderAifhubBlock(mode) {

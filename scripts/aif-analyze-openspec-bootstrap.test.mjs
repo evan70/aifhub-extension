@@ -36,6 +36,9 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
     assertIncludes(skill, 'aifhub.artifactProtocol: openspec', 'skills/aif-analyze/SKILL.md');
     assertIncludes(skill, 'Do not silently migrate a legacy AI Factory-only project', 'skills/aif-analyze/SKILL.md');
     assertIncludes(template, 'artifactProtocol: ai-factory', 'skills/aif-analyze/references/config-template.yaml');
+    assertIncludes(template, 'utilities:', 'skills/aif-analyze/references/config-template.yaml');
+    assertIncludes(template, 'graphify:', 'skills/aif-analyze/references/config-template.yaml');
+    assertIncludes(template, 'enabled: false', 'skills/aif-analyze/references/config-template.yaml');
   });
 
   it('keeps the legacy default template exclusive to the selected protocol', async () => {
@@ -131,6 +134,31 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
       '.ai-factory/rules/generated'
     ]) {
       assertIncludes(skill, expected, 'skills/aif-analyze/SKILL.md OpenSpec bootstrap artifacts');
+    }
+  });
+
+  it('documents optional Graphify utility config and analyze recommendation', async () => {
+    const skill = await readRepoFile('skills/aif-analyze/SKILL.md');
+    const template = await readRepoFile('skills/aif-analyze/references/config-template.yaml');
+    const combined = [skill, template].join('\n');
+
+    for (const expected of [
+      'utilities.graphify.enabled',
+      'Graphify is recommended for large or unfamiliar repositories',
+      'uv --version',
+      'uv tool install graphifyy',
+      'graphify install',
+      'graphify .',
+      'utilities:',
+      'graphify:',
+      'enabled: false',
+      'uv_check: uv --version',
+      'install: uv tool install graphifyy',
+      'activate: graphify install',
+      'report_command: graphify .',
+      'Do not install `graphifyy`, run `graphify`'
+    ]) {
+      assertIncludes(combined, expected, 'aif-analyze Graphify utility guidance');
     }
   });
 

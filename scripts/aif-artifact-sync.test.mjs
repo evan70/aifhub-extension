@@ -316,7 +316,14 @@ describe('mode switching', () => {
       'allowWarnOnDone:',
       'rules: false',
       'coverage: false',
-      'openspecStatus: true'
+      'openspecStatus: true',
+      'utilities:',
+      'graphify:',
+      'enabled: false',
+      'uv_check: uv --version',
+      'install: uv tool install graphifyy',
+      'activate: graphify install',
+      'report_command: graphify .'
     ]) {
       assert.match(config, new RegExp(line), `OpenSpec config should include ${line}`);
     }
@@ -349,6 +356,39 @@ describe('mode switching', () => {
     assert.equal(await pathExists(rootDir, 'openspec/changes/add-oauth/proposal.md'), false);
   });
 
+  it('preserves existing utility settings while adding Graphify defaults', async () => {
+    const rootDir = await createTempRoot();
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: ai-factory',
+      'paths:',
+      '  plans: .ai-factory/plans',
+      '  specs: .ai-factory/specs',
+      '  rules: .ai-factory/rules',
+      'utilities:',
+      '  custom_tool:',
+      '    enabled: true',
+      ''
+    ].join('\n'));
+
+    const result = await switchToOpenSpecMode({
+      rootDir,
+      detectOpenSpec: async () => missingCliDetection(),
+      timestamp: '2026-04-29T00-00-00-000Z'
+    });
+
+    assert.equal(result.ok, true);
+    const config = await readFixture(rootDir, '.ai-factory/config.yaml');
+    assert.match(config, /^  custom_tool:\s*$/m);
+    assert.match(config, /^    enabled: true\s*$/m);
+    assert.match(config, /^  graphify:\s*$/m);
+    assert.match(config, /^    enabled: false\s*$/m);
+    assert.match(config, /^    uv_check: uv --version\s*$/m);
+    assert.match(config, /^    install: uv tool install graphifyy\s*$/m);
+    assert.match(config, /^    activate: graphify install\s*$/m);
+    assert.match(config, /^    report_command: graphify \.\s*$/m);
+  });
+
   it('switches to AI Factory mode without deleting OpenSpec artifacts', async () => {
     const rootDir = await createTempRoot();
     await writeFixture(rootDir, 'openspec/changes/add-oauth/proposal.md', '# Proposal\n');
@@ -361,6 +401,17 @@ describe('mode switching', () => {
     assert.equal(result.ok, true);
     const config = await readFixture(rootDir, '.ai-factory/config.yaml');
     assert.match(config, /artifactProtocol: ai-factory/);
+    for (const line of [
+      'utilities:',
+      'graphify:',
+      'enabled: false',
+      'uv_check: uv --version',
+      'install: uv tool install graphifyy',
+      'activate: graphify install',
+      'report_command: graphify .'
+    ]) {
+      assert.match(config, new RegExp(line), `AI Factory config should include ${line}`);
+    }
     assert.doesNotMatch(config, /^  openspec:\s*$/m);
     assert.doesNotMatch(config, /^  state:\s*\.ai-factory\/state\s*$/m);
     assert.doesNotMatch(config, /^  qa:\s*\.ai-factory\/qa\s*$/m);
