@@ -31,6 +31,18 @@ Allowed read context:
 - `openspec/specs/**`
 - `openspec/changes/<change-id>/**`
 - `.ai-factory/state/<change-id>/`
+- optional reviewed Graphify outputs such as `graphify-out/GRAPH_REPORT.md`, `graphify-out/graph.json`, `.ai-factory/references/graphify/GRAPH_REPORT.md`, and `.ai-factory/state/<change-id>/graphify/GRAPH_REPORT.md`
+
+Optional Graphify context:
+
+- Graphify is optional supporting context for large repository architecture/relation discovery.
+- `/aif-explore` may recommend that the user run Graphify manually outside AIFHub command ownership, but it must not install `graphifyy`, run `graphify`, add Graphify dependencies, or start/register Graphify MCP automatically.
+- Missing Graphify or missing `graphify-out/GRAPH_REPORT.md` is degraded context, not an exploration failure.
+- When existing Graphify output is available, treat extracted, inferred, ambiguous, or confidence-labeled relationships as hypotheses for direct repository inspection.
+- Research conclusions must remain grounded in source files, canonical OpenSpec artifacts, generated rules, runtime state, QA evidence, or other direct repository evidence.
+- Project-wide reviewed Graphify copies belong under `.ai-factory/references/graphify/`; change-scoped reviewed copies belong under `.ai-factory/state/<change-id>/graphify/`.
+- Do not store Graphify generated files such as `GRAPH_REPORT.md`, `graph.json`, or `graph.html` under `openspec/changes/<change-id>/`, `openspec/specs/`, `.ai-factory/rules/generated/`, or `.ai-factory/qa/<change-id>/`.
+- Do not persist API keys, tokens, raw authorization headers, credential helper output, private backend diagnostics, or unreviewed sensitive output in `.ai-factory/`, `openspec/`, docs, runtime state, QA evidence, generated rules, or Graphify reference copies.
 
 Canonical OpenSpec change files under an active change are only:
 

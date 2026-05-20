@@ -16,7 +16,7 @@ OpenSpec CLI features are reached through AIFHub wrappers and `scripts/openspec-
 
 1. [Project README](../README.md) for the landing page, quick start, artifact layout, compatibility summary, migration summary, and troubleshooting summary.
 2. [Usage](usage.md) for the full command flow, `/aif-mode` switching and sync, rules/review/security gates, verification/fix/finalization tail, commit/evolve handoff, OAuth example, troubleshooting, and smoke checks.
-3. [Context Loading Policy](context-loading-policy.md) for consumer context, GitHub-aware roadmap evidence, ownership boundaries, generated rules, quality gates, commit handoff, and legacy path rules.
+3. [Context Loading Policy](context-loading-policy.md) for consumer context, optional Graphify context guidance, GitHub-aware roadmap evidence, ownership boundaries, generated rules, quality gates, commit handoff, and legacy path rules.
 4. [OpenSpec Compatibility](openspec-compatibility.md) for optional CLI adapter support, artifact sync points, rules gate behavior, Node requirements, validation policy flags, and degraded mode.
 5. [OpenSpec Artifact Validation](openspec-validation.md) for the AIFHub contract validator layered over OpenSpec CLI validation.
 6. [OpenSpec Coverage Matrix](spec-coverage.md) for requirement-to-task-to-code coverage evidence and verify/done policy.
@@ -38,8 +38,8 @@ The remaining runtime-specific guides are supporting references:
 
 | Guide | Purpose |
 |---|---|
-| [Usage](usage.md) | Full OpenSpec-native command flow, gates, finalization tail, commit, and examples |
-| [Context Loading Policy](context-loading-policy.md) | Runtime context, GitHub-aware roadmap evidence, ownership, gates, commit handoff, and legacy boundaries |
+| [Usage](usage.md) | Full OpenSpec-native command flow, optional Graphify context, gates, finalization tail, commit, and examples |
+| [Context Loading Policy](context-loading-policy.md) | Runtime context, optional Graphify context, GitHub-aware roadmap evidence, ownership, gates, commit handoff, and legacy boundaries |
 | [OpenSpec Compatibility](openspec-compatibility.md) | CLI adapter policy, validation policy flags, sync points, rules gate, version support, and degraded mode |
 | [OpenSpec Artifact Validation](openspec-validation.md) | Read-only AIFHub contract validator for canonical artifacts, runtime evidence, QA, and generated rules |
 | [OpenSpec Coverage Matrix](spec-coverage.md) | Requirement-to-task-to-code coverage evidence, policy, staleness, and integration points |
@@ -60,6 +60,7 @@ This docs set covers:
 - OpenSpec-native v1 workflow
 - artifact mode switching and sync through `/aif-mode`
 - command reads, writes, and forbidden writes
+- optional Graphify context provider guidance
 - optional rules, review, and security gates
 - verification, fix, done, post-archive sync, commit, and evolve handoff
 - OpenSpec requirement coverage evidence and policy

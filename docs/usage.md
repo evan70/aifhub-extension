@@ -49,6 +49,38 @@ The `aifhub-extension` package repository stays artifact-light: root `openspec/`
 
 AIFHub commands request OpenSpec validation, status, instructions, and archive through `scripts/openspec-runner.mjs` when the CLI is available. Slash-command runtimes should keep using `/aif-*` commands. Codex app uses `$aif-*` skill invocations, as shown in the Recommended Codex App Flow. This extension does not install or rely on OpenSpec slash commands.
 
+## Optional Graphify Context
+
+Graphify can be used as a manual, user-owned repository research aid before or during AIFHub work. AIFHub Extension does not require Graphify, does not install `graphifyy`, does not run `graphify`, does not add Graphify to extension dependencies, and does not start or register Graphify MCP automatically.
+
+Manual usage, outside AIFHub command ownership:
+
+```powershell
+python -m pip install graphifyy
+graphify .
+```
+
+Use `graphify .` in PowerShell; do not prefix it as `/graphify .`.
+
+Graphify writes local outputs under `graphify-out/`, including:
+
+- `graphify-out/GRAPH_REPORT.md`
+- `graphify-out/graph.json`
+- `graphify-out/graph.html`
+
+Its CLI may also expose research commands such as `graphify query`, `graphify path`, and `graphify explain`.
+
+When `graphify-out/GRAPH_REPORT.md` already exists, AIFHub commands may read it as optional supporting context. To keep reviewed output for later context loading, copy it only to:
+
+- `.ai-factory/references/graphify/` for project-wide reference context.
+- `.ai-factory/state/<change-id>/graphify/` for change-scoped runtime context.
+
+Do not store Graphify generated files under `openspec/changes/<change-id>/`, `openspec/specs/`, `.ai-factory/rules/generated/`, or `.ai-factory/qa/<change-id>/`.
+
+Treat Graphify findings as supporting evidence only. Reports can include extracted, inferred, ambiguous, or confidence-labeled relationships, so final plans, review findings, verification status, generated rules, and roadmap completion still need direct repository evidence from canonical OpenSpec artifacts, source files, tests, runtime state, or QA evidence.
+
+Before copying a report into `.ai-factory/`, review it for sensitive information. Do not persist API keys, tokens, raw authorization headers, credential helper output, private backend diagnostics, or unreviewed sensitive output in AIFHub artifacts.
+
 ## Bug Fix Workflows
 
 OpenSpec-native mode separates new bug reports from fixes for failed verification findings.

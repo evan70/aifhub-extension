@@ -75,6 +75,37 @@ Generated rules and generated trace metadata are derived guidance only. If gener
 
 Runner output from OpenSpec CLI commands is runtime guidance or evidence. It does not replace the canonical filesystem artifacts under `openspec/`.
 
+## Optional Graphify Context
+
+Graphify is an optional context/research provider. AIFHub commands may use existing Graphify output as supporting context, but they must not make Graphify a required extension dependency, install `graphifyy`, run `graphify`, add Graphify manifest dependencies, start or register Graphify MCP automatically, or turn Graphify availability into a verification gate.
+
+Allowed Graphify inputs are existing local or copied outputs:
+
+- `graphify-out/GRAPH_REPORT.md`
+- `graphify-out/graph.json`
+- `.ai-factory/references/graphify/GRAPH_REPORT.md`
+- `.ai-factory/references/graphify/graph.json`
+- `.ai-factory/state/<change-id>/graphify/GRAPH_REPORT.md`
+- `.ai-factory/state/<change-id>/graphify/graph.json`
+
+If Graphify is unavailable, or if no `graphify-out/GRAPH_REPORT.md` or copied report exists, commands continue normally and report Graphify context as unavailable or degraded rather than failing.
+
+Graphify output remains supporting evidence only. `GRAPH_REPORT.md` may include extracted, inferred, ambiguous, or confidence-labeled relationships; commands must treat those graph-derived claims as hypotheses for further inspection. Final requirements, plans, findings, completion status, roadmap status, generated rules, and QA verdicts must be grounded in canonical OpenSpec artifacts, source files, tests, runtime state, QA evidence, or other direct repository evidence.
+
+Allowed durable storage for reviewed Graphify context:
+
+- `.ai-factory/references/graphify/` for project-wide reference copies.
+- `.ai-factory/state/<change-id>/graphify/` for change-scoped runtime copies.
+
+Forbidden storage for Graphify generated files such as `GRAPH_REPORT.md`, `graph.json`, or `graph.html`:
+
+- `openspec/changes/<change-id>/`
+- `openspec/specs/`
+- `.ai-factory/rules/generated/`
+- `.ai-factory/qa/<change-id>/`
+
+Before copying Graphify output into `.ai-factory/`, review it for sensitive information. AIFHub guidance must not persist API keys, tokens, raw authorization headers, credential helper output, private backend diagnostics, or unreviewed sensitive output in `.ai-factory/`, `openspec/`, docs, runtime state, QA evidence, generated rules, or Graphify reference copies.
+
 ## Bug Fix Context
 
 OpenSpec-native bug fixes have two context shapes:

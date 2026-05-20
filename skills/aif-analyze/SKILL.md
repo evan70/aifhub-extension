@@ -102,6 +102,23 @@ Do not rewrite or delete those folders automatically in this skill.
 - Prefer direct evidence from manifests, source layout, config files, and project docs.
 - Note the tech stack for rules/base.md generation.
 
+### Step 2.1: Optional Graphify Context
+
+Graphify is an optional context/research provider. During repository inspection, this skill may read existing Graphify outputs as supporting context:
+
+- `graphify-out/GRAPH_REPORT.md`
+- `graphify-out/graph.json`
+- `.ai-factory/references/graphify/GRAPH_REPORT.md`
+- `.ai-factory/state/<change-id>/graphify/GRAPH_REPORT.md`
+
+Missing Graphify or missing reports are degraded context, not bootstrap failure. Do not install `graphifyy`, run `graphify`, add Graphify dependencies or manifest entries, or start/register Graphify MCP automatically.
+
+Treat Graphify findings as supporting context only. `GRAPH_REPORT.md` can contain extracted, inferred, ambiguous, or confidence-labeled relationships; use those claims as hypotheses for direct repository inspection. Bootstrap decisions, config content, rules/base.md content, and artifact status must still be grounded in manifests, source files, project docs, existing AIFHub artifacts, or other direct repository evidence.
+
+Do not copy Graphify output during bootstrap unless the user explicitly asks to preserve reviewed output. If preserving reviewed Graphify context, use `.ai-factory/references/graphify/` for project-wide references or `.ai-factory/state/<change-id>/graphify/` for change-scoped runtime context. Never store Graphify generated files under `openspec/changes/<change-id>/`, `openspec/specs/`, `.ai-factory/rules/generated/`, or `.ai-factory/qa/<change-id>/`.
+
+Before reading or preserving Graphify output, treat privacy as explicit caveat: do not persist API keys, tokens, raw authorization headers, credential helper output, private backend diagnostics, or unreviewed sensitive output in `.ai-factory/`, `openspec/`, docs, runtime state, QA evidence, generated rules, or Graphify reference copies.
+
 ### Step 2.5: Resolve Bootstrap Mode
 
 Resolve the bootstrap/config mode before creating directories:
