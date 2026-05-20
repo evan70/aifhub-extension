@@ -1651,6 +1651,10 @@ function renderUtilitiesBlock(blocks) {
     return fallback;
   }
 
+  if (hasTopLevelScalarValue(existing, 'utilities')) {
+    return existing;
+  }
+
   if (/^  graphify:(?:\s|$)/m.test(existing)) {
     return existing;
   }
@@ -1664,6 +1668,18 @@ function renderUtilitiesBlock(blocks) {
     '    activate: graphify install',
     '    report_command: graphify .'
   ].join('\n');
+}
+
+function hasTopLevelScalarValue(blockText, key) {
+  const firstLine = String(blockText ?? '').split('\n')[0] ?? '';
+  const match = firstLine.match(new RegExp(`^${key}:\\s*(.*?)\\s*$`));
+
+  if (!match) {
+    return false;
+  }
+
+  const value = match[1].replace(/(?:^|\s)#.*$/, '').trim();
+  return value.length > 0;
 }
 
 function renderAifhubBlock(mode) {

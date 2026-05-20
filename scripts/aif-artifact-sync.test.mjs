@@ -421,6 +421,37 @@ describe('mode switching', () => {
     }
   });
 
+  it('preserves scalar utilities settings instead of appending an invalid child block', async () => {
+    for (const utilitiesLine of [
+      'utilities: false',
+      'utilities: disabled # managed manually'
+    ]) {
+      const rootDir = await createTempRoot();
+      await writeFixture(rootDir, '.ai-factory/config.yaml', [
+        'aifhub:',
+        '  artifactProtocol: ai-factory',
+        'paths:',
+        '  plans: .ai-factory/plans',
+        '  specs: .ai-factory/specs',
+        '  rules: .ai-factory/rules',
+        utilitiesLine,
+        ''
+      ].join('\n'));
+
+      const result = await switchToOpenSpecMode({
+        rootDir,
+        detectOpenSpec: async () => missingCliDetection(),
+        timestamp: '2026-04-29T00-00-00-000Z'
+      });
+
+      assert.equal(result.ok, true);
+      const config = await readFixture(rootDir, '.ai-factory/config.yaml');
+      assert.match(config, new RegExp(`^${utilitiesLine.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm'));
+      assert.doesNotMatch(config, /^  graphify:\s*$/m);
+      assert.doesNotMatch(config, /^    install: uv tool install graphifyy\s*$/m);
+    }
+  });
+
   it('switches to AI Factory mode without deleting OpenSpec artifacts', async () => {
     const rootDir = await createTempRoot();
     await writeFixture(rootDir, 'openspec/changes/add-oauth/proposal.md', '# Proposal\n');
