@@ -87,6 +87,20 @@ const GRAPHIFY_CONTEXT_PROMPT_ASSETS = [
   'agent-files/claude/aifhub-review-sidecar.md'
 ];
 
+const CONTEXT7_CONTEXT_DOC_ASSETS = [
+  'docs/context-providers.md',
+  'docs/context-loading-policy.md',
+  'docs/usage.md'
+];
+
+const CONTEXT7_CONTEXT_PROMPT_ASSETS = [
+  'injections/core/aif-explore-plan-folder.md',
+  'injections/core/aif-plan-plan-folder.md',
+  'injections/core/aif-review-context-providers.md',
+  'agent-files/codex/aifhub-review-sidecar.toml',
+  'agent-files/claude/aifhub-review-sidecar.md'
+];
+
 const ROADMAP_REFERENCE_ASSETS = [
   'injections/references/aif-roadmap/roadmap-template.md',
   'injections/references/aif-roadmap/slice-checklist.md'
@@ -282,6 +296,43 @@ function assertGraphifyOptionalContextGuidance(source, label) {
   assert.match(source, /Graphify MCP automatically/i, `${label} should forbid automatic Graphify MCP registration`);
 }
 
+function assertContext7OptionalDocumentationGuidance(source, label) {
+  for (const expected of [
+    'Context7',
+    'npx ctx7',
+    'ctx7 library <name> <query>',
+    'ctx7 docs <libraryId> <query>',
+    'resolve-library-id',
+    'get-library-docs',
+    'query-docs',
+    '.ai-factory/references/context7/',
+    '.ai-factory/state/<change-id>/context7/',
+    'openspec/changes/<change-id>/',
+    'openspec/specs/',
+    '.ai-factory/rules/generated/',
+    '.ai-factory/qa/<change-id>/',
+    'supporting',
+    'degraded',
+    'direct repository evidence',
+    'source-grounded',
+    'CONTEXT7_API_KEY',
+    'API keys',
+    'tokens',
+    'raw authorization headers',
+    'private provider diagnostics',
+    'private backend diagnostics',
+    '.mcp.json',
+    '.cursor/mcp.json',
+    '.opencode.json'
+  ]) {
+    assertIncludes(source, expected, label);
+  }
+
+  assert.match(source, /do(?:es)? not .*install `?ctx7`?|must not .*install `?ctx7`?/i, `${label} should forbid automatic Context7 CLI install`);
+  assert.match(source, /do(?:es)? not .*run `?ctx7 setup`?|must not .*run `?ctx7 setup`?/i, `${label} should forbid automatic Context7 setup`);
+  assert.match(source, /Context7 MCP automatically|automatic(?:ally)? .*Context7 MCP/i, `${label} should forbid automatic Context7 MCP registration`);
+}
+
 describe('OpenSpec-native prompt asset contract', () => {
   it('discovers active prompt assets from extension.json only', async () => {
     const assets = await activePromptAssets();
@@ -295,6 +346,7 @@ describe('OpenSpec-native prompt asset contract', () => {
       COMMIT_PROMPT_ASSET,
       ...ROADMAP_REFERENCE_ASSETS,
       'injections/core/aif-implement-plan-folder.md',
+      'injections/core/aif-review-context-providers.md',
       'agent-files/codex/aifhub-verifier.toml',
       'agent-files/claude/aifhub-verifier.md'
     ]) {
@@ -496,6 +548,26 @@ describe('OpenSpec-native prompt asset contract', () => {
     ]) {
       assertIncludes(usage, expected, 'docs/usage.md');
     }
+  });
+
+  it('documents Context7 as optional documentation context, not an AIFHub dependency', async () => {
+    for (const relativePath of [...CONTEXT7_CONTEXT_DOC_ASSETS, ...CONTEXT7_CONTEXT_PROMPT_ASSETS]) {
+      const asset = await readRepoFile(relativePath);
+      assertContext7OptionalDocumentationGuidance(asset, relativePath);
+    }
+
+    const manifest = await loadManifest();
+    const reviewInjection = manifest.injections.find((entry) => entry.target === 'aif-review');
+    assert.ok(reviewInjection, 'extension.json should include an aif-review injection');
+    assert.equal(reviewInjection.position, 'prepend');
+    assert.equal(normalizeManifestPath(reviewInjection.file), 'injections/core/aif-review-context-providers.md');
+
+    const readme = await readRepoFile('docs/README.md');
+    assertIncludes(readme, 'Context Providers', 'docs/README.md');
+    assertIncludes(readme, 'optional Context7 documentation provider guidance', 'docs/README.md');
+
+    const rootReadme = await readRepoFile('README.md');
+    assertIncludes(rootReadme, 'docs/context-providers.md', 'README.md');
   });
 
   it('requires verifier prompts to use fail-fast OpenSpec verification context', async () => {

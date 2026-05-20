@@ -1,4 +1,4 @@
-[Back to Documentation](README.md) | [Back to README](../README.md) | [Next Page](context-loading-policy.md)
+[Back to Documentation](README.md) | [Back to README](../README.md) | [Next Page](context-providers.md)
 
 # Usage
 
@@ -49,7 +49,13 @@ The `aifhub-extension` package repository stays artifact-light: root `openspec/`
 
 AIFHub commands request OpenSpec validation, status, instructions, and archive through `scripts/openspec-runner.mjs` when the CLI is available. Slash-command runtimes should keep using `/aif-*` commands. Codex app uses `$aif-*` skill invocations, as shown in the Recommended Codex App Flow. This extension does not install or rely on OpenSpec slash commands.
 
-## Optional Graphify Context
+## Optional Context Providers
+
+Context providers are manual, user-owned research aids. AIFHub may read reviewed provider notes as optional supporting context, but provider availability is degraded behavior and never a validation, verification, review, rules, security, done, or commit gate.
+
+See [Context Providers](context-providers.md) for the central policy.
+
+### Graphify
 
 Graphify can be used as a manual, user-owned repository research aid before or during AIFHub work. AIFHub Extension does not require Graphify, does not install `graphifyy`, does not run `graphify`, does not add Graphify to extension dependencies, and does not start or register Graphify MCP automatically.
 
@@ -96,6 +102,45 @@ Do not store Graphify generated files under `openspec/changes/<change-id>/`, `op
 Treat Graphify findings as supporting evidence only. Reports can include extracted, inferred, ambiguous, or confidence-labeled relationships, so final plans, review findings, verification status, generated rules, and roadmap completion still need direct repository evidence from canonical OpenSpec artifacts, source files, tests, runtime state, or QA evidence.
 
 Before copying a report into `.ai-factory/`, review it for sensitive information. Do not persist API keys, tokens, raw authorization headers, credential helper output, private backend diagnostics, or unreviewed sensitive output in AIFHub artifacts.
+
+### Context7
+
+Context7 can be used as a manual, user-owned documentation research aid for current library/API docs. AIFHub Extension does not require Context7, does not install `ctx7` or `@upstash/context7-mcp`, does not run `ctx7`, does not run `ctx7 setup`, does not add Context7 to extension dependencies, does not add Context7 MCP templates to `extension.json`, and does not start or register Context7 MCP automatically.
+
+Use Context7 when version-sensitive API documentation can materially reduce uncertainty during `/aif-explore`, `/aif-plan full`, or `/aif-review`. Examples include framework migrations, deprecations, third-party client behavior, package-specific configuration, or review findings that depend on current upstream docs.
+
+Manual CLI usage, outside AIFHub command ownership:
+
+```bash
+npx ctx7 library <name> <query>
+npx ctx7 docs <libraryId> <query>
+```
+
+If the user already installed Context7, equivalent local commands may be:
+
+```bash
+ctx7 library <name> <query>
+ctx7 docs <libraryId> <query>
+```
+
+Context7 CLI usage requires a suitable local Node.js runtime. If `npx ctx7` or a user-installed `ctx7` is unavailable, too old, unauthenticated, rate-limited, or missing provider access, continue with degraded documentation context and use repository evidence plus local package docs instead.
+
+Context7 library IDs are provider output and may include forms such as `/org/project`, `/org/project/version`, `/org/project@version`, `/packages/<name>`, or `/websites/<name>`. Treat exact IDs as unstable external references rather than AIFHub schema.
+
+If the user has already configured Context7 MCP, agents may use it as optional read-only documentation context. The usual MCP flow is `resolve-library-id` followed by a docs retrieval tool; depending on client/server version, that docs retrieval tool may be named `get-library-docs` or `query-docs`.
+
+Do not run `ctx7 setup` from AIFHub commands or sidecars. It can mutate `.mcp.json`, `.cursor/mcp.json`, `.opencode.json`, agent rules, or agent skills. AIFHub guidance may mention it only as user-owned setup.
+
+To keep reviewed Context7 notes for later context loading, write concise summaries only to:
+
+- `.ai-factory/references/context7/` for project-wide documentation context.
+- `.ai-factory/state/<change-id>/context7/` for change-scoped runtime context.
+
+Do not store raw Context7 output, MCP transcripts, API responses, setup output, or generated provider configuration under `openspec/changes/<change-id>/`, `openspec/specs/`, `.ai-factory/rules/generated/`, or `.ai-factory/qa/<change-id>/`.
+
+Treat Context7 output as supporting evidence only. Plans, review findings, verification status, generated rules, and completion decisions must remain source-grounded in direct repository evidence from canonical OpenSpec artifacts, source files, tests, runtime state, QA evidence, generated rules, or package files in the repository.
+
+Do not persist `CONTEXT7_API_KEY`, API keys, tokens, raw authorization headers, credential helper output, private provider diagnostics, private backend diagnostics, or unreviewed sensitive output in AIFHub artifacts.
 
 ## Bug Fix Workflows
 
@@ -444,12 +489,15 @@ Reads:
 
 - changed files
 - OpenSpec context and generated rules when available
+- optional reviewed Context7 notes under `.ai-factory/references/context7/` or `.ai-factory/state/<change-id>/context7/` for version-sensitive API review
 
 Writes:
 
 - none
 
 `/aif-review` is an optional read-only code review gate. It returns a final `aif-gate-result` with `gate: "review"`, is useful before `/aif-verify` or for high-risk changes, and does not write OpenSpec, runtime, or QA artifacts.
+
+Review findings may use Context7 as supporting documentation context only. Findings still need changed-file evidence, canonical OpenSpec context, generated rules, runtime state, QA evidence, or other direct repository evidence; missing Context7 is degraded context, not a review failure.
 
 ### `/aif-security-checklist`
 

@@ -156,6 +156,11 @@
       "file": "./injections/core/aif-explore-plan-folder.md"
     },
     {
+      "target": "aif-review",
+      "position": "prepend",
+      "file": "./injections/core/aif-review-context-providers.md"
+    },
+    {
       "target": "aif-roadmap",
       "position": "prepend",
       "file": "./injections/core/aif-roadmap-maturity-audit.md"
