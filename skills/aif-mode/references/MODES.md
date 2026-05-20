@@ -39,6 +39,14 @@ paths:
   state: .ai-factory/state
   qa: .ai-factory/qa
   generated_rules: .ai-factory/rules/generated
+
+utilities:
+  graphify:
+    enabled: false
+    uv_check: uv --version
+    install: uv tool install graphifyy
+    activate: graphify install
+    report_command: graphify .
 ```
 
 Canonical requirements and change intent live under `openspec/`. Runtime state, QA evidence, migration reports, and generated rules live under `.ai-factory/`.
@@ -68,6 +76,14 @@ paths:
   plans: .ai-factory/plans
   specs: .ai-factory/specs
   rules: .ai-factory/rules
+
+utilities:
+  graphify:
+    enabled: false
+    uv_check: uv --version
+    install: uv tool install graphifyy
+    activate: graphify install
+    report_command: graphify .
 ```
 
 Legacy mode uses the companion plan model:

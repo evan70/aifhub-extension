@@ -49,6 +49,20 @@ paths:
   rules: .ai-factory/rules
 
 # ============================================================================
+# OPTIONAL UTILITIES
+# ============================================================================
+# Optional, user-owned tools that can provide extra context.
+utilities:
+  graphify:
+    # Recommended for large or unfamiliar repositories.
+    # AIFHub never installs or runs Graphify automatically.
+    enabled: false
+    uv_check: uv --version
+    install: uv tool install graphifyy
+    activate: graphify install
+    report_command: graphify .
+
+# ============================================================================
 # WORKFLOW SETTINGS
 # ============================================================================
 workflow:

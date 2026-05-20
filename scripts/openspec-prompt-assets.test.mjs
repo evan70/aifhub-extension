@@ -74,6 +74,19 @@ const SIDECAR_PROMPT_ASSETS = [
 const ROADMAP_PROMPT_ASSET = 'injections/core/aif-roadmap-maturity-audit.md';
 const COMMIT_PROMPT_ASSET = 'injections/core/aif-commit-roadmap-freshness.md';
 
+const GRAPHIFY_CONTEXT_DOC_ASSETS = [
+  'docs/context-loading-policy.md',
+  'docs/usage.md'
+];
+
+const GRAPHIFY_CONTEXT_PROMPT_ASSETS = [
+  'skills/aif-analyze/SKILL.md',
+  'injections/core/aif-explore-plan-folder.md',
+  'injections/core/aif-plan-plan-folder.md',
+  'agent-files/codex/aifhub-review-sidecar.toml',
+  'agent-files/claude/aifhub-review-sidecar.md'
+];
+
 const ROADMAP_REFERENCE_ASSETS = [
   'injections/references/aif-roadmap/roadmap-template.md',
   'injections/references/aif-roadmap/slice-checklist.md'
@@ -239,6 +252,34 @@ function assertNoExecutableRootScriptGuidance(source, label) {
     /\bnode\s+scripts\/[A-Za-z0-9_.-]+\.mjs\b/,
     `${label} should not expose root scripts as installed-project executable helper commands`
   );
+}
+
+function assertGraphifyOptionalContextGuidance(source, label) {
+  for (const expected of [
+    'Graphify',
+    'graphify-out/GRAPH_REPORT.md',
+    'graphify-out/graph.json',
+    '.ai-factory/references/graphify/',
+    '.ai-factory/state/<change-id>/graphify/',
+    'openspec/changes/<change-id>/',
+    'openspec/specs/',
+    '.ai-factory/rules/generated/',
+    '.ai-factory/qa/<change-id>/',
+    'supporting',
+    'degraded',
+    'extracted, inferred, ambiguous, or confidence-labeled',
+    'direct repository evidence',
+    'API keys',
+    'tokens',
+    'raw authorization headers',
+    'private backend diagnostics'
+  ]) {
+    assertIncludes(source, expected, label);
+  }
+
+  assert.match(source, /do(?:es)? not .*install `?graphifyy`?|must not .*install `?graphifyy`?/i, `${label} should forbid automatic graphifyy install`);
+  assert.match(source, /do(?:es)? not .*run `?graphify`?|must not .*run `?graphify`?/i, `${label} should forbid automatic graphify execution`);
+  assert.match(source, /Graphify MCP automatically/i, `${label} should forbid automatic Graphify MCP registration`);
 }
 
 describe('OpenSpec-native prompt asset contract', () => {
@@ -418,6 +459,42 @@ describe('OpenSpec-native prompt asset contract', () => {
     for (const relativePath of await activePromptAssets()) {
       const asset = await readRepoFile(relativePath);
       assertNoExecutableRootScriptGuidance(asset, relativePath);
+    }
+  });
+
+  it('documents Graphify as optional supporting context, not an AIFHub dependency', async () => {
+    for (const relativePath of [...GRAPHIFY_CONTEXT_DOC_ASSETS, ...GRAPHIFY_CONTEXT_PROMPT_ASSETS]) {
+      const asset = await readRepoFile(relativePath);
+      assertGraphifyOptionalContextGuidance(asset, relativePath);
+    }
+
+    const readme = await readRepoFile('docs/README.md');
+    assertIncludes(readme, 'optional Graphify context', 'docs/README.md');
+    assertIncludes(readme, 'Context Loading Policy', 'docs/README.md');
+  });
+
+  it('documents manual Graphify CLI usage without making it command-owned', async () => {
+    const usage = await readRepoFile('docs/usage.md');
+
+    for (const expected of [
+      'uv --version',
+      'uv tool install graphifyy',
+      'graphify install',
+      'graphify .',
+      'do not prefix it as `/graphify .`',
+      'graphify-out/graph.html',
+      'graphify query',
+      'graphify path',
+      'graphify explain',
+      'utilities.graphify.enabled',
+      'uv_check: uv --version',
+      'install: uv tool install graphifyy',
+      'activate: graphify install',
+      'report_command: graphify .',
+      'AIFHub Extension does not require Graphify',
+      'does not add Graphify to extension dependencies'
+    ]) {
+      assertIncludes(usage, expected, 'docs/usage.md');
     }
   });
 

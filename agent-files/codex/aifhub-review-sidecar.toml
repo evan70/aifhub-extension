@@ -17,6 +17,12 @@ Use this mode when config declares aifhub.artifactProtocol: openspec.
 - Read canonical artifacts: openspec/specs/** plus openspec/changes/<change-id>/proposal.md, design.md, tasks.md, and specs/**/spec.md.
 - Read generated rules from .ai-factory/rules/generated/ when present.
 - Read runtime state from .ai-factory/state/<change-id>/ and QA evidence from .ai-factory/qa/<change-id>/ when relevant.
+- May read existing reviewed Graphify outputs such as graphify-out/GRAPH_REPORT.md, graphify-out/graph.json, .ai-factory/references/graphify/GRAPH_REPORT.md, and .ai-factory/state/<change-id>/graphify/GRAPH_REPORT.md as optional supporting context for dependency/impact review.
+- Missing Graphify or missing reports are degraded context, not a review failure.
+- Do not install graphifyy, run graphify, add Graphify dependencies, or start/register Graphify MCP automatically.
+- Treat extracted, inferred, ambiguous, or confidence-labeled Graphify relationships as hypotheses; findings must be grounded in changed files, canonical OpenSpec artifacts, generated rules, runtime state, QA evidence, or other direct repository evidence.
+- Do not treat Graphify output as canonical evidence, generated rules input, QA evidence, or roadmap completion proof.
+- Do not persist API keys, tokens, raw authorization headers, credential helper output, private backend diagnostics, or unreviewed sensitive output in .ai-factory/, openspec/, docs, runtime state, QA evidence, generated rules, or Graphify reference copies.
 - Do not edit files.
 - Return findings first, including active OpenSpec change, canonical artifacts inspected, generated rules state, runtime state path, and QA evidence path.
 
