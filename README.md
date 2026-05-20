@@ -299,7 +299,8 @@ Switching to AI Factory-only mode updates the legacy path profile and preserves 
 |---|---|
 | [Documentation Index](docs/README.md) | Reading order and docs map |
 | [Usage](docs/usage.md) | Full command flow, read/write boundaries, examples, and troubleshooting |
-| [Context Loading Policy](docs/context-loading-policy.md) | Consumer context, GitHub-aware roadmap evidence, ownership, and legacy boundaries |
+| [Context Providers](docs/context-providers.md) | Optional Graphify and Context7 provider guidance, reviewed-note paths, degraded behavior, and user-owned setup boundaries |
+| [Context Loading Policy](docs/context-loading-policy.md) | Consumer context, optional provider context, GitHub-aware roadmap evidence, ownership, and legacy boundaries |
 | [OpenSpec Compatibility](docs/openspec-compatibility.md) | Optional CLI adapter policy and capability flags |
 | [OpenSpec Artifact Validation](docs/openspec-validation.md) | Read-only AIFHub contract validator for OpenSpec-native artifacts |
 | [OpenSpec Coverage Matrix](docs/spec-coverage.md) | Requirement-to-code coverage artifact and verify/done policy |

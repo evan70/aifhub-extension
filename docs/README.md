@@ -16,14 +16,15 @@ OpenSpec CLI features are reached through AIFHub wrappers and `scripts/openspec-
 
 1. [Project README](../README.md) for the landing page, quick start, artifact layout, compatibility summary, migration summary, and troubleshooting summary.
 2. [Usage](usage.md) for the full command flow, `/aif-mode` switching and sync, rules/review/security gates, verification/fix/finalization tail, commit/evolve handoff, OAuth example, troubleshooting, and smoke checks.
-3. [Context Loading Policy](context-loading-policy.md) for consumer context, optional Graphify context guidance, GitHub-aware roadmap evidence, ownership boundaries, generated rules, quality gates, commit handoff, and legacy path rules.
-4. [OpenSpec Compatibility](openspec-compatibility.md) for optional CLI adapter support, artifact sync points, rules gate behavior, Node requirements, validation policy flags, and degraded mode.
-5. [OpenSpec Artifact Validation](openspec-validation.md) for the AIFHub contract validator layered over OpenSpec CLI validation.
-6. [OpenSpec Coverage Matrix](spec-coverage.md) for requirement-to-task-to-code coverage evidence and verify/done policy.
-7. [Legacy Plan Migration](legacy-plan-migration.md) if existing `.ai-factory/plans` artifacts need to move into OpenSpec-native changes.
-8. [Active Change Resolver](active-change-resolver.md) for active change selection, runtime paths, current pointer behavior, and ambiguity diagnostics.
-9. [Handoff Validation Profile](handoff-validation-profile.md) for the read-only orchestration summary contract.
-10. [ADR 0001](adr/0001-openspec-native-artifact-protocol.md) for the v1 artifact ownership decision.
+3. [Context Providers](context-providers.md) for optional Graphify context and Context7 documentation provider guidance, reviewed-note paths, degraded behavior, and user-owned setup boundaries.
+4. [Context Loading Policy](context-loading-policy.md) for consumer context, optional Graphify context guidance, optional Context7 documentation context, GitHub-aware roadmap evidence, ownership boundaries, generated rules, quality gates, commit handoff, and legacy path rules.
+5. [OpenSpec Compatibility](openspec-compatibility.md) for optional CLI adapter support, artifact sync points, rules gate behavior, Node requirements, validation policy flags, and degraded mode.
+6. [OpenSpec Artifact Validation](openspec-validation.md) for the AIFHub contract validator layered over OpenSpec CLI validation.
+7. [OpenSpec Coverage Matrix](spec-coverage.md) for requirement-to-task-to-code coverage evidence and verify/done policy.
+8. [Legacy Plan Migration](legacy-plan-migration.md) if existing `.ai-factory/plans` artifacts need to move into OpenSpec-native changes.
+9. [Active Change Resolver](active-change-resolver.md) for active change selection, runtime paths, current pointer behavior, and ambiguity diagnostics.
+10. [Handoff Validation Profile](handoff-validation-profile.md) for the read-only orchestration summary contract.
+11. [ADR 0001](adr/0001-openspec-native-artifact-protocol.md) for the v1 artifact ownership decision.
 
 The remaining runtime-specific guides are supporting references:
 
@@ -38,8 +39,9 @@ The remaining runtime-specific guides are supporting references:
 
 | Guide | Purpose |
 |---|---|
-| [Usage](usage.md) | Full OpenSpec-native command flow, optional Graphify context, gates, finalization tail, commit, and examples |
-| [Context Loading Policy](context-loading-policy.md) | Runtime context, optional Graphify context, GitHub-aware roadmap evidence, ownership, gates, commit handoff, and legacy boundaries |
+| [Usage](usage.md) | Full OpenSpec-native command flow, optional Graphify context, optional Context7 guidance, gates, finalization tail, commit, and examples |
+| [Context Providers](context-providers.md) | Optional Graphify and Context7 provider guidance, reviewed-note paths, degraded behavior, credential safety, and user-owned setup boundaries |
+| [Context Loading Policy](context-loading-policy.md) | Runtime context, optional Graphify context, optional Context7 context, GitHub-aware roadmap evidence, ownership, gates, commit handoff, and legacy boundaries |
 | [OpenSpec Compatibility](openspec-compatibility.md) | CLI adapter policy, validation policy flags, sync points, rules gate, version support, and degraded mode |
 | [OpenSpec Artifact Validation](openspec-validation.md) | Read-only AIFHub contract validator for canonical artifacts, runtime evidence, QA, and generated rules |
 | [OpenSpec Coverage Matrix](spec-coverage.md) | Requirement-to-task-to-code coverage evidence, policy, staleness, and integration points |
@@ -61,6 +63,7 @@ This docs set covers:
 - artifact mode switching and sync through `/aif-mode`
 - command reads, writes, and forbidden writes
 - optional Graphify context provider guidance
+- optional Context7 documentation provider guidance
 - optional rules, review, and security gates
 - verification, fix, done, post-archive sync, commit, and evolve handoff
 - OpenSpec requirement coverage evidence and policy
@@ -87,6 +90,7 @@ npm test
 
 - [Project README](../README.md)
 - [Usage](usage.md)
+- [Context Providers](context-providers.md)
 - [Context Loading Policy](context-loading-policy.md)
 - [OpenSpec Compatibility](openspec-compatibility.md)
 - [OpenSpec Artifact Validation](openspec-validation.md)
