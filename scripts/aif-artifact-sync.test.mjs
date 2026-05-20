@@ -389,6 +389,38 @@ describe('mode switching', () => {
     assert.match(config, /^    report_command: graphify \.\s*$/m);
   });
 
+  it('does not duplicate existing scalar or commented Graphify utility settings', async () => {
+    for (const graphifyLine of [
+      '  graphify: false',
+      '  graphify: # managed manually'
+    ]) {
+      const rootDir = await createTempRoot();
+      await writeFixture(rootDir, '.ai-factory/config.yaml', [
+        'aifhub:',
+        '  artifactProtocol: ai-factory',
+        'paths:',
+        '  plans: .ai-factory/plans',
+        '  specs: .ai-factory/specs',
+        '  rules: .ai-factory/rules',
+        'utilities:',
+        graphifyLine,
+        ''
+      ].join('\n'));
+
+      const result = await switchToOpenSpecMode({
+        rootDir,
+        detectOpenSpec: async () => missingCliDetection(),
+        timestamp: '2026-04-29T00-00-00-000Z'
+      });
+
+      assert.equal(result.ok, true);
+      const config = await readFixture(rootDir, '.ai-factory/config.yaml');
+      assert.equal((config.match(/^  graphify:/gm) ?? []).length, 1);
+      assert.match(config, new RegExp(graphifyLine.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+      assert.doesNotMatch(config, /^    install: uv tool install graphifyy\s*$/m);
+    }
+  });
+
   it('switches to AI Factory mode without deleting OpenSpec artifacts', async () => {
     const rootDir = await createTempRoot();
     await writeFixture(rootDir, 'openspec/changes/add-oauth/proposal.md', '# Proposal\n');

@@ -1651,7 +1651,7 @@ function renderUtilitiesBlock(blocks) {
     return fallback;
   }
 
-  if (/^  graphify:\s*$/m.test(existing)) {
+  if (/^  graphify:(?:\s|$)/m.test(existing)) {
     return existing;
   }
 
