@@ -102,29 +102,83 @@ Do not rewrite or delete those folders automatically in this skill.
 - Prefer direct evidence from manifests, source layout, config files, and project docs.
 - Note the tech stack for rules/base.md generation.
 
-### Step 2.1: Optional Graphify Context
+### Step 2.1: Optional Context/Memory Tool Recommendations
 
-Graphify is an optional context/research provider. During repository inspection, this skill may read existing Graphify outputs as supporting context:
+Use local recommendation metadata to suggest optional context and memory tools during repository inspection.
+
+Read metadata from the installed extension path when available:
+
+```text
+.ai-factory/extensions/aifhub-extension/docs/memory-tools-research/recommendation-metadata.yaml
+```
+
+When this skill is running inside the AIFHub extension source repository, the source-tree metadata path may be used:
+
+```text
+docs/memory-tools-research/recommendation-metadata.yaml
+```
+
+Installed-project diagnostics should use the wrapper command:
+
+```bash
+ai-factory aifhub-memory-tools recommend --from-project --json
+ai-factory aifhub-memory-tools status --json
+ai-factory aifhub-memory-tools metadata --json
+```
+
+If metadata is unavailable, skip recommendations with a degraded note and keep `rg` as the baseline tool.
+
+Classify project shape from repository evidence:
+
+- `multirepo`
+- `large_framework_app`
+- `large_legacy`
+- `go_service`
+- `small_microservice`
+
+Detect task signals from the user request and analysis context:
+
+- `exact_file_or_symbol_lookup`
+- `architecture_or_impact_discovery`
+- `multirepo_surface_mapping`
+- `resume_previous_work`
+- `open_work_or_completion_check`
+- `large_command_output_compression`
+- `version_sensitive_library_docs`
+- `manual_durable_notes`
+
+Recommendation rules:
+
+- `rg` remains the baseline for exact file/symbol lookup, small projects, and first-pass literal search.
+- Recommend only tools allowed by local metadata.
+- Prefer installed/local tools in recommendations; non-installed tools may be described as optional manual install only when metadata allows.
+- Never auto-install, run setup, start MCP, register MCP, index source, sync memory, install hooks, start background daemons, or persist provider output.
+- Provider output is supporting context only, never canonical OpenSpec evidence.
+- `codex-mem` and `eagle-mem` are not recommended by default.
+- `agent-memory` is recommended only when the user explicitly asks for manual durable notes.
+
+Safe local availability probes are limited to:
+
+```bash
+rg --version
+uv --version
+graphify --version
+graphify --help
+codex-agent-mem-policy --help
+codex-agent-mem-smoke --help
+context-mode doctor
+ctx7 --version
+npx --no-install ctx7 --help
+```
+
+Run the Context7 probes only when a docs-provider check is explicitly requested. Do not run `ctx7 setup`.
+
+Optional Graphify context remains allowed only as supporting context. During repository inspection, this skill may read existing reviewed Graphify outputs:
 
 - `graphify-out/GRAPH_REPORT.md`
 - `graphify-out/graph.json`
 - `.ai-factory/references/graphify/GRAPH_REPORT.md`
 - `.ai-factory/state/<change-id>/graphify/GRAPH_REPORT.md`
-
-At the beginning of this optional Graphify check, test whether `uv` is available:
-
-```powershell
-uv --version
-```
-
-Read `utilities.graphify.enabled` from `.ai-factory/config.yaml` when available. If it is missing or `false`, include a non-blocking analysis hint that Graphify is recommended for large or unfamiliar repositories and show the manual setup commands:
-
-```powershell
-uv tool install graphifyy
-graphify install
-```
-
-If `uv` is unavailable, report that Graphify setup should start by installing `uv` and rerunning `uv --version`. Also mention that the user may generate reports manually with `graphify .` and set `utilities.graphify.enabled: true` only after the project chooses to use Graphify. If `utilities.graphify.enabled: true`, report Graphify as enabled and still treat missing reports as degraded context rather than failure.
 
 Missing Graphify or missing reports are degraded context, not bootstrap failure. Do not install `graphifyy`, run `graphify`, add Graphify dependencies or manifest entries, or start/register Graphify MCP automatically.
 
@@ -132,7 +186,7 @@ Treat Graphify findings as supporting context only. `GRAPH_REPORT.md` can contai
 
 Do not copy Graphify output during bootstrap unless the user explicitly asks to preserve reviewed output. If preserving reviewed Graphify context, use `.ai-factory/references/graphify/` for project-wide references or `.ai-factory/state/<change-id>/graphify/` for change-scoped runtime context. Never store Graphify generated files under `openspec/changes/<change-id>/`, `openspec/specs/`, `.ai-factory/rules/generated/`, or `.ai-factory/qa/<change-id>/`.
 
-Before reading or preserving Graphify output, treat privacy as explicit caveat: do not persist API keys, tokens, raw authorization headers, credential helper output, private backend diagnostics, or unreviewed sensitive output in `.ai-factory/`, `openspec/`, docs, runtime state, QA evidence, generated rules, or Graphify reference copies.
+Before reading or preserving provider output, treat privacy as an explicit caveat: do not persist API keys, tokens, raw authorization headers, credential helper output, private backend diagnostics, private provider diagnostics, or unreviewed sensitive output in `.ai-factory/`, `openspec/`, docs, runtime state, QA evidence, generated rules, or provider reference copies.
 
 ### Step 2.5: Resolve Bootstrap Mode
 
@@ -159,7 +213,7 @@ Resolve the bootstrap/config mode before creating directories:
 - Preserve existing `language.ui`, `language.artifacts`, and `language.technical_terms` values. If `language.technical_terms` is missing, default it to `keep`; accepted values are `keep | translate | mixed`.
 - If localization answers were collected while config was missing, write those pending config values into the selected legacy `ai-factory` or `openspec-native` config shape.
 - Keep schema consistent with nested sections: `language`, `aifhub`, `paths`, `utilities`, `rules`, `workflow`.
-- Ensure the shared optional utility config is present in both legacy `ai-factory` and `openspec-native` modes, preserving existing user values:
+- Ensure the shared optional utility config is present in both legacy `ai-factory` and `openspec-native` modes, preserving existing user values. `utilities.graphify` is a backward-compatible preference shim only; new optional memory/context recommendations come from local `recommendation-metadata.yaml`, not from a generic provider config abstraction:
 
 ```yaml
 utilities:
@@ -330,7 +384,8 @@ openspec init --tools none
 - Report the resolved bootstrap mode.
 - Report the bootstrap mode selection source: existing config, explicit user request, first-bootstrap answer, or autonomous default.
 - Report whether config values were created or preserved.
-- Report the Graphify utility setting and `uv` availability. If `utilities.graphify.enabled` is missing or `false`, include the optional recommendation `Graphify is recommended for large or unfamiliar repositories; check uv with: uv --version; install manually with: uv tool install graphifyy; activate manually with: graphify install`.
+- Report optional local tool recommendations from `ai-factory aifhub-memory-tools recommend --from-project --json` when the installed wrapper is available, or from source-tree metadata only when running inside the AIFHub extension repository. Include baseline `rg`, recommended tools with availability/read scope/purge path, and not-recommended tools such as `codex-mem` and `eagle-mem`. If metadata is unavailable, report a degraded note and continue.
+- Report the backward-compatible Graphify utility setting and `uv` availability only as compatibility context. If `utilities.graphify.enabled` is missing or `false`, Graphify may still be recommended only through local metadata; show manual setup commands only as explicit opt-in guidance: `uv --version`, `uv tool install graphifyy`, `graphify install`, and `graphify .`.
 - If autonomous/subagent mode defaulted to legacy `ai-factory` because the artifact protocol question could not be asked, report OpenSpec-native mode selection as an open question/blocker.
 - Report the active path set.
 - In `openspec-native` mode, include the OpenSpec capability object, degraded reason when present, created/preserved skeleton directories, and the statement that OpenSpec skill installation was skipped by design.

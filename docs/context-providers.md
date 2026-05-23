@@ -1,4 +1,4 @@
-[Previous Page](usage.md) | [Back to Documentation](README.md) | [Next Page](context-loading-policy.md)
+[Previous Page](usage.md) | [Back to Documentation](README.md) | [Next Page](memory-tool-recommendations.md)
 
 # Context Providers
 
@@ -27,6 +27,16 @@ AIFHub Extension must not:
 - turn provider availability into validation, verification, review, rules, security, done, or commit gates.
 
 Future runtime features such as a `context_provider_suggestion` metadata field may recommend manual provider usage, but they must not change the user-owned setup boundary.
+
+For installed-project diagnostics and metadata-driven recommendations, use:
+
+```bash
+ai-factory aifhub-memory-tools recommend --from-project --json
+ai-factory aifhub-memory-tools status --json
+ai-factory aifhub-memory-tools metadata --json
+```
+
+The recommender reads only local installed metadata and must not fetch GitHub or the internet.
 
 ## Context7
 

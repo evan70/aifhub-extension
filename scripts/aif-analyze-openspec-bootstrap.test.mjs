@@ -137,14 +137,27 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
     }
   });
 
-  it('documents optional Graphify utility config and analyze recommendation', async () => {
+  it('documents metadata-driven optional tool recommendations and Graphify compatibility config', async () => {
     const skill = await readRepoFile('skills/aif-analyze/SKILL.md');
     const template = await readRepoFile('skills/aif-analyze/references/config-template.yaml');
     const combined = [skill, template].join('\n');
 
     for (const expected of [
+      '### Step 2.1: Optional Context/Memory Tool Recommendations',
+      'recommendation-metadata.yaml',
+      'ai-factory aifhub-memory-tools recommend --from-project --json',
+      'ai-factory aifhub-memory-tools status --json',
+      'ai-factory aifhub-memory-tools metadata --json',
+      'exact_file_or_symbol_lookup',
+      'architecture_or_impact_discovery',
+      'resume_previous_work',
+      'large_command_output_compression',
+      'version_sensitive_library_docs',
+      'codex-mem',
+      'eagle-mem',
+      'Provider output is supporting context only, never canonical OpenSpec evidence.',
       'utilities.graphify.enabled',
-      'Graphify is recommended for large or unfamiliar repositories',
+      'backward-compatible preference',
       'uv --version',
       'uv tool install graphifyy',
       'graphify install',

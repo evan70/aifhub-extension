@@ -53,13 +53,21 @@ AIFHub commands request OpenSpec validation, status, instructions, and archive t
 
 Context providers are manual, user-owned research aids. AIFHub may read reviewed provider notes as optional supporting context, but provider availability is degraded behavior and never a validation, verification, review, rules, security, done, or commit gate.
 
-See [Context Providers](context-providers.md) for the central policy.
+See [Context Providers](context-providers.md) for the central policy and [Memory Tool Recommendations](memory-tool-recommendations.md) for local metadata-driven recommendation diagnostics.
+
+Installed projects can inspect optional recommendations with:
+
+```bash
+ai-factory aifhub-memory-tools recommend --from-project --json
+ai-factory aifhub-memory-tools status --json
+ai-factory aifhub-memory-tools metadata --json
+```
 
 ### Graphify
 
 Graphify can be used as a manual, user-owned repository research aid before or during AIFHub work. AIFHub Extension does not require Graphify, does not install `graphifyy`, does not run `graphify`, does not add Graphify to extension dependencies, and does not start or register Graphify MCP automatically.
 
-`/aif-analyze` records the project preference under shared utility config. At the start of the optional Graphify check it should verify whether `uv` is available with `uv --version`. When Graphify is not enabled, analysis should show a non-blocking recommendation with the manual setup commands:
+`/aif-analyze` keeps the Graphify shared utility config only as a backward-compatible preference. New optional tool recommendations come from local `recommendation-metadata.yaml` through the installed wrapper command, not from a provider config abstraction. The compatibility config shape remains:
 
 ```yaml
 utilities:
@@ -71,7 +79,7 @@ utilities:
     report_command: graphify .
 ```
 
-Set `utilities.graphify.enabled: true` only after the project chooses to use manually generated Graphify reports.
+Set `utilities.graphify.enabled: true` only after the project chooses to use manually generated Graphify reports. The setting does not install Graphify and does not replace metadata-driven recommendations.
 
 Manual usage, outside AIFHub command ownership:
 
@@ -290,7 +298,7 @@ If localization questions run first, `/aif-analyze` carries those answers forwar
 
 The selected artifact protocol owns its config profile. Legacy `artifactProtocol: ai-factory` configs do not include `aifhub.openspec` settings or OpenSpec runtime path defaults; OpenSpec-native `artifactProtocol: openspec` configs include those settings and paths explicitly.
 
-Shared protocol-neutral settings such as `utilities.graphify.enabled` may appear in either profile. They record optional tooling preferences and do not make that tool an AIFHub dependency.
+Shared protocol-neutral settings such as `utilities.graphify.enabled` may appear in either profile. They record optional tooling preferences and do not make that tool an AIFHub dependency. Optional memory/context tool recommendations are resolved from local installed metadata with `ai-factory aifhub-memory-tools recommend --from-project --json`; missing metadata is degraded context and leaves `rg` as the baseline.
 
 ### `/aif-plan full`
 
@@ -860,6 +868,7 @@ npm test
 ## See Also
 
 - [Documentation Index](README.md)
+- [Memory Tool Recommendations](memory-tool-recommendations.md)
 - [Context Loading Policy](context-loading-policy.md)
 - [OpenSpec Compatibility](openspec-compatibility.md)
 - [OpenSpec Coverage Matrix](spec-coverage.md)

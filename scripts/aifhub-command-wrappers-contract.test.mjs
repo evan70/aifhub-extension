@@ -59,6 +59,13 @@ const WRAPPER_COMMANDS = [
     module: './commands/aifhub-handoff-gate-summary.mjs',
     script: 'handoff-gate-summary.mjs',
     args: ['--change', 'add-oauth', '--stage', 'review', '--json']
+  },
+  {
+    name: 'aifhub-memory-tools',
+    description: 'Run AIFHub optional memory and context tool recommendation diagnostics.',
+    module: './commands/aifhub-memory-tools.mjs',
+    script: 'memory-tool-recommender.mjs',
+    args: ['recommend', '--shape', 'large_framework_app', '--task', 'architecture_or_impact_discovery', '--json']
   }
 ];
 
@@ -290,6 +297,11 @@ describe('AIFHub wrapper guidance contract', () => {
       ]],
       ['docs/handoff-validation-profile.md', [
         'ai-factory aifhub-handoff-gate-summary --change <change-id> --stage review --json'
+      ]],
+      ['docs/memory-tool-recommendations.md', [
+        'ai-factory aifhub-memory-tools recommend --from-project --json',
+        'ai-factory aifhub-memory-tools status --json',
+        'ai-factory aifhub-memory-tools metadata --json'
       ]],
       ['docs/legacy-plan-migration.md', [
         'ai-factory aifhub-migrate-legacy-plans --list',

@@ -24,6 +24,29 @@ Look for the main working areas:
 - `docs/`, `config/`
 - `migrations/`, `prisma/`, `db/`
 
+## Optional Tool Recommendation Signals
+
+Classify project shape from evidence, not from repository name:
+
+- `small_microservice`: small file count, one service manifest, narrow source tree, exact `rg` lookup is likely enough.
+- `go_service`: `go.mod` plus service-style packages or integrations; use baseline `rg` first.
+- `large_framework_app`: framework markers such as `app/`, `src/`, routes/controllers/components, build config, and enough files that broad impact search may be noisy.
+- `multirepo`: multiple manifests, workspace markers, or coordinated component directories.
+- `large_legacy`: very large file count, mixed older layouts, dense integrations, and noisy literal search.
+
+Detect task signals from the user's request and analysis context:
+
+- `exact_file_or_symbol_lookup`: user asks for a known file, symbol, config key, or literal string.
+- `architecture_or_impact_discovery`: user asks for architecture, dependencies, impact, ownership, or broad codebase understanding.
+- `multirepo_surface_mapping`: user asks how multiple packages/repos/components connect.
+- `resume_previous_work`: user asks to resume, continue, or recover previous session context.
+- `open_work_or_completion_check`: user asks what remains open or whether work is complete.
+- `large_command_output_compression`: analysis output is too large and needs temporary retrieval/compression.
+- `version_sensitive_library_docs`: answer depends on current library/API docs, migrations, or deprecations.
+- `manual_durable_notes`: user explicitly asks for durable manual notes.
+
+Always keep `rg` as the baseline. Optional memory/context tools may only be recommended through local metadata and explicit opt-in.
+
 ## Source Control
 
 Use git only to confirm repository state and remotes:
