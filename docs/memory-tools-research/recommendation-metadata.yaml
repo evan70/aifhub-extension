@@ -1,0 +1,272 @@
+schema: aifhub.memory_tools.recommendation.v1
+updated: "2026-05-22"
+purpose: "Метаданные для этапа анализа проекта: какие memory/retrieval инструменты можно предлагать пользователю, когда и с какими ограничениями."
+default_policy:
+  install_policy: explicit_user_opt_in_only
+  never_auto_install: true
+  require_explicit_paths: true
+  require_purge_path: true
+  baseline_tool: rg
+  privacy_rule: "Не предлагать инструмент, если read scope не ограничен или purge path не проверен."
+project_shape_signals:
+  large_legacy:
+    description: "Большой legacy проект с плотными интеграциями, большим числом файлов и шумным literal search."
+    conditional_tools:
+      - graphify
+    condition: "Предлагать только после baseline rg, если literal search даёт слишком много шума или нужен architecture/impact overview."
+    avoid_tools:
+      - codex-mem
+      - eagle-mem
+  multirepo:
+    description: "Работа идёт сразу по нескольким репозиториям или нужно понять surface между компонентами."
+    suggest_tools:
+      - graphify
+    conditional_tools:
+      - codex-agent-mem
+    avoid_tools:
+      - codex-mem
+      - eagle-mem
+  large_framework_app:
+    description: "Крупное web-приложение на framework stack, где нужны architecture/impact вопросы."
+    suggest_tools:
+      - graphify
+    conditional_tools:
+      - context-mode
+  go_service:
+    description: "Средний Go сервис с интеграциями."
+    conditional_tools:
+      - graphify
+      - codex-agent-mem
+    baseline_first:
+      - rg
+  small_microservice:
+    description: "Малый сервис, где точный поиск обычно быстрее любых индексов."
+    suggest_tools: []
+    baseline_first:
+      - rg
+    avoid_tools:
+      - graphify
+      - context-mode
+      - codex-mem
+      - agent-memory
+      - eagle-mem
+task_signals:
+  exact_file_or_symbol_lookup:
+    recommend:
+      - rg
+    avoid:
+      - graphify
+      - context-mode
+  architecture_or_impact_discovery:
+    recommend:
+      - graphify
+  multirepo_surface_mapping:
+    recommend:
+      - graphify
+  resume_previous_work:
+    recommend:
+      - codex-agent-mem
+  open_work_or_completion_check:
+    recommend:
+      - codex-agent-mem
+  large_command_output_compression:
+    recommend:
+      - context-mode
+  manual_durable_notes:
+    conditional:
+      - agent-memory
+  codex_history_search:
+    avoid_by_default:
+      - codex-mem
+tools:
+  graphify:
+    display_name: Graphify
+    doc: graphify.md
+    repository: "https://github.com/safishamsi/graphify"
+    tested_version: "graphifyy 0.8.14"
+    decision: optional
+    recommendation_action: suggest_optional_install
+    integration_role: repo_graph_provider
+    install_policy: explicit_user_opt_in_only
+    stable_cli: true
+    mcp_status: works_after_installing_python_mcp
+    read_scope: explicit_project_path
+    purge_path: "delete graphify-out/ or run graphify uninstall --purge if installed"
+    recommended_for:
+      project_shapes:
+        - multirepo
+        - large_framework_app
+      tasks:
+        - architecture_or_impact_discovery
+        - multirepo_surface_mapping
+        - token_reduction_for_broad_codebase_questions
+    conditional_for:
+      project_shapes:
+        - large_legacy
+        - go_service
+      condition: "Только после baseline rg и только для broad architecture/impact вопросов, не для exact lookup."
+    do_not_recommend_for:
+      project_shapes:
+        - small_microservice
+      tasks:
+        - exact_file_or_symbol_lookup
+        - durable_session_memory
+    suggestion_text: "Проект выглядит как large framework или multirepo; можно предложить Graphify как optional repo graph для architecture/impact анализа после baseline поиска через rg. Для legacy/go предлагать только если rg слишком шумный."
+  codex-agent-mem:
+    display_name: codex-agent-mem
+    doc: codex-agent-mem.md
+    repository: "https://github.com/MarceloCaporale/codex-agent-mem"
+    tested_version: "1.0.2"
+    decision: optional
+    recommendation_action: suggest_when_continuity_needed
+    integration_role: read_only_continuity_memory
+    install_policy: explicit_user_opt_in_only
+    stable_cli: true
+    mcp_status: read_only_mcp_verified
+    read_scope: explicit_sqlite_db_path
+    purge_path: "delete configured SQLite DB and sidecar files"
+    recommended_for:
+      tasks:
+        - resume_previous_work
+        - open_work_or_completion_check
+        - compact_handoff_context
+    conditional_for:
+      project_shapes:
+        - multirepo
+        - large_legacy
+        - go_service
+      condition: "Есть prior memory DB или пользователь хочет continuity между сессиями."
+    do_not_recommend_for:
+      tasks:
+        - initial_code_discovery
+        - exact_file_or_symbol_lookup
+        - architecture_graphing
+    suggestion_text: "Если нужен resume/open-work context между сессиями, можно предложить codex-agent-mem в read-only MCP mode с explicit DB path."
+  context-mode:
+    display_name: context-mode
+    doc: context-mode.md
+    repository: "https://github.com/mksglu/context-mode"
+    tested_version: "1.0.146"
+    decision: manual_helper_only
+    recommendation_action: suggest_only_for_large_temporary_outputs
+    integration_role: temporary_output_index
+    install_policy: explicit_user_opt_in_only
+    stable_cli: partial
+    mcp_status: verified
+    read_scope: explicit_indexed_content
+    purge_path: "ctx_purge with session or project scope"
+    recommended_for:
+      tasks:
+        - large_command_output_compression
+        - temporary_one_session_retrieval
+    do_not_recommend_for:
+      tasks:
+        - persistent_project_memory
+        - source_code_indexing
+      project_shapes:
+        - small_microservice
+    suggestion_text: "Если анализ генерирует очень большой output, можно предложить context-mode как manual temporary index с обязательным purge."
+  codex-mem:
+    display_name: codex-mem
+    doc: codex-mem.md
+    repository: "https://github.com/Just-Boring-Cat/codex-mem"
+    tested_version: "0.1.1"
+    decision: reject_default
+    recommendation_action: do_not_suggest_install_by_default
+    integration_role: none
+    install_policy: do_not_auto_install
+    stable_cli: true
+    mcp_status: verified_but_unsafe_by_default
+    read_scope: broad_codex_history_unless_fully_isolated
+    purge_path: "delete configured SQLite DB and sidecar files"
+    avoid_reason: "Default scope может ingest cross-project Codex history; isolation слишком fragile для default recommendation."
+  agent-memory:
+    display_name: agent-memory
+    doc: agent-memory.md
+    repository: "https://github.com/jayzeng/agentmemory"
+    tested_version: "myagentmemory 0.4.12"
+    decision: docs_only_manual_notes
+    recommendation_action: mention_only_if_user_requests_manual_notes
+    integration_role: manual_markdown_memory
+    install_policy: explicit_user_opt_in_only
+    stable_cli: partial_on_windows
+    mcp_status: not_found
+    read_scope: explicit_memory_dir
+    purge_path: "delete selected memory directory"
+    recommended_for:
+      tasks:
+        - manual_durable_notes
+    do_not_recommend_for:
+      tasks:
+        - codebase_retrieval
+        - project_analysis
+        - mcp_provider_integration
+    suggestion_text: "Предлагать только как ручной markdown notebook, если пользователь сам просит durable notes."
+  eagle-mem:
+    display_name: eagle-mem
+    doc: eagle-mem.md
+    repository: "https://github.com/eagleisbatman/eagle-mem"
+    tested_version: "4.9.10"
+    decision: reject_defer
+    recommendation_action: do_not_suggest_install
+    integration_role: none
+    install_policy: do_not_auto_install
+    stable_cli: partial_on_windows
+    mcp_status: not_proven
+    read_scope: not_proven
+    purge_path: not_proven
+    avoid_reason: "Слишком широкий lifecycle surface: hooks, background lanes, user-home runtime и неvalidated purge/read scope."
+evidence_runs:
+  - id: local-anonymous-profiles-2026-05-22
+    date: "2026-05-22"
+    scope: "13 anonymous local project profiles with .ai-factory/ARCHITECTURE.md, copied to sanitized temp fixtures before testing."
+    privacy: "Docs contain only anonymous profile ids and project shape labels; real project names and local paths are excluded."
+    sanitization:
+      excluded:
+        - ".git"
+        - ".env*"
+        - "node_modules"
+        - "vendor"
+        - "logs/cache/build artifacts"
+        - "lock files"
+        - "binary/media/data artifacts"
+    profile_counts:
+      go_service: 1
+      large_framework_app: 4
+      large_legacy: 1
+      multirepo: 3
+      small_microservice: 4
+    baseline:
+      tool: rg
+      scenario: "common architecture/source terms"
+      token_estimate_method: "ceil(chars / 4)"
+    outcomes:
+      graphify:
+        tested_profiles: 13
+        good: 7
+        partial: 2
+        poor: 4
+        recommendation_update: "Предлагать для large_framework_app и multirepo broad analysis; для go_service/large_legacy только после rg; не предлагать для small_microservice."
+      codex-agent-mem:
+        tested_profiles: 13
+        smoke_passed: 13
+        mcp_read_only_passed: 13
+        recommendation_update: "Project shape не влияет; предлагать только для continuity с explicit DB path."
+      context-mode:
+        tested_profiles: 13
+        explicit_index_search_purge_passed: 13
+        recommendation_update: "Оставить manual helper для explicit generated output; не считать source-code retrieval provider."
+      codex-mem:
+        tested_profiles: 13
+        isolated_save_search_stats_purge_passed: 13
+        recommendation_update: "Full isolation работает, но default broad Codex history scope оставляет reject_default."
+      agent-memory:
+        tested_profiles: 13
+        manual_context_passed: 13
+        qmd_missing: true
+        recommendation_update: "Оставить docs-only/manual notes; без qmd нет usable retrieval."
+      eagle-mem:
+        tested_profiles: 13
+        help_doctor_passed_with_git_bash: 13
+        full_install_tested: false
+        recommendation_update: "Оставить reject/defer; scoped read and purge evidence not proven."

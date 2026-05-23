@@ -31,6 +31,7 @@ The remaining runtime-specific guides are supporting references:
 - [AIFHub MCP](aifhub-mcp.md)
 - [Codex Agents](codex-agents.md)
 - [Claude Agents](claude-agents.md)
+- [Research по Memory Tools](memory-tools-research/README.md)
 - [Codex Plan Mode](codex-plan-mode.md)
 - [Handoff Naming](handoff.md)
 - [Handoff Validation Profile](handoff-validation-profile.md)
@@ -52,6 +53,7 @@ The remaining runtime-specific guides are supporting references:
 | [AIFHub MCP](aifhub-mcp.md) | Optional MCP server tools and runtime-specific config shapes |
 | [Codex Agents](codex-agents.md) | Namespaced Codex subagents and invocation contract |
 | [Claude Agents](claude-agents.md) | Namespaced Claude subagents and install target |
+| [Research по Memory Tools](memory-tools-research/README.md) | Результаты проверки local memory/retrieval кандидатов для optional context providers |
 | [Codex Plan Mode](codex-plan-mode.md) | Codex mode and question-format guidance |
 | [Handoff Naming](handoff.md) | Stage vocabulary versus public CLI commands |
 
@@ -64,6 +66,7 @@ This docs set covers:
 - command reads, writes, and forbidden writes
 - optional Graphify context provider guidance
 - optional Context7 documentation provider guidance
+- optional local memory/retrieval candidate research
 - optional rules, review, and security gates
 - verification, fix, done, post-archive sync, commit, and evolve handoff
 - OpenSpec requirement coverage evidence and policy
@@ -100,3 +103,4 @@ npm test
 - [Handoff Validation Profile](handoff-validation-profile.md)
 - [ADR 0001](adr/0001-openspec-native-artifact-protocol.md)
 - [AIFHub MCP](aifhub-mcp.md)
+- [Research по Memory Tools](memory-tools-research/README.md)
