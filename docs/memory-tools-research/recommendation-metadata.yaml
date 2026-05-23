@@ -72,6 +72,9 @@ task_signals:
   large_command_output_compression:
     recommend:
       - context-mode
+  version_sensitive_library_docs:
+    recommend:
+      - context7
   manual_durable_notes:
     conditional:
       - agent-memory
@@ -166,6 +169,29 @@ tools:
       project_shapes:
         - small_microservice
     suggestion_text: "Если анализ генерирует очень большой output, можно предложить context-mode как manual temporary index с обязательным purge."
+  context7:
+    display_name: Context7
+    doc: ../context-providers.md
+    repository: "https://github.com/upstash/context7"
+    tested_version: "docs-provider guidance only"
+    decision: optional
+    recommendation_action: suggest_for_version_sensitive_docs
+    integration_role: optional_docs_provider
+    install_policy: explicit_user_opt_in_only
+    stable_cli: partial
+    mcp_status: user_configured_optional
+    read_scope: explicit_library_or_docs_query
+    purge_path: "delete reviewed notes under .ai-factory/references/context7/ or .ai-factory/state/<change-id>/context7/"
+    recommended_for:
+      tasks:
+        - version_sensitive_library_docs
+        - framework_migration_or_deprecation_check
+    do_not_recommend_for:
+      tasks:
+        - canonical_openspec_evidence
+        - validation_gate
+        - automatic_mcp_registration
+    suggestion_text: "Если вопрос зависит от актуальных library/API docs, можно предложить Context7 как optional docs provider; setup и MCP registration остаются user-owned."
   codex-mem:
     display_name: codex-mem
     doc: codex-mem.md

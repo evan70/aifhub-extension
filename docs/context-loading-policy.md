@@ -1,4 +1,4 @@
-[Previous Page](context-providers.md) | [Back to Documentation](README.md) | [Next Page](openspec-compatibility.md)
+[Previous Page](memory-tool-recommendations.md) | [Back to Documentation](README.md) | [Next Page](openspec-compatibility.md)
 
 # Context Loading Policy
 
@@ -81,13 +81,13 @@ Optional providers are read-only supporting context. They are not command prereq
 
 Provider output can be copied into `.ai-factory/` only after user review and only as concise notes or reviewed summaries. Raw provider output, MCP transcripts, setup output, generated provider configuration, and unreviewed sensitive output must stay out of canonical OpenSpec, generated rules, runtime QA, and validation artifacts.
 
-See [Context Providers](context-providers.md) for the central provider guide.
+See [Context Providers](context-providers.md) for the central provider guide and [Memory Tool Recommendations](memory-tool-recommendations.md) for local metadata-driven recommendation diagnostics.
 
 ## Optional Graphify Context
 
 Graphify is an optional context/research provider. AIFHub commands may use existing Graphify output as supporting context, but they must not make Graphify a required extension dependency, install `graphifyy`, run `graphify`, add Graphify manifest dependencies, start or register Graphify MCP automatically, or turn Graphify availability into a verification gate.
 
-Project preference is recorded in `.ai-factory/config.yaml` as `utilities.graphify.enabled`. At the beginning of the optional Graphify check, `/aif-analyze` should test `uv` availability with `uv --version`. If Graphify is missing, or if `utilities.graphify.enabled` is missing or `false`, `/aif-analyze` should report Graphify as optional and recommended for large or unfamiliar repositories, including the manual setup commands `uv tool install graphifyy` and `graphify install`. This recommendation is advisory only and must not trigger installation, execution, dependency changes, or MCP registration.
+Project preference is recorded in `.ai-factory/config.yaml` as `utilities.graphify.enabled` only for backward compatibility. New `/aif-analyze` recommendations should come from local installed recommendation metadata through `ai-factory aifhub-memory-tools recommend --from-project --json`. If Graphify is recommended, the recommendation is advisory only and must not trigger installation, execution, dependency changes, indexing, or MCP registration.
 
 Allowed Graphify inputs are existing local or copied outputs:
 
@@ -274,6 +274,7 @@ If `.ai-factory/config.yaml` is missing or incomplete:
 ## See Also
 
 - [Usage](usage.md)
+- [Memory Tool Recommendations](memory-tool-recommendations.md)
 - [OpenSpec Compatibility](openspec-compatibility.md)
 - [Legacy Plan Migration](legacy-plan-migration.md)
 - [ADR 0001](adr/0001-openspec-native-artifact-protocol.md)
