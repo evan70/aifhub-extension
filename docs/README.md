@@ -1,33 +1,33 @@
-[Back to README](../README.md) | [Next Page](usage.md)
+[К README](../README.md) | [Следующая страница](usage.md)
 
-# Documentation
+# Документация
 
-This documentation explains the AIFHub Extension v1 workflow:
+Эта документация описывает workflow AIFHub Extension v1:
 
 ```text
 AI Factory UX + OpenSpec artifact protocol
 ```
 
-OpenSpec-native artifacts under `openspec/` are canonical. AI Factory artifacts under `.ai-factory/` hold runtime state, QA evidence, generated rules, and legacy migration input.
+OpenSpec-native artifacts в `openspec/` являются canonical. AI Factory artifacts в `.ai-factory/` хранят runtime state, QA evidence, generated rules и legacy migration input.
 
-OpenSpec CLI features are reached through AIFHub wrappers and `scripts/openspec-runner.mjs`; OpenSpec skills or slash commands are not installed by the extension.
+OpenSpec CLI features вызываются через AIFHub wrappers и `scripts/openspec-runner.mjs`; OpenSpec skills или slash commands extension не устанавливает.
 
-## Reading Order
+## Порядок Чтения
 
-1. [Project README](../README.md) for the landing page, quick start, artifact layout, compatibility summary, migration summary, and troubleshooting summary.
-2. [Usage](usage.md) for the full command flow, `/aif-mode` switching and sync, rules/review/security gates, verification/fix/finalization tail, commit/evolve handoff, OAuth example, troubleshooting, and smoke checks.
-3. [Context Providers](context-providers.md) for optional Graphify context and Context7 documentation provider guidance, reviewed-note paths, degraded behavior, and user-owned setup boundaries.
-4. [Memory Tool Recommendations](memory-tool-recommendations.md) for local metadata-driven optional tool recommendations and installed wrapper commands.
-5. [Context Loading Policy](context-loading-policy.md) for consumer context, optional Graphify context guidance, optional Context7 documentation context, GitHub-aware roadmap evidence, ownership boundaries, generated rules, quality gates, commit handoff, and legacy path rules.
-6. [OpenSpec Compatibility](openspec-compatibility.md) for optional CLI adapter support, artifact sync points, rules gate behavior, Node requirements, validation policy flags, and degraded mode.
-7. [OpenSpec Artifact Validation](openspec-validation.md) for the AIFHub contract validator layered over OpenSpec CLI validation.
-8. [OpenSpec Coverage Matrix](spec-coverage.md) for requirement-to-task-to-code coverage evidence and verify/done policy.
-9. [Legacy Plan Migration](legacy-plan-migration.md) if existing `.ai-factory/plans` artifacts need to move into OpenSpec-native changes.
-10. [Active Change Resolver](active-change-resolver.md) for active change selection, runtime paths, current pointer behavior, and ambiguity diagnostics.
-11. [Handoff Validation Profile](handoff-validation-profile.md) for the read-only orchestration summary contract.
-12. [ADR 0001](adr/0001-openspec-native-artifact-protocol.md) for the v1 artifact ownership decision.
+1. [Project README](../README.md) - landing page, quick start, artifact layout, compatibility summary, migration summary и troubleshooting summary.
+2. [Usage](usage.md) - полный command flow, `/aif-mode` switching and sync, rules/review/security gates, verification/fix/finalization tail, commit/evolve handoff, OAuth example, troubleshooting и smoke checks.
+3. [Context Providers](context-providers.md) - optional Graphify context, CodeGraph manual CLI context, Context7 documentation provider guidance, reviewed-note paths, degraded behavior и user-owned setup boundaries.
+4. [Memory Tool Recommendations](memory-tool-recommendations.md) - local metadata-driven optional tool recommendations и installed wrapper commands.
+5. [Context Loading Policy](context-loading-policy.md) - consumer context, optional Graphify/CodeGraph/Context7 guidance, GitHub-aware roadmap evidence, ownership boundaries, generated rules, quality gates, commit handoff и legacy path rules.
+6. [OpenSpec Compatibility](openspec-compatibility.md) - optional CLI adapter support, artifact sync points, rules gate behavior, Node requirements, validation policy flags и degraded mode.
+7. [OpenSpec Artifact Validation](openspec-validation.md) - AIFHub contract validator поверх OpenSpec CLI validation.
+8. [OpenSpec Coverage Matrix](spec-coverage.md) - requirement-to-task-to-code coverage evidence и verify/done policy.
+9. [Legacy Plan Migration](legacy-plan-migration.md) - если существующие `.ai-factory/plans` artifacts нужно перенести в OpenSpec-native changes.
+10. [Active Change Resolver](active-change-resolver.md) - active change selection, runtime paths, current pointer behavior и ambiguity diagnostics.
+11. [Handoff Validation Profile](handoff-validation-profile.md) - read-only orchestration summary contract.
+12. [ADR 0001](adr/0001-openspec-native-artifact-protocol.md) - v1 artifact ownership decision.
 
-The remaining runtime-specific guides are supporting references:
+Остальные runtime-specific guides являются supporting references:
 
 - [AIFHub MCP](aifhub-mcp.md)
 - [Codex Agents](codex-agents.md)
@@ -39,59 +39,60 @@ The remaining runtime-specific guides are supporting references:
 
 ## Guides
 
-| Guide | Purpose |
+| Guide | Назначение |
 |---|---|
-| [Usage](usage.md) | Full OpenSpec-native command flow, optional Graphify context, optional Context7 guidance, gates, finalization tail, commit, and examples |
-| [Context Providers](context-providers.md) | Optional Graphify and Context7 provider guidance, reviewed-note paths, degraded behavior, credential safety, and user-owned setup boundaries |
-| [Memory Tool Recommendations](memory-tool-recommendations.md) | Local metadata-driven optional memory/context tool recommendations and installed wrapper commands |
-| [Context Loading Policy](context-loading-policy.md) | Runtime context, optional Graphify context, optional Context7 context, GitHub-aware roadmap evidence, ownership, gates, commit handoff, and legacy boundaries |
-| [OpenSpec Compatibility](openspec-compatibility.md) | CLI adapter policy, validation policy flags, sync points, rules gate, version support, and degraded mode |
-| [OpenSpec Artifact Validation](openspec-validation.md) | Read-only AIFHub contract validator for canonical artifacts, runtime evidence, QA, and generated rules |
-| [OpenSpec Coverage Matrix](spec-coverage.md) | Requirement-to-task-to-code coverage evidence, policy, staleness, and integration points |
-| [Legacy Plan Migration](legacy-plan-migration.md) | Explicit migration commands and artifact mapping |
-| [Active Change Resolver](active-change-resolver.md) | Active change selection and runtime paths |
-| [Handoff Validation Profile](handoff-validation-profile.md) | Read-only validation summary contract for Handoff orchestration |
-| [ADR 0001](adr/0001-openspec-native-artifact-protocol.md) | Canonical OpenSpec and AI Factory runtime state contract |
-| [AIFHub MCP](aifhub-mcp.md) | Optional MCP server tools and runtime-specific config shapes |
-| [Codex Agents](codex-agents.md) | Namespaced Codex subagents and invocation contract |
-| [Claude Agents](claude-agents.md) | Namespaced Claude subagents and install target |
+| [Usage](usage.md) | Полный OpenSpec-native command flow, optional Graphify/CodeGraph/Context7 guidance, gates, finalization tail, commit и examples |
+| [Context Providers](context-providers.md) | Optional Graphify context, CodeGraph manual CLI context и Context7 provider guidance, reviewed-note paths, degraded behavior, credential safety и user-owned setup boundaries |
+| [Memory Tool Recommendations](memory-tool-recommendations.md) | Local metadata-driven optional memory/context tool recommendations и installed wrapper commands |
+| [Context Loading Policy](context-loading-policy.md) | Runtime context, optional Graphify/CodeGraph/Context7 context, GitHub-aware roadmap evidence, ownership, gates, commit handoff и legacy boundaries |
+| [OpenSpec Compatibility](openspec-compatibility.md) | CLI adapter policy, validation policy flags, sync points, rules gate, version support и degraded mode |
+| [OpenSpec Artifact Validation](openspec-validation.md) | Read-only AIFHub contract validator для canonical artifacts, runtime evidence, QA и generated rules |
+| [OpenSpec Coverage Matrix](spec-coverage.md) | Requirement-to-task-to-code coverage evidence, policy, staleness и integration points |
+| [Legacy Plan Migration](legacy-plan-migration.md) | Explicit migration commands и artifact mapping |
+| [Active Change Resolver](active-change-resolver.md) | Active change selection и runtime paths |
+| [Handoff Validation Profile](handoff-validation-profile.md) | Read-only validation summary contract для Handoff orchestration |
+| [ADR 0001](adr/0001-openspec-native-artifact-protocol.md) | Canonical OpenSpec и AI Factory runtime state contract |
+| [AIFHub MCP](aifhub-mcp.md) | Optional MCP server tools и runtime-specific config shapes |
+| [Codex Agents](codex-agents.md) | Namespaced Codex subagents и invocation contract |
+| [Claude Agents](claude-agents.md) | Namespaced Claude subagents и install target |
 | [Research по Memory Tools](memory-tools-research/README.md) | Результаты проверки local memory/retrieval кандидатов для optional context providers |
-| [Codex Plan Mode](codex-plan-mode.md) | Codex mode and question-format guidance |
+| [Codex Plan Mode](codex-plan-mode.md) | Codex mode и question-format guidance |
 | [Handoff Naming](handoff.md) | Stage vocabulary versus public CLI commands |
 
-## Scope
+## Границы
 
-This docs set covers:
+Этот набор docs покрывает:
 
 - OpenSpec-native v1 workflow
-- artifact mode switching and sync through `/aif-mode`
-- command reads, writes, and forbidden writes
+- artifact mode switching и sync через `/aif-mode`
+- command reads, writes и forbidden writes
 - optional Graphify context provider guidance
+- optional CodeGraph manual CLI context provider guidance
 - optional Context7 documentation provider guidance
 - optional local memory/retrieval candidate research
-- optional rules, review, and security gates
-- verification, fix, done, post-archive sync, commit, and evolve handoff
-- OpenSpec requirement coverage evidence and policy
+- optional rules, review и security gates
+- verification, fix, done, post-archive sync, commit и evolve handoff
+- OpenSpec requirement coverage evidence и policy
 - canonical OpenSpec artifact ownership
-- AI Factory runtime state, QA evidence, and generated rules
-- legacy AI Factory-only compatibility and migration
-- runtime-managed Codex and Claude agent files
-- optional AIFHub MCP server registration and runtime-specific settings shapes
+- AI Factory runtime state, QA evidence и generated rules
+- legacy AI Factory-only compatibility и migration
+- runtime-managed Codex и Claude agent files
+- optional AIFHub MCP server registration и runtime-specific settings shapes
 
-It does not document `.ai-factory/plans` as the normal v1 artifact model. Those paths are legacy compatibility and migration input only.
+Она не описывает `.ai-factory/plans` как normal v1 artifact model. Эти paths являются только legacy compatibility и migration input.
 
-## Local Checks
+## Локальные Проверки
 
-Run:
+Запуск:
 
 ```bash
 npm run validate
 npm test
 ```
 
-`npm run validate` checks markdown links under `docs/`, `injections/`, and `skills/`. Root `README.md` links need a manual check when edited.
+`npm run validate` проверяет markdown links в `docs/`, `injections/` и `skills/`. Links в root `README.md` требуют manual check при изменениях.
 
-## See Also
+## См. Также
 
 - [Project README](../README.md)
 - [Usage](usage.md)

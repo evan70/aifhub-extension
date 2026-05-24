@@ -12,9 +12,11 @@ const execFileAsync = promisify(execFile);
 export const RECOMMENDATION_RESULT_SCHEMA = 'aifhub.memory_tools.recommendation_result.v1';
 export const METADATA_RESULT_SCHEMA = 'aifhub.memory_tools.metadata_result.v1';
 export const STATUS_RESULT_SCHEMA = 'aifhub.memory_tools.status_result.v1';
+export const SELECTION_RESULT_SCHEMA = 'aifhub.memory_tools.selection_result.v1';
 export const ERROR_SCHEMA = 'aifhub.memory_tools.error.v1';
 
 const METADATA_RELATIVE_PATH = path.join('docs', 'memory-tools-research', 'recommendation-metadata.yaml');
+const PROJECT_CONFIG_RELATIVE_PATH = path.join('.ai-factory', 'config.yaml');
 const INSTALLED_EXTENSION_PARTS = ['.ai-factory', 'extensions', 'aifhub-extension'];
 const VALID_PROJECT_SHAPES = new Set([
   'large_legacy',
@@ -24,6 +26,7 @@ const VALID_PROJECT_SHAPES = new Set([
   'small_microservice'
 ]);
 const DEFAULT_TASK_SIGNAL = 'architecture_or_impact_discovery';
+const DEFAULT_COMMAND = 'aif-analyze';
 const ALWAYS_REJECTED_TOOLS = new Set(['codex-mem', 'eagle-mem']);
 const MANUAL_ONLY_TASKS = new Map([
   ['agent-memory', new Set(['manual_durable_notes'])]
@@ -92,6 +95,41 @@ export async function runMemoryToolRecommender(args = [], options = {}) {
         metadata: loaded.metadata,
         projectShape,
         taskSignals,
+        command: parsed.flags.command,
+        checkDocsProvider: Boolean(parsed.flags.checkDocsProvider),
+        probeRunner: options.probeRunner
+      });
+      return emitResult(body, 0, { ...options, json });
+    }
+
+    if (parsed.command === 'select') {
+      const loaded = await tryLoadMetadata(parsed, cwd, options);
+      const taskSignals = parsed.flags.task.length > 0 ? parsed.flags.task : [DEFAULT_TASK_SIGNAL];
+      const projectShape = parsed.flags.fromProject
+        ? await classifyProjectShape(cwd)
+        : normalizeProjectShape(parsed.flags.shape);
+      const config = await loadProjectToolConfig({
+        cwd,
+        metadata: loaded.ok ? loaded.metadata : null
+      });
+
+      if (!loaded.ok) {
+        const body = degradedSelectionResult({
+          metadataError: loaded,
+          config,
+          projectShape,
+          taskSignals,
+          command: parsed.flags.command
+        });
+        return emitResult(body, 0, { ...options, json });
+      }
+
+      const body = await buildSelectionResult({
+        metadata: loaded.metadata,
+        config,
+        projectShape,
+        taskSignals,
+        command: parsed.flags.command,
         checkDocsProvider: Boolean(parsed.flags.checkDocsProvider),
         probeRunner: options.probeRunner
       });
@@ -192,10 +230,47 @@ export async function resolveMetadataPath(options = {}) {
   return metadataMissing(candidates, 'Local recommendation metadata was not found.');
 }
 
+export async function loadProjectToolConfig(options = {}) {
+  const cwd = path.resolve(options.cwd ?? process.cwd());
+  const configPath = path.join(cwd, PROJECT_CONFIG_RELATIVE_PATH);
+
+  if (!await pathExists(configPath)) {
+    return {
+      source_kind: 'missing',
+      source_path: configPath,
+      enabled_tools: [],
+      warnings: [{
+        code: 'config-missing',
+        message: 'Project config .ai-factory/config.yaml was not found.'
+      }]
+    };
+  }
+
+  try {
+    const raw = await readFile(configPath, 'utf8');
+    const parsed = parseSimpleYaml(raw);
+    return normalizeProjectToolConfig(parsed, {
+      sourcePath: configPath,
+      metadata: options.metadata
+    });
+  } catch (err) {
+    return {
+      source_kind: 'invalid',
+      source_path: configPath,
+      enabled_tools: [],
+      warnings: [{
+        code: 'config-unreadable',
+        message: `Project config could not be read: ${err?.message ?? String(err)}`
+      }]
+    };
+  }
+}
+
 export async function buildRecommendationResult(options = {}) {
   const metadata = options.metadata;
   const projectShape = normalizeProjectShape(options.projectShape);
   const taskSignals = normalizeTaskSignals(options.taskSignals);
+  const command = normalizeCommand(options.command);
   const baseline = [metadata?.default_policy?.baseline_tool ?? 'rg'];
   const warnings = [];
   const candidates = collectCandidateTools(metadata, projectShape, taskSignals);
@@ -205,6 +280,8 @@ export async function buildRecommendationResult(options = {}) {
     const tool = metadata.tools?.[toolId];
     if (!tool || isRejectedTool(toolId, tool)) continue;
     if (!isAllowedForRequest(toolId, tool, projectShape, taskSignals, metadata)) continue;
+    const permission = permissionForTool(metadata, toolId, command);
+    if (commandBoundaryReason(tool, command, permission)) continue;
 
     const probe = await runProbeForTool(toolId, {
       checkDocsProvider: Boolean(options.checkDocsProvider),
@@ -213,6 +290,8 @@ export async function buildRecommendationResult(options = {}) {
     recommendations.push(buildRecommendation(toolId, tool, {
       projectShape,
       taskSignals,
+      command,
+      permission,
       availability: probe.availability,
       command: probe.command
     }));
@@ -227,7 +306,102 @@ export async function buildRecommendationResult(options = {}) {
     baseline,
     recommendations: dedupeRecommendations(recommendations),
     do_not_recommend: buildDoNotRecommend(metadata, projectShape, taskSignals),
+    protected_artifacts: asArray(metadata.protected_artifacts),
+    forbidden_operations: asArray(metadata.forbidden_operations),
     warnings
+  };
+}
+
+export async function buildSelectionResult(options = {}) {
+  const metadata = options.metadata;
+  const projectShape = normalizeProjectShape(options.projectShape);
+  const taskSignals = normalizeTaskSignals(options.taskSignals);
+  const command = normalizeCommand(options.command);
+  const config = options.config ?? {
+    source_kind: 'missing',
+    source_path: null,
+    enabled_tools: [],
+    warnings: []
+  };
+  const baseline = [metadata?.default_policy?.baseline_tool ?? 'rg'];
+  const selectedTools = [];
+  const notSelectedTools = [];
+
+  for (const toolId of asArray(config.enabled_tools)) {
+    const tool = metadata.tools?.[toolId];
+    if (!tool) {
+      notSelectedTools.push({
+        tool_id: toolId,
+        reason: 'unknown tool id in project config'
+      });
+      continue;
+    }
+
+    const permission = permissionForTool(metadata, toolId, command);
+    const boundaryReason = commandBoundaryReason(tool, command, permission);
+    if (boundaryReason) {
+      notSelectedTools.push({
+        tool_id: toolId,
+        reason: boundaryReason,
+        permission
+      });
+      continue;
+    }
+
+    if (isRejectedTool(toolId, tool)) {
+      notSelectedTools.push({
+        tool_id: toolId,
+        reason: tool.avoid_reason ?? `${tool.display_name ?? toolId} is rejected by local metadata.`,
+        permission
+      });
+      continue;
+    }
+
+    if (!isAllowedForRequest(toolId, tool, projectShape, taskSignals, metadata)) {
+      notSelectedTools.push({
+        tool_id: toolId,
+        reason: `${tool.display_name ?? toolId} is not applicable for ${projectShape} + ${taskSignals.join(', ')}.`,
+        permission
+      });
+      continue;
+    }
+
+    const probe = await runProbeForTool(toolId, {
+      checkDocsProvider: Boolean(options.checkDocsProvider),
+      probeRunner: options.probeRunner
+    });
+    selectedTools.push({
+      ...buildRecommendation(toolId, tool, {
+        projectShape,
+        taskSignals,
+        command,
+        permission,
+        availability: probe.availability,
+        command: probe.command
+      }),
+      configured: true,
+      execution: executionForTool(tool, command)
+    });
+  }
+
+  return {
+    schema: SELECTION_RESULT_SCHEMA,
+    metadata_available: true,
+    metadata_source: metadata.source_path ?? null,
+    config: {
+      source_kind: config.source_kind,
+      source_path: config.source_path ? toPosix(path.normalize(config.source_path)) : null,
+      enabled_tools: asArray(config.enabled_tools)
+    },
+    command,
+    project_shape: projectShape,
+    task_signals: taskSignals,
+    baseline,
+    selected_tools: dedupeRecommendations(selectedTools),
+    not_selected_tools: notSelectedTools,
+    protected_artifacts: asArray(metadata.protected_artifacts),
+    forbidden_operations: asArray(metadata.forbidden_operations),
+    warnings: asArray(config.warnings)
   };
 }
 
@@ -263,7 +437,12 @@ function metadataSummary(metadata) {
       recommendation_action: tool.recommendation_action ?? null,
       install_policy: tool.install_policy ?? metadata.default_policy?.install_policy ?? null,
       read_scope: tool.read_scope ?? null,
-      purge_path: tool.purge_path ?? null
+      purge_path: tool.purge_path ?? null,
+      allowed_in: asArray(tool.allowed_in),
+      forbidden_in: asArray(tool.forbidden_in),
+      privacy_caveat: tool.privacy_caveat ?? null,
+      permissions: metadata.tool_permissions?.[toolId] ?? null,
+      execution: tool.execution ?? null
     };
   }
 
@@ -273,6 +452,11 @@ function metadataSummary(metadata) {
     metadata_available: true,
     metadata_source: metadata.source_path ?? null,
     default_policy: metadata.default_policy ?? {},
+    skill_usage_matrix: metadata.skill_usage_matrix ?? {},
+    tool_permissions: metadata.tool_permissions ?? {},
+    availability_probes: metadata.availability_probes ?? {},
+    forbidden_operations: asArray(metadata.forbidden_operations),
+    protected_artifacts: asArray(metadata.protected_artifacts),
     project_shape_signals: Object.keys(metadata.project_shape_signals ?? {}),
     task_signals: Object.keys(metadata.task_signals ?? {}),
     tools
@@ -290,6 +474,31 @@ function degradedRecommendationResult(options = {}) {
     recommendations: [],
     do_not_recommend: [],
     warnings: [metadataWarning(options.metadataError)]
+  };
+}
+
+function degradedSelectionResult(options = {}) {
+  return {
+    schema: SELECTION_RESULT_SCHEMA,
+    metadata_available: false,
+    metadata_source: options.metadataError?.path ?? null,
+    config: {
+      source_kind: options.config?.source_kind ?? 'missing',
+      source_path: options.config?.source_path ? toPosix(path.normalize(options.config.source_path)) : null,
+      enabled_tools: asArray(options.config?.enabled_tools)
+    },
+    command: normalizeCommand(options.command),
+    project_shape: normalizeProjectShape(options.projectShape),
+    task_signals: normalizeTaskSignals(options.taskSignals),
+    baseline: ['rg'],
+    selected_tools: [],
+    not_selected_tools: [],
+    protected_artifacts: [],
+    forbidden_operations: [],
+    warnings: [
+      metadataWarning(options.metadataError),
+      ...asArray(options.config?.warnings)
+    ]
   };
 }
 
@@ -373,6 +582,20 @@ function isRejectedTool(toolId, tool) {
     || /^do_not_/.test(String(tool.recommendation_action ?? ''));
 }
 
+function commandBoundaryReason(tool, command, permission) {
+  if (permission === 'forbidden') {
+    return `${tool.display_name ?? 'Tool'} is forbidden for ${command}.`;
+  }
+  if (asArray(tool.forbidden_in).includes(command)) {
+    return `${tool.display_name ?? 'Tool'} is forbidden for ${command}.`;
+  }
+  const allowedIn = asArray(tool.allowed_in).filter((scope) => String(scope).startsWith('aif-'));
+  if (allowedIn.length > 0 && !allowedIn.includes(command)) {
+    return `${tool.display_name ?? 'Tool'} is not allowed for ${command}.`;
+  }
+  return null;
+}
+
 function buildRecommendation(toolId, tool, context) {
   const installPolicy = tool.install_policy ?? 'explicit_user_opt_in_only';
   return {
@@ -384,8 +607,18 @@ function buildRecommendation(toolId, tool, context) {
     install_policy: installPolicy,
     read_scope: tool.read_scope ?? 'unknown',
     purge_path: tool.purge_path ?? 'unknown',
+    allowed_in: asArray(tool.allowed_in),
+    forbidden_in: asArray(tool.forbidden_in),
+    permission: context.permission ?? null,
+    privacy_caveat: tool.privacy_caveat ?? null,
     next_step: nextStepForTool(toolId, tool)
   };
+}
+
+function executionForTool(tool, command) {
+  const execution = tool?.execution;
+  if (!execution || typeof execution !== 'object') return null;
+  return execution[command] ?? execution.default ?? null;
 }
 
 function nextStepForTool(toolId, tool) {
@@ -400,6 +633,9 @@ function nextStepForTool(toolId, tool) {
   }
   if (toolId === 'context7') {
     return 'Use only as optional user-owned docs lookup for version-sensitive library/API questions.';
+  }
+  if (toolId === 'codegraph') {
+    return 'Use rg first; for broad repo graph questions only, run codegraph init <project>, codegraph index --quiet <project>, codegraph query --path <project> ... --json, then codegraph uninit --force <project>. Do not run codegraph install, sync, serve, serve --mcp, or mutate agent config.';
   }
   if (toolId === 'agent-memory') {
     return 'Use only as a manual markdown notebook when the user explicitly asks for durable notes.';
@@ -468,6 +704,13 @@ async function runProbeForTool(toolId, options = {}) {
     }
     return probeAny([['ctx7', ['--version']], ['npx', ['--no-install', 'ctx7', '--help']]]);
   }
+  if (toolId === 'codegraph') {
+    return probeAny([
+      ['codegraph', ['--version']],
+      ['codegraph', ['--help']],
+      ['codegraph', ['status']]
+    ]);
+  }
 
   return {
     availability: 'unknown',
@@ -500,12 +743,49 @@ async function probeCommand(command, args) {
       command: commandLabel
     };
   } catch (err) {
+    if (process.platform === 'win32' && (err?.code === 'ENOENT' || err?.code === 'EINVAL')) {
+      return probeWindowsShellCommand(command, args, commandLabel);
+    }
     return {
       availability: err?.code === 'ENOENT' ? 'not_installed' : 'unknown',
       command: commandLabel,
       reason: err?.code === 'ENOENT' ? 'command-not-found' : 'probe-failed'
     };
   }
+}
+
+async function probeWindowsShellCommand(command, args, commandLabel) {
+  const shell = process.env.ComSpec || 'cmd.exe';
+  const commandLine = [command, ...args].map(quoteWindowsShellArg).join(' ');
+  try {
+    await execFileAsync(shell, ['/d', '/s', '/c', commandLine], {
+      windowsHide: true,
+      timeout: 5000,
+      maxBuffer: 64 * 1024
+    });
+    return {
+      availability: 'installed',
+      command: commandLabel
+    };
+  } catch (err) {
+    const output = `${err?.stdout ?? ''}\n${err?.stderr ?? ''}`;
+    const notFound = isWindowsShellCommandNotFound(output);
+    return {
+      availability: notFound ? 'not_installed' : 'unknown',
+      command: commandLabel,
+      reason: notFound ? 'command-not-found' : 'probe-failed'
+    };
+  }
+}
+
+export function isWindowsShellCommandNotFound(output) {
+  return /not recognized|cannot find|not found/i.test(String(output ?? ''));
+}
+
+function quoteWindowsShellArg(value) {
+  const text = String(value);
+  if (/^[A-Za-z0-9._:=+/@%-]+$/.test(text)) return text;
+  return `"${text.replaceAll('"', '\\"')}"`;
 }
 
 function normalizeProbeResult(probe) {
@@ -642,6 +922,7 @@ function parseArgs(args) {
     checkDocsProvider: false,
     shape: null,
     task: [],
+    command: null,
     metadata: null
   };
 
@@ -657,6 +938,8 @@ function parseArgs(args) {
       flags.shape = rest[++index];
     } else if (token === '--task') {
       flags.task.push(rest[++index]);
+    } else if (token === '--command') {
+      flags.command = rest[++index];
     } else if (token === '--metadata') {
       flags.metadata = rest[++index];
     }
@@ -668,6 +951,49 @@ function parseArgs(args) {
   };
 }
 
+function normalizeProjectToolConfig(parsed, options = {}) {
+  const metadataTools = Object.keys(options.metadata?.tools ?? {});
+  const utilities = isPlainObject(parsed.utilities) ? parsed.utilities : {};
+  const contextTools = firstPlainObject(
+    utilities.context_tools,
+    utilities.optional_context_tools,
+    utilities.memory_tools
+  );
+  const enabled = [];
+
+  for (const toolId of asArray(contextTools.enabled)) {
+    addNormalizedToolId(enabled, toolId);
+  }
+
+  for (const toolId of metadataTools) {
+    const utility = utilities[toolId];
+    if (utility === true || (isPlainObject(utility) && utility.enabled === true)) {
+      addNormalizedToolId(enabled, toolId);
+    }
+  }
+
+  return {
+    source_kind: 'project-config',
+    source_path: options.sourcePath ?? null,
+    enabled_tools: enabled,
+    warnings: []
+  };
+}
+
+function firstPlainObject(...values) {
+  return values.find((value) => isPlainObject(value)) ?? {};
+}
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function addNormalizedToolId(target, value) {
+  const text = String(value ?? '').trim();
+  if (!text || target.includes(text)) return;
+  target.push(text);
+}
+
 function normalizeProjectShape(shape) {
   const normalized = String(shape ?? 'large_framework_app').trim();
   return VALID_PROJECT_SHAPES.has(normalized) ? normalized : 'large_framework_app';
@@ -676,6 +1002,17 @@ function normalizeProjectShape(shape) {
 function normalizeTaskSignals(signals) {
   const normalized = asArray(signals).map((signal) => String(signal).trim()).filter(Boolean);
   return normalized.length > 0 ? [...new Set(normalized)] : [DEFAULT_TASK_SIGNAL];
+}
+
+function normalizeCommand(command) {
+  const normalized = String(command ?? DEFAULT_COMMAND).trim();
+  return normalized || DEFAULT_COMMAND;
+}
+
+function permissionForTool(metadata, toolId, command) {
+  const permissions = metadata?.tool_permissions?.[toolId];
+  if (!permissions || typeof permissions !== 'object') return null;
+  return permissions[command] ?? permissions.default ?? null;
 }
 
 function dedupeRecommendations(recommendations) {
@@ -811,12 +1148,49 @@ function parseScalar(value) {
   }
 
   const lower = trimmed.toLowerCase();
+  if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+    return parseInlineList(trimmed);
+  }
   if (lower === 'true') return true;
   if (lower === 'false') return false;
   if (lower === 'null') return null;
   if (/^-?\d+(?:\.\d+)?$/.test(trimmed)) return Number(trimmed);
 
   return trimmed;
+}
+
+function parseInlineList(value) {
+  const body = String(value ?? '').trim().slice(1, -1).trim();
+  if (!body) return [];
+  return splitInlineListItems(body).map((item) => parseScalar(item));
+}
+
+function splitInlineListItems(value) {
+  const items = [];
+  let quote = null;
+  let current = '';
+  const raw = String(value ?? '');
+
+  for (let index = 0; index < raw.length; index += 1) {
+    const char = raw[index];
+    if ((char === '"' || char === "'") && (index === 0 || raw[index - 1] !== '\\')) {
+      quote = quote === char ? null : quote ?? char;
+      current += char;
+      continue;
+    }
+    if (char === ',' && quote === null) {
+      items.push(current.trim());
+      current = '';
+      continue;
+    }
+    current += char;
+  }
+
+  if (current.trim().length > 0) {
+    items.push(current.trim());
+  }
+
+  return items;
 }
 
 function stripInlineComment(value) {

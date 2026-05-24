@@ -31,10 +31,18 @@ Do not create legacy `.ai-factory/plans` plan files or companion folders in this
 
 If the task is docs/tooling-only and does not change product or workflow behavior, a delta spec may be omitted only when the plan explicitly explains why no delta spec is needed.
 
+#### Enabled optional tool use
+
+- Before using any optional provider, call the installed wrapper when available: `ai-factory aifhub-memory-tools select --from-project --command aif-plan --json`.
+- Use only entries returned in `selected_tools`. For each selected entry, follow its `tool_id`, `permission`, `execution`, `forbidden_operations`, `protected_artifacts`, read scope, purge path, and privacy caveat.
+- Do not use tools that are absent from `selected_tools`, including tools listed in `not_selected_tools`, tools missing from config, tools forbidden for `/aif-plan`, or tools whose execution guidance is unavailable.
+- If no optional provider is selected, continue with the rg baseline and direct repository/OpenSpec evidence.
+
 #### Optional Graphify context
 
 Graphify is optional supporting context for integration discovery before creating or refining a canonical OpenSpec change.
 
+- This provider-specific boundary applies only when `selected_tools` includes Graphify, or when reading already reviewed Graphify output that exists in an allowed context path.
 - `/aif-plan full` may read existing reviewed Graphify outputs such as `graphify-out/GRAPH_REPORT.md`, `graphify-out/graph.json`, `.ai-factory/references/graphify/GRAPH_REPORT.md`, and `.ai-factory/state/<change-id>/graphify/GRAPH_REPORT.md`.
 - Missing Graphify or missing reports are degraded context, not planning failure.
 - Do not install `graphifyy`, run `graphify`, add Graphify dependencies or manifest entries, or start/register Graphify MCP automatically.
@@ -48,7 +56,8 @@ Graphify is optional supporting context for integration discovery before creatin
 
 Context7 is optional supporting documentation context for current library/API docs before creating or refining a canonical OpenSpec change.
 
-- `/aif-plan full` may recommend that the user run Context7 manually outside AIFHub command ownership with commands such as `npx ctx7 library <name> <query>` and `npx ctx7 docs <libraryId> <query>`, or user-installed equivalents `ctx7 library <name> <query>` and `ctx7 docs <libraryId> <query>`.
+- This provider-specific boundary applies only when `selected_tools` includes Context7, or when reading already reviewed Context7 notes that exist in an allowed context path.
+- `/aif-plan full` may recommend that the user run Context7 manually outside AIFHub command ownership only when the selection output allows Context7, with commands such as `npx ctx7 library <name> <query>` and `npx ctx7 docs <libraryId> <query>`, or user-installed equivalents `ctx7 library <name> <query>` and `ctx7 docs <libraryId> <query>`.
 - `/aif-plan full` may read reviewed Context7 notes under `.ai-factory/references/context7/` and `.ai-factory/state/<change-id>/context7/`.
 - Missing Context7, missing Node.js runtime support, missing provider access, or missing reviewed notes is degraded context, not planning failure.
 - If the user already configured Context7 MCP, available tools may include `resolve-library-id` plus a docs retrieval tool named `get-library-docs` or `query-docs`; use them only as optional read-only documentation context.

@@ -1,8 +1,8 @@
 # codex-agent-mem
 
-Repository: [MarceloCaporale/codex-agent-mem](https://github.com/MarceloCaporale/codex-agent-mem)
+Репозиторий: [MarceloCaporale/codex-agent-mem](https://github.com/MarceloCaporale/codex-agent-mem)
 
-Tested package: `codex-agent-mem 1.0.2`.
+Проверенный package: `codex-agent-mem 1.0.2`.
 
 ## Мета Для Анализа
 
@@ -79,13 +79,13 @@ Live MCP calls заняли 411 ms total для session list, bootstrap context,
 
 ## Результаты Тестов
 
-| Check | Result |
+| Проверка | Результат |
 |---|---|
 | Stable CLI | PASS |
 | MCP `tools/list` | PASS |
 | Read-only mode | PASS |
 | Explicit DB path | PASS |
-| Purge/delete index | PASS через удаление SQLite DB |
+| Очистка/delete index | PASS через удаление SQLite DB |
 | Private code indexing risk | Low в read-only continuity mode |
 | Token output | Compact context pack reported `pack_tokens=130` |
 
@@ -109,7 +109,7 @@ Shared controlled result: smoke DB работал за 794.4 ms, live read-only 
 
 Проверка выполнялась как continuity smoke, а не source indexing. Для каждого профиля создавалась отдельная temp SQLite DB; MCP запускался в `--read-only --profile minimal` mode. Source files не индексировались.
 
-| Profile | Shape | Smoke | MCP Calls | Tools | DB Size | Pack Tokens | Privacy/Purge | Decision |
+| Profile | Shape | Smoke | MCP Calls | Tools | DB Size | Pack Tokens | Privacy/Очистка | Решение |
 |---|---|---:|---:|---:|---:|---:|---|---|
 | R2026-05-22-P01 | `go_service` | 1.7 s | 839 ms | 7 | 208.0 KB | n/a | explicit DB; purge PASS | Optional только для continuity. |
 | R2026-05-22-P02 | `large_framework_app` | 1.3 s | 1.0 s | 7 | 208.0 KB | n/a | explicit DB; purge PASS | Optional только для continuity. |
@@ -127,7 +127,21 @@ Shared controlled result: smoke DB работал за 794.4 ms, live read-only 
 
 Вывод по этому прогону: project shape почти не влияет, потому что tool не читает source. Рекомендация остаётся прежней: предлагать только если нужна continuity между сессиями и есть explicit DB path.
 
-## Scope И Privacy
+## Локальный Прогон На Real Project Roots (2026-05-23)
+
+Проверка выполнялась как continuity smoke с отдельной temp SQLite DB на каждый anonymous profile. Real source files не индексировались; `project_key` был anonymous id.
+
+| Profile | Shape | Smoke | DB Created | Source Indexed | Результат | Решение |
+|---|---|---:|---|---|---|---|
+| real-profile-01 | `large_legacy_web_app` | 684 ms | yes | no | PASS | Optional only for continuity/open work. |
+| real-profile-02 | `go_service` | 510 ms | yes | no | PASS | Optional only for continuity/open work. |
+| real-profile-03 | `large_framework_app` | 493 ms | yes | no | PASS | Optional only for continuity/open work. |
+| real-profile-04 | `multi_app_workspace` | 484 ms | yes | no | PASS | Optional only for continuity/open work. |
+| real-profile-05 | `small_microservice` | 951 ms | yes | no | PASS | Usually unnecessary unless session continuity matters. |
+
+Вывод не изменился: tool безопасно работает с explicit DB path, но он не помогает initial code discovery. Для поиска по коду baseline остаётся `rg`, для broad repo graph - optional Graphify.
+
+## Границы И Privacy
 
 Safe configuration использует:
 
@@ -140,7 +154,7 @@ Safe configuration использует:
 
 Избегать default/global setup, пока пользователь явно не opt-in. Bootstrap был safe в trial, потому что он печатал config snippet и не мутировал Codex config automatically.
 
-## Purge
+## Очистка
 
 Практический purge path - удалить configured SQLite DB и sidecar files, если они есть:
 

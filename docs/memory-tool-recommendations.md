@@ -1,70 +1,122 @@
-[Previous Page](context-providers.md) | [Back to Documentation](README.md) | [Next Page](context-loading-policy.md)
+[Предыдущая страница](context-providers.md) | [К документации](README.md) | [Следующая страница](context-loading-policy.md)
 
-# Memory Tool Recommendations
+# Рекомендации По Memory Tools
 
-AIFHub uses local recommendation metadata to suggest optional memory and context tools during analysis. The metadata lives in the installed extension, not on GitHub:
+AIFHub использует локальную metadata рекомендаций, чтобы во время анализа предлагать optional memory и context tools. Metadata живет в установленном extension, а не на GitHub:
 
 ```text
 .ai-factory/extensions/aifhub-extension/docs/memory-tools-research/recommendation-metadata.yaml
 ```
 
-When developing this extension itself, the source-tree copy under `docs/memory-tools-research/recommendation-metadata.yaml` may be used.
+При разработке самого extension можно использовать source-tree копию:
 
-## Commands
+```text
+docs/memory-tools-research/recommendation-metadata.yaml
+```
 
-Installed projects should use the wrapper command:
+## Команды
+
+Установленные проекты должны использовать wrapper command:
 
 ```bash
 ai-factory aifhub-memory-tools recommend --from-project --json
 ai-factory aifhub-memory-tools recommend --shape large_framework_app --task architecture_or_impact_discovery --json
+ai-factory aifhub-memory-tools select --from-project --command aif-explore --json
+ai-factory aifhub-memory-tools select --from-project --command aif-plan --json
 ai-factory aifhub-memory-tools status --json
 ai-factory aifhub-memory-tools metadata --json
 ```
 
-The wrapper resolves scripts from the installed extension and keeps the user project as the working directory.
+Wrapper находит scripts из установленного extension и оставляет рабочей директорией пользовательский проект.
 
-## Rules
+## Правила
 
-The recommender is advisory only:
+Recommender только советует:
 
-- `rg` remains the baseline for exact file and symbol lookup.
-- Tools are explicit opt-in only.
-- Missing tools are degraded context, not command failure.
-- Provider output is supporting context only, never canonical OpenSpec evidence.
-- AIFHub must not auto-install tools, run setup, index source, sync memory, register MCP servers, install hooks, start daemons, or write provider output.
+- `rg` остается baseline для точного поиска файлов и symbols.
+- Инструменты включаются только через explicit opt-in.
+- Отсутствующие tools означают degraded context, а не failure команды.
+- Provider output является только supporting context, никогда canonical OpenSpec evidence.
+- AIFHub не должен auto-install tools, запускать setup, индексировать source, sync memory, register MCP servers, install hooks, start daemons или записывать provider output.
+- Если metadata содержит поля, рекомендации включают allowed command scopes, forbidden command scopes, command-specific permission, privacy caveat, read scope, purge path, availability и explicit opt-in install policy.
+- Context/compression tools не должны rewrite validation artifacts и не должны compress protected artifacts in place.
+- `/aif-analyze` записывает только user-accepted tool ids в `utilities.context_tools.enabled`.
+- Follow-on skills вызывают `select` для своей команды и используют только `selected_tools`; изменение списка tools должно требовать metadata/config changes, а не prompt rewrites.
 
-## Tool Decisions
+Protected validation artifacts:
 
-Allowed recommendations:
+- `aif-gate-result`
+- `coverage.json`
+- `done-readiness.json`
+- `openspec/specs/**`
+- generated-rules traces
+- exact evidence snippets
+
+## Решения По Tools
+
+Разрешенные рекомендации:
 
 - `rg`: baseline search.
-- Graphify: optional repo graph for large framework, legacy, and multirepo impact discovery after baseline `rg`.
-- `codex-agent-mem`: optional read-only continuity memory with an explicit SQLite DB path.
-- `context-mode`: manual temporary index for explicit generated output or large command output.
-- Context7: optional docs provider for version-sensitive library/API questions.
-- `agent-memory`: manual notes only when the user explicitly asks for durable notes.
+- Graphify: optional repo graph для large framework, legacy и multirepo impact discovery после baseline `rg`.
+- `codex-agent-mem`: optional read-only continuity memory с explicit SQLite DB path.
+- `context-mode`: manual temporary index для explicit generated output или large command output.
+- Context7: optional docs provider для version-sensitive library/API questions.
+- `agent-memory`: manual notes только когда пользователь явно просит durable notes.
+- CodeGraph: `manual_cli_only` / `suggest_manual_cli_for_repo_graph_when_enabled_or_explicit`; CLI scoped read и purge прошли explicit real-root testing. `/aif-analyze` может рекомендовать его для broad repo graph questions, а `/aif-explore` может использовать его только когда command-specific `select` output возвращает его в `selected_tools`.
 
-Not recommended by default:
+Не рекомендовать по умолчанию:
 
-- `codex-mem`: default scope may ingest broad Codex history.
-- `eagle-mem`: scoped read and purge behavior is not proven.
+- `codex-mem`: default scope может ingest broad Codex history.
+- `eagle-mem`: scoped read и purge behavior не доказаны.
 
-## Safe Status Probes
+AIFHub по-прежнему не принимает CodeGraph `install`, MCP serving, hooks/background services или agent configuration mutation.
 
-`ai-factory aifhub-memory-tools status --json` may run only local, non-mutating probes:
+## Безопасные Status Probes
+
+`ai-factory aifhub-memory-tools status --json` может запускать только локальные non-mutating probes:
 
 - `rg --version`
 - `uv --version`
-- `graphify --version` or `graphify --help`
-- `codex-agent-mem-policy --help` or `codex-agent-mem-smoke --help`
+- `graphify --version` или `graphify --help`
+- `codex-agent-mem-policy --help` или `codex-agent-mem-smoke --help`
 - `context-mode doctor`
-- `ctx7 --version` or `npx --no-install ctx7 --help` only when `--check-docs-provider` is passed
+- `ctx7 --version` или `npx --no-install ctx7 --help` только когда передан `--check-docs-provider`
+- `codegraph --version`, `codegraph --help` или `codegraph status` только как availability probes
 
-These probes must not install packages, create indexes, run setup, register MCP servers, write hooks, or start background processes.
+Эти probes не должны install packages, run setup, register MCP servers, write hooks или start background processes. `codegraph init/index/query/uninit` разрешен только когда `select --command aif-explore --json` возвращает CodeGraph в `selected_tools` с `manual_purged_cli_execution`, explicit project path и purge через `codegraph uninit --force <project>`.
 
-## Analyze Output
+## Выбор Через Config
 
-`/aif-analyze` should summarize recommendations like this:
+`/aif-analyze` должен классифицировать текущий проект, запустить `recommend`, спросить пользователя, какие рекомендации включить, и сохранить accepted tool ids в config:
+
+```yaml
+utilities:
+  context_tools:
+    enabled:
+      - codegraph
+      - graphify
+```
+
+Compatibility flags вроде `utilities.graphify.enabled: true` и `utilities.codegraph.enabled: true` все еще читаются командой `select`, но стабильный provider list - это `utilities.context_tools.enabled`.
+
+Во время выполнения skill используйте command-specific selection:
+
+```bash
+ai-factory aifhub-memory-tools select --from-project --command aif-explore --json
+ai-factory aifhub-memory-tools select --from-project --command aif-plan --json
+```
+
+Selection output включает `selected_tools`, `not_selected_tools`, `permission`, `execution`, `forbidden_operations` и `protected_artifacts`. Metadata output включает такое же per-tool execution guidance, чтобы `/aif-analyze` мог показать доступные параметры без hard-code конкретного provider. Skill не должен использовать configured tools, которых нет в `selected_tools`.
+
+## Evidence На Реальных Проектах
+
+Follow-up smoke от 2026-05-23 использовал пять real local project roots, записанных только как anonymous profiles. `rg` был единственным default tool, который напрямую читал source. Graphify запускался AST-only на temporary copies; memory/context tools использовали isolated temp DB/data dirs и anonymous marker notes.
+
+Позже CodeGraph был установлен по явному запросу пользователя и проверен на 29 real local project roots через `init`, `index --quiet`, `status`, JSON `query` и `uninit --force`. Lifecycle прошел на всех 29 roots без protected agent/config mutations и без оставшихся `.codegraph/` directories. Принятая рекомендация - manual CLI-only; `install`/MCP/agent-config behavior все еще не принят для AIFHub automation.
+
+## Вывод Анализа
+
+`/aif-analyze` должен кратко суммировать рекомендации так:
 
 ```text
 Optional local tools:
@@ -76,7 +128,7 @@ Recommended:
 - Graphify: useful for broad architecture/impact discovery in this large framework project.
   Status: installed/not installed/unknown
   Read scope: explicit project path
-  Purge: delete graphify-out/
+  Очистка: delete graphify-out/
   Note: supporting context only, not OpenSpec evidence.
 
 Not recommended:
@@ -84,4 +136,4 @@ Not recommended:
 - eagle-mem: scoped read and purge not proven.
 ```
 
-If metadata is unavailable, `/aif-analyze` should report a degraded note and continue with `rg` as the baseline.
+Если metadata недоступна, `/aif-analyze` должен сообщить degraded note и продолжить с `rg` как baseline.

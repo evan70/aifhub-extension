@@ -1,8 +1,8 @@
 # context-mode
 
-Repository: [mksglu/context-mode](https://github.com/mksglu/context-mode)
+Репозиторий: [mksglu/context-mode](https://github.com/mksglu/context-mode)
 
-Tested package: `context-mode 1.0.146`.
+Проверенный package: `context-mode 1.0.146`.
 
 ## Мета Для Анализа
 
@@ -86,7 +86,7 @@ Shared controlled result: explicit indexed canary был retrievable before purg
 
 Проверка выполнялась только на explicit generated text: anonymous profile summary + canary. Source files не индексировались. Для каждого профиля использовался отдельный `CONTEXT_MODE_DATA_DIR`, затем выполнялся `ctx_purge({ confirm: true, scope: "project" })`.
 
-| Profile | Shape | Indexed Tokens | Index | Search | Found | Purge | Decision |
+| Profile | Shape | Indexed Tokens | Index | Search | Found | Очистка | Решение |
 |---|---|---:|---:|---:|---|---|---|
 | R2026-05-22-P01 | `go_service` | ~43 | 59 ms | 8 ms | yes | PASS | Manual helper для explicit generated output. |
 | R2026-05-22-P02 | `large_framework_app` | ~46 | 49 ms | 8 ms | yes | PASS | Manual helper для explicit generated output. |
@@ -104,7 +104,21 @@ Shared controlled result: explicit indexed canary был retrievable before purg
 
 Вывод по этому прогону: `context-mode` быстро работает как temporary index для явного generated output, но это не доказательство пользы как source-code retrieval tool. Рекомендация остаётся manual/helper-only.
 
-## Scope И Privacy
+## Локальный Прогон На Real Project Roots (2026-05-23)
+
+Проверка выполнялась через MCP SDK на пяти real project roots, но индексировались только generated profile summaries из `rg` baseline. Source snippets, paths, secrets и validation artifacts не передавались в `ctx_index`. Для каждого профиля использовался отдельный `CONTEXT_MODE_DATA_DIR`, затем выполнялся `ctx_purge({ confirm: true, scope: "project" })`.
+
+| Profile | Shape | MCP Connect | `ctx_index` | `ctx_search` | `ctx_purge` | Результат | Решение |
+|---|---|---:|---:|---:|---:|---|---|
+| real-profile-01 | `large_legacy_web_app` | 3.36 s | 83 ms | 8 ms | 121 ms | PASS | Manual helper только для generated output. |
+| real-profile-02 | `go_service` | 1.55 s | 36 ms | 7 ms | 9 ms | PASS | Manual helper только для generated output. |
+| real-profile-03 | `large_framework_app` | 1.69 s | 39 ms | 7 ms | 8 ms | PASS | Manual helper только для generated output. |
+| real-profile-04 | `multi_app_workspace` | 2.29 s | 40 ms | 7 ms | 8 ms | PASS | Manual helper только для generated output. |
+| real-profile-05 | `small_microservice` | 1.73 s | 46 ms | 8 ms | 10 ms | PASS | Обычно не нужен для малых проектов. |
+
+`context-mode doctor` также прошел runtime/server/FTS5 checks, а Codex hook registration failed/warned, потому что hooks намеренно не устанавливались. Для AIFHub docs это ожидаемо: не устанавливать hooks и не register MCP automatically.
+
+## Границы И Privacy
 
 Privacy content-driven:
 
@@ -114,7 +128,11 @@ Privacy content-driven:
 
 Для AIFHub это значит, что `context-mode` не должен регистрироваться как default provider. Если используется, то только как manual, per-session helper для большого command output и docs, а не persistent project memory.
 
-## Purge
+## Защищенные Validation Artifacts
+
+`context-mode` не должен rewrite validation artifacts и не должен compress protected artifacts in place. Protected validation artifacts включают `aif-gate-result`, `coverage.json`, `done-readiness.json`, OpenSpec specs, generated-rules traces и exact evidence snippets.
+
+## Очистка
 
 `ctx_purge` поддерживает explicit scopes:
 

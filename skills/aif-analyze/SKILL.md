@@ -104,7 +104,7 @@ Do not rewrite or delete those folders automatically in this skill.
 
 ### Step 2.1: Optional Context/Memory Tool Recommendations
 
-Use local recommendation metadata to suggest optional context and memory tools during repository inspection.
+Use local recommendation metadata to suggest optional context and memory tools during repository inspection. This skill recommends the needed tools; it does not execute provider setup, indexing, MCP registration, or agent configuration.
 
 Read metadata from the installed extension path when available:
 
@@ -122,6 +122,7 @@ Installed-project diagnostics should use the wrapper command:
 
 ```bash
 ai-factory aifhub-memory-tools recommend --from-project --json
+ai-factory aifhub-memory-tools select --from-project --command aif-explore --json
 ai-factory aifhub-memory-tools status --json
 ai-factory aifhub-memory-tools metadata --json
 ```
@@ -152,10 +153,26 @@ Recommendation rules:
 - `rg` remains the baseline for exact file/symbol lookup, small projects, and first-pass literal search.
 - Recommend only tools allowed by local metadata.
 - Prefer installed/local tools in recommendations; non-installed tools may be described as optional manual install only when metadata allows.
+- Include enriched recommendation details when metadata provides them: allowed command scopes, forbidden command scopes, command-specific permission, execution guidance, privacy caveat, read scope, purge path, availability, and explicit opt-in install policy.
+- Ask the user which recommended tools to enable. Write only accepted tool ids to `utilities.context_tools.enabled`; do not enable a tool just because it was recommended.
+- After config is updated, follow-on skills should call `ai-factory aifhub-memory-tools select --from-project --command <skill> --json` and use only `selected_tools`. Do not hard-code provider-specific tool lists into follow-on skills.
 - Never auto-install, run setup, start MCP, register MCP, index source, sync memory, install hooks, start background daemons, or persist provider output.
 - Provider output is supporting context only, never canonical OpenSpec evidence.
 - `codex-mem` and `eagle-mem` are not recommended by default.
 - `agent-memory` is recommended only when the user explicitly asks for manual durable notes.
+- `CodeGraph` is `manual_cli_only` with `suggest_manual_cli_for_repo_graph_when_enabled_or_explicit`: explicit CLI scoped read/purge is verified for broad repo graph questions, but `install`/MCP/agent configuration mutation surface is not accepted. `/aif-analyze` may recommend it; `/aif-explore` may use it only when `select --command aif-explore --json` returns it in `selected_tools` and the run can purge with the returned purge command.
+- Treat protected validation artifacts as off limits for context/compression rewriting. Optional tools must not rewrite validation artifacts and must not compress protected artifacts in place, including `aif-gate-result`, `coverage.json`, `done-readiness.json`, `openspec/specs/**`, generated-rules traces, and exact evidence snippets.
+
+CodeGraph manual CLI lifecycle is metadata-owned execution guidance for a later selected explore run:
+
+```bash
+codegraph init <project>
+codegraph index --quiet <project>
+codegraph query --path <project> --limit 10 --json "<query>"
+codegraph uninit --force <project>
+```
+
+Do not run `codegraph install`, `codegraph sync`, `codegraph serve`, `codegraph serve --mcp`, agent configuration commands, hooks, or background services.
 
 Safe local availability probes are limited to:
 
@@ -167,6 +184,9 @@ graphify --help
 codex-agent-mem-policy --help
 codex-agent-mem-smoke --help
 context-mode doctor
+codegraph --version
+codegraph --help
+codegraph status
 ctx7 --version
 npx --no-install ctx7 --help
 ```
@@ -213,16 +233,27 @@ Resolve the bootstrap/config mode before creating directories:
 - Preserve existing `language.ui`, `language.artifacts`, and `language.technical_terms` values. If `language.technical_terms` is missing, default it to `keep`; accepted values are `keep | translate | mixed`.
 - If localization answers were collected while config was missing, write those pending config values into the selected legacy `ai-factory` or `openspec-native` config shape.
 - Keep schema consistent with nested sections: `language`, `aifhub`, `paths`, `utilities`, `rules`, `workflow`.
-- Ensure the shared optional utility config is present in both legacy `ai-factory` and `openspec-native` modes, preserving existing user values. `utilities.graphify` is a backward-compatible preference shim only; new optional memory/context recommendations come from local `recommendation-metadata.yaml`, not from a generic provider config abstraction:
+- Ensure the shared optional utility config is present in both legacy `ai-factory` and `openspec-native` modes, preserving existing user values. `utilities.context_tools.enabled` is the stable user-accepted tool id list. `utilities.graphify.enabled` and `utilities.codegraph.enabled` are backward-compatible preference shims. New optional memory/context recommendations come from local `recommendation-metadata.yaml`, not from a generic provider config abstraction:
 
 ```yaml
 utilities:
+  context_tools:
+    # accepted tool ids from /aif-analyze recommendations
+    enabled: []
   graphify:
     enabled: false
     uv_check: uv --version
     install: uv tool install graphifyy
     activate: graphify install
     report_command: graphify .
+  codegraph:
+    enabled: false
+    command: codegraph
+    status: codegraph status
+    init: codegraph init .
+    index: codegraph index --quiet .
+    query: codegraph query --path . --limit 10 --json
+    purge: codegraph uninit --force .
 ```
 
 - In legacy `ai-factory` mode:
@@ -384,7 +415,9 @@ openspec init --tools none
 - Report the resolved bootstrap mode.
 - Report the bootstrap mode selection source: existing config, explicit user request, first-bootstrap answer, or autonomous default.
 - Report whether config values were created or preserved.
-- Report optional local tool recommendations from `ai-factory aifhub-memory-tools recommend --from-project --json` when the installed wrapper is available, or from source-tree metadata only when running inside the AIFHub extension repository. Include baseline `rg`, recommended tools with availability/read scope/purge path, and not-recommended tools such as `codex-mem` and `eagle-mem`. If metadata is unavailable, report a degraded note and continue.
+- Report optional local tool recommendations from `ai-factory aifhub-memory-tools recommend --from-project --json` when the installed wrapper is available, or from source-tree metadata only when running inside the AIFHub extension repository. Include baseline `rg`, recommended tools with availability/read scope/purge path, and not-recommended tools such as `codex-mem` and `eagle-mem`. Ask which recommendations to enable and write accepted tool ids to `utilities.context_tools.enabled`. If metadata is unavailable, report a degraded note and continue.
+- Report the selected tool view from `ai-factory aifhub-memory-tools select --from-project --command aif-explore --json` after config is updated, including `selected_tools` and any `not_selected_tools`.
+- When the recommender output includes enriched fields, include allowed command scopes, forbidden command scopes, command-specific permission, execution guidance, privacy caveat, and protected validation artifacts in the concise recommendation summary when relevant.
 - Report the backward-compatible Graphify utility setting and `uv` availability only as compatibility context. If `utilities.graphify.enabled` is missing or `false`, Graphify may still be recommended only through local metadata; show manual setup commands only as explicit opt-in guidance: `uv --version`, `uv tool install graphifyy`, `graphify install`, and `graphify .`.
 - If autonomous/subagent mode defaulted to legacy `ai-factory` because the artifact protocol question could not be asked, report OpenSpec-native mode selection as an open question/blocker.
 - Report the active path set.

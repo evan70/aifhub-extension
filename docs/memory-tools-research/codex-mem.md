@@ -1,6 +1,6 @@
 # codex-mem
 
-Package: `codex-mem 0.1.1`
+Пакет: `codex-mem 0.1.1`
 
 Package metadata не содержит repository URL. Ближайший публичный repository, проверенный во время research: [Just-Boring-Cat/codex-mem](https://github.com/Just-Boring-Cat/codex-mem), но installed npm package сам не доказывает связь с этим repository.
 
@@ -47,7 +47,7 @@ MCP exposed 8 tools:
 - `recent_sessions`
 - `build_context`
 
-## Isolated Test Results
+## Результаты Изолированных Тестов
 
 С правильной explicit isolation:
 
@@ -55,9 +55,9 @@ MCP exposed 8 tools:
 - `CODEX_MEM_DATA_DIR` указывал на temp data dir.
 - `CODEX_MEM_DB_PATH` указывал на temp SQLite DB.
 
-Results:
+Результаты:
 
-| Operation | Time |
+| Операция | Время |
 |---|---:|
 | `save` manual note | 413.4 ms |
 | `search` manual note | 392.1 ms |
@@ -85,7 +85,7 @@ Shared controlled result: explicit isolated manual note save/search/stats сра
 
 Проверка выполнялась только в full isolation: отдельные `CODEX_HOME`, `CODEX_MEM_DATA_DIR` и `CODEX_MEM_DB_PATH` на профиль. `sync` не запускался, глобальная Codex history не читалась.
 
-| Profile | Shape | Save | Search | Stats | DB Size | Found | Purge | Decision |
+| Profile | Shape | Save | Search | Stats | DB Size | Found | Очистка | Решение |
 |---|---|---:|---:|---:|---:|---|---|---|
 | R2026-05-22-P01 | `go_service` | 421 ms | 394 ms | 384 ms | 56.0 KB | yes | PASS | Safe only with full isolation; reject default. |
 | R2026-05-22-P02 | `large_framework_app` | 531 ms | 395 ms | 406 ms | 56.0 KB | yes | PASS | Safe only with full isolation; reject default. |
@@ -103,7 +103,21 @@ Shared controlled result: explicit isolated manual note save/search/stats сра
 
 Вывод по этому прогону: isolated manual-note mode работает стабильно, но это не снимает blocker по default broad Codex history scope. Рекомендация остаётся `reject_default`.
 
-## Privacy Failure
+## Локальный Прогон На Real Project Roots (2026-05-23)
+
+Проверка выполнялась только в full isolation: отдельные temp `CODEX_HOME`, `CODEX_MEM_DATA_DIR` и `CODEX_MEM_DB_PATH`. `sync`, `worker`, `init-mcp` и global Codex history не запускались. Каждая команда сохраняла только anonymous marker note с real project `--cwd` scope и проверяла scoped search.
+
+| Profile | Shape | Save | Search | Stats | Scoped Search | Source Indexed | Решение |
+|---|---|---:|---:|---:|---|---|---|
+| real-profile-01 | `large_legacy_web_app` | 597 ms | 428 ms | 445 ms | 1 result | no | Safe only with full isolation; reject default. |
+| real-profile-02 | `go_service` | 377 ms | 378 ms | 369 ms | 1 result | no | Safe only with full isolation; reject default. |
+| real-profile-03 | `large_framework_app` | 403 ms | 427 ms | 415 ms | 1 result | no | Safe only with full isolation; reject default. |
+| real-profile-04 | `multi_app_workspace` | 380 ms | 470 ms | 948 ms | 1 result | no | Safe only with full isolation; reject default. |
+| real-profile-05 | `small_microservice` | 704 ms | 563 ms | 372 ms | 1 result | no | Safe only with full isolation; reject default. |
+
+Вывод не меняется: isolated scoped notes работают, но опасным остается default/global Codex history scope. AIFHub не должен рекомендовать это как default provider.
+
+## Сбой Privacy
 
 Default behavior unsafe для AIFHub integration.
 
@@ -111,7 +125,7 @@ Default behavior unsafe для AIFHub integration.
 
 Оба generated indexes были quarantined, а global default store был removed из active home directory. Важный вывод не в operator mistake, а в том, что default source у tool - broad Codex session/history data.
 
-## Scope И Privacy
+## Границы И Privacy
 
 Default read scope включает Codex session/history logs под user's Codex home. Там могут быть private prompts, tool outputs, paths, snippets и cross-project context.
 
@@ -123,9 +137,9 @@ Safe use требует explicit настройки всех переменны�
 
 Это слишком fragile для default AIFHub integration.
 
-## Purge
+## Очистка
 
-Purge возможен удалением configured SQLite DB и sidecar files:
+Очистка возможна удалением configured SQLite DB и sidecar files:
 
 - `codex-mem.db`
 - `codex-mem.db-wal`

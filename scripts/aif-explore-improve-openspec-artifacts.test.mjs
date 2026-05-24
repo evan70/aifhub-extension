@@ -220,6 +220,42 @@ describe('aif-explore and aif-improve OpenSpec-native contracts', () => {
     }
   });
 
+  it('lets /aif-explore use enabled optional tools only within metadata permissions', async () => {
+    const injection = await readRepoFile('injections/core/aif-explore-plan-folder.md');
+    const openspec = extractSection(injection, 'OpenSpec-native mode');
+
+    for (const expected of [
+      'Enabled optional tool use',
+      'recommendation-metadata.yaml',
+      'ai-factory aifhub-memory-tools select --from-project --command aif-explore --json',
+      'utilities.context_tools.enabled',
+      'selected_tools',
+      'not_selected_tools',
+      'tool_id',
+      'permission',
+      'execution',
+      'forbidden_operations',
+      'protected_artifacts',
+      'Do not use tools that are absent from `selected_tools`',
+      'If no optional provider is selected, continue with the rg baseline',
+      'This provider-specific boundary applies only when `selected_tools` includes Graphify',
+      'This provider-specific boundary applies only when `selected_tools` includes Context7'
+    ]) {
+      assertIncludes(openspec, expected, 'aif-explore enabled optional tool use');
+    }
+
+    for (const unexpected of [
+      'codegraph init <project>',
+      'codegraph index --quiet <project>',
+      'codegraph query --path <project>',
+      'codegraph uninit --force <project>',
+      'utilities.codegraph.enabled: true',
+      'utilities.graphify.enabled: true'
+    ]) {
+      assertNotIncludes(openspec, unexpected, 'aif-explore should rely on CLI-selected tool execution');
+    }
+  });
+
   it('keeps Codex and IDE planning-mode guidance capability-gated', async () => {
     for (const relativePath of [
       'injections/core/aif-explore-plan-folder.md',

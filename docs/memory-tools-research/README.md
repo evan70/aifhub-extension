@@ -1,4 +1,4 @@
-# Research по Memory Tools
+# Research По Memory Tools
 
 Этот каталог фиксирует выводы по инструментам локальной памяти и retrieval для issue #85. Документы описывают результаты установки и полевых проверок без названий приватных проектов.
 
@@ -6,11 +6,12 @@
 
 Файл [recommendation-metadata.yaml](recommendation-metadata.yaml) содержит machine-readable правила для analysis-этапа. Его можно читать при анализе проекта и превращать project signals в предложение пользователю:
 
-- если проект выглядит как `multirepo`, предложить `Graphify` как optional repo graph для surface mapping;
+- если проект выглядит как `multirepo` или large framework, предложить `Graphify` или `CodeGraph` как optional repo graph для broad architecture/impact mapping;
 - если задача про resume/open work между сессиями, предложить `codex-agent-mem` в read-only MCP mode с explicit DB path;
 - если задача про большой command output, предложить `context-mode` как temporary manual helper с обязательным purge;
 - если проект маленький или нужен точный file/symbol lookup, оставить baseline `rg`;
 - `codex-mem` и `eagle-mem` не предлагать по умолчанию из-за scope/privacy risks.
+- `CodeGraph` можно предлагать только как `manual_cli_only` для `/aif-analyze` и использовать в `/aif-explore` только когда `select --command aif-explore --json` возвращает его в `selected_tools` с purge-командой; `install`/MCP/agent-config surface не принят.
 
 Эта meta не разрешает auto-install. Любой инструмент из списка должен предлагаться пользователю только как explicit opt-in с объяснением read scope, purge path и privacy tradeoff.
 
@@ -41,7 +42,7 @@
    - Stable CLI: `--help`, `--version` или ближайшая безопасная команда.
    - MCP: `tools/list` и минимальные read-only calls, если MCP заявлен.
    - Read scope: только explicit temp path, explicit DB или explicit indexed content.
-   - Purge: удалить index/DB/sidecar files или вызвать documented purge command.
+   - Очистка: удалить index/DB/sidecar files или вызвать documented purge command.
    - Privacy: не читать global history, user home, hooks или real source root без явного opt-in.
 
 6. Проверить функциональные сценарии.
@@ -69,7 +70,9 @@
 
 ## Сводка
 
-| Tool | Repository | Tested Version | Где подходит | Решение |
+README содержит только общую сводку и итоговую рекомендацию. Датированные результаты тестирования, anonymous profile таблицы, safety evidence и выводы по конкретному инструменту находятся в файле этого инструмента.
+
+| Tool | Repository | Проверенная версия | Где подходит | Решение |
 |---|---|---:|---|---|
 | [Graphify](graphify.md) | [safishamsi/graphify](https://github.com/safishamsi/graphify) | `graphifyy 0.8.14` | Repo graph / architecture / impact discovery. Не memory. | Оставить как optional guidance для больших/legacy/multirepo проектов. |
 | [codex-agent-mem](codex-agent-mem.md) | [MarceloCaporale/codex-agent-mem](https://github.com/MarceloCaporale/codex-agent-mem) | `1.0.2` | Cross-session continuity, open work, closure checks, compact context packs. | Основной кандидат для optional read-only continuity memory. |
@@ -77,6 +80,7 @@
 | [codex-mem](codex-mem.md) | package не содержит repository metadata; ближайший проверенный публичный repo: [Just-Boring-Cat/codex-mem](https://github.com/Just-Boring-Cat/codex-mem) | `0.1.1` | Codex session/history memory. | Reject as default; privacy risk без строгой изоляции. |
 | [agent-memory](agent-memory.md) | [jayzeng/agentmemory](https://github.com/jayzeng/agentmemory) | `myagentmemory 0.4.12` | Manual markdown memory. | Docs-only/manual notes, без интеграции. |
 | [eagle-mem](eagle-mem.md) | [eagleisbatman/eagle-mem](https://github.com/eagleisbatman/eagle-mem) | `4.9.10` | Shared memory + hooks + guardrails + lanes. | Reject/defer; слишком широкий surface для issue #85. |
+| [CodeGraph](codegraph.md) | [colbymchenry/codegraph](https://github.com/colbymchenry/codegraph) | `@colbymchenry/codegraph 0.9.3` | Manual CLI-only repo graph для broad analyze/explore questions. | `manual_cli_only`; scoped CLI read/purge verified, но `install`/MCP/agent-config surface не принят. |
 
 ## Итоговая Рекомендация
 
@@ -89,5 +93,8 @@
 - `Graphify` можно документировать как optional repo-graph provider для исследования больших кодовых баз.
 - `context-mode` может остаться manual helper для temporary indexing больших command outputs.
 - `codex-mem`, `agent-memory` и `eagle-mem` не должны становиться default AIFHub integrations.
+- `CodeGraph` можно рекомендовать из `/aif-analyze` как manual CLI-only opt-in и использовать из `/aif-explore` только когда selection CLI возвращает его в `selected_tools`; `install`/MCP/agent-config surface не принят.
 
 Любая будущая реализация должна требовать explicit opt-in, explicit local paths, отсутствие global hooks по умолчанию, отсутствие canonical OpenSpec writes, отсутствие зависимости от install path и документированный purge/delete-index path.
+
+Compression/context helpers не должны rewrite validation artifacts. Protected validation artifacts включают `aif-gate-result`, `coverage.json`, `done-readiness.json`, OpenSpec specs under `openspec/specs/**`, generated-rules traces и exact evidence snippets. Optional tools не должны compress protected artifacts in place.

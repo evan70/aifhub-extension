@@ -34,10 +34,20 @@ Allowed read context:
 - optional reviewed Graphify outputs such as `graphify-out/GRAPH_REPORT.md`, `graphify-out/graph.json`, `.ai-factory/references/graphify/GRAPH_REPORT.md`, and `.ai-factory/state/<change-id>/graphify/GRAPH_REPORT.md`
 - optional reviewed Context7 notes under `.ai-factory/references/context7/` and `.ai-factory/state/<change-id>/context7/`
 
+Enabled optional tool use:
+
+- Before using any optional provider, call the installed wrapper when available: `ai-factory aifhub-memory-tools select --from-project --command aif-explore --json`.
+- The wrapper reads `utilities.context_tools.enabled`, compatibility utility flags, local `recommendation-metadata.yaml`, command-specific `tool_permissions`, and project/task signals.
+- Use only entries returned in `selected_tools`. For each selected entry, follow its `tool_id`, `permission`, `execution`, `forbidden_operations`, `protected_artifacts`, read scope, purge path, and privacy caveat.
+- Do not use tools that are absent from `selected_tools`, including tools listed in `not_selected_tools`, tools missing from config, tools forbidden for `/aif-explore`, or tools whose execution guidance is unavailable.
+- If no optional provider is selected, continue with the rg baseline and source/OpenSpec evidence.
+- Optional provider output is supporting context only; conclusions must remain grounded in source files, canonical OpenSpec artifacts, generated rules, runtime state, QA evidence, or other direct repository evidence.
+
 Optional Graphify context:
 
+- This provider-specific boundary applies only when `selected_tools` includes Graphify, or when reading already reviewed Graphify output that exists in an allowed context path.
 - Graphify is optional supporting context for large repository architecture/relation discovery.
-- `/aif-explore` may recommend that the user run Graphify manually outside AIFHub command ownership, but it must not install `graphifyy`, run `graphify`, add Graphify dependencies, or start/register Graphify MCP automatically.
+- `/aif-explore` may recommend that the user run Graphify manually outside AIFHub command ownership only when the selection output allows Graphify, but it must not install `graphifyy`, run `graphify`, add Graphify dependencies, or start/register Graphify MCP automatically.
 - Missing Graphify or missing `graphify-out/GRAPH_REPORT.md` is degraded context, not an exploration failure.
 - When existing Graphify output is available, treat extracted, inferred, ambiguous, or confidence-labeled relationships as hypotheses for direct repository inspection.
 - Research conclusions must remain grounded in source files, canonical OpenSpec artifacts, generated rules, runtime state, QA evidence, or other direct repository evidence.
@@ -47,8 +57,9 @@ Optional Graphify context:
 
 Optional Context7 context:
 
+- This provider-specific boundary applies only when `selected_tools` includes Context7, or when reading already reviewed Context7 notes that exist in an allowed context path.
 - Context7 is optional supporting documentation context for current library/API docs.
-- `/aif-explore` may recommend that the user run Context7 manually outside AIFHub command ownership with commands such as `npx ctx7 library <name> <query>` and `npx ctx7 docs <libraryId> <query>`, or user-installed equivalents `ctx7 library <name> <query>` and `ctx7 docs <libraryId> <query>`.
+- `/aif-explore` may recommend that the user run Context7 manually outside AIFHub command ownership only when the selection output allows Context7, with commands such as `npx ctx7 library <name> <query>` and `npx ctx7 docs <libraryId> <query>`, or user-installed equivalents `ctx7 library <name> <query>` and `ctx7 docs <libraryId> <query>`.
 - Missing Context7, missing Node.js runtime support, missing provider access, or missing reviewed notes is degraded context, not an exploration failure.
 - If the user already configured Context7 MCP, available tools may include `resolve-library-id` plus a docs retrieval tool named `get-library-docs` or `query-docs`; use them only as optional read-only documentation context.
 - Do not install `ctx7` or `@upstash/context7-mcp`, run `ctx7`, run `ctx7 setup`, add Context7 dependencies or manifest entries, add Context7 MCP templates to `extension.json`, mutate `.mcp.json`, `.cursor/mcp.json`, `.opencode.json`, agent rules, or agent skills, or start/register Context7 MCP automatically.

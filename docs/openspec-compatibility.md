@@ -1,4 +1,4 @@
-[Previous Page](context-loading-policy.md) | [Back to Documentation](README.md) | [Next Page](openspec-validation.md)
+[Предыдущая страница](context-loading-policy.md) | [К документации](README.md) | [Следующая страница](openspec-validation.md)
 
 # OpenSpec Compatibility
 
@@ -26,7 +26,7 @@ AI Factory = execution runtime
 
 AI Factory-only workflows follow AI Factory's runtime support. OpenSpec validation/archive follows the OpenSpec CLI runtime requirement.
 
-## Optional Initialization
+## Опциональная Инициализация
 
 Projects may initialize OpenSpec without tool integrations:
 
@@ -54,12 +54,22 @@ paths:
   rules: .ai-factory/rules
 
 utilities:
+  context_tools:
+    enabled: []
   graphify:
     enabled: false
     uv_check: uv --version
     install: uv tool install graphifyy
     activate: graphify install
     report_command: graphify .
+  codegraph:
+    enabled: false
+    command: codegraph
+    status: codegraph status
+    init: codegraph init .
+    index: codegraph index --quiet .
+    query: codegraph query --path . --limit 10 --json
+    purge: codegraph uninit --force .
 ```
 
 OpenSpec-native mode adds the OpenSpec settings and runtime path profile shown below.
@@ -113,9 +123,9 @@ utilities:
     report_command: graphify .
 ```
 
-`installSkills: false` is intentional. AIFHub Extension uses OpenSpec artifacts and `scripts/openspec-runner.mjs` as the optional CLI adapter, not OpenSpec-installed skills or slash commands.
+`installSkills: false` задан намеренно. AIFHub Extension использует OpenSpec artifacts и `scripts/openspec-runner.mjs` как optional CLI adapter, а не OpenSpec-installed skills или slash commands.
 
-The `utilities` section is protocol-neutral. It records optional tool preferences only; Graphify remains manually installed, activated, and run by the user.
+Секция `utilities` protocol-neutral. Она хранит только optional tool preferences. `utilities.context_tools.enabled` хранит user-accepted provider ids из `/aif-analyze`; follow-on skills вызывают `ai-factory aifhub-memory-tools select --from-project --command <skill> --json` и используют только `selected_tools`. Graphify остается manually installed/activated/run пользователем. CodeGraph остается manual CLI-only и может использоваться `/aif-explore` только когда выбран CLI, с purge перед завершением.
 
 On first bootstrap, `/aif-analyze` may create the OpenSpec marker after asking for the artifact protocol. If `.ai-factory/config.yaml` is missing and the user did not explicitly request OpenSpec-native mode, interactive runtimes ask the user to choose `legacy AI Factory-only` or `OpenSpec-native` before writing the config. Existing configs are preserved without prompting. Autonomous/subagent runs do not ask; they default to legacy AI Factory-only and report OpenSpec-native mode as an open question.
 
@@ -171,7 +181,7 @@ When no active changes exist after archive, `/aif-mode sync` still refreshes `.a
 
 For `/aif-mode sync --all`, selected active changes without `openspec/changes/<change-id>/specs/**/spec.md` delta specs are reported as `no-delta-specs` warnings and skipped for sync validation. Changes with delta specs are still validated/statused when the CLI is available.
 
-## Rules Gate
+## Гейт Rules
 
 `/aif-rules-check` is read-only. It uses AIFHub generated rules in OpenSpec-native mode and returns a machine-readable `aif-gate-result` with `gate: "rules"`.
 
