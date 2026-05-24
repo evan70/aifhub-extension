@@ -1,10 +1,10 @@
 # agent-memory
 
-Package: `myagentmemory 0.4.12`
+Пакет: `myagentmemory 0.4.12`
 
-Repository: [jayzeng/agentmemory](https://github.com/jayzeng/agentmemory)
+Репозиторий: [jayzeng/agentmemory](https://github.com/jayzeng/agentmemory)
 
-Repository README говорит, что `agentmemory` - canonical GitHub repository для `agent-memory` CLI, published as `myagentmemory` on npm.
+README репозитория говорит, что `agentmemory` - canonical GitHub repository для `agent-memory` CLI, опубликованный как `myagentmemory` в npm.
 
 ## Мета Для Анализа
 
@@ -80,11 +80,11 @@ Usable MCP server не найден.
 
 Тесты использовали только explicit temp paths. Dependency install для cloned repo выполнялся через `bun install --ignore-scripts`, потому что package `postinstall` настраивает `git config core.hooksPath .githooks`, если запускается внутри git repository.
 
-### Upstream Tests
+### Upstream Тесты
 
-| Test Command | Result | Notes |
+| Test Command | Результат | Заметки |
 |---|---:|---|
-| `bun test test/unit.test.ts` | 139 passed / 0 failed | Core memory, scratchpad, qmd mocks, distil, parser utilities passed. |
+| `bun test test/unit.test.ts` | 139 passed / 0 failed | Core memory, scratchpad, qmd mocks, distil и parser utilities прошли. |
 | `bun test test/cli.test.ts` | 41 passed / 3 failed | Failures были Windows/environment-specific вокруг skill install detection и shell script execution. |
 | `bun run build` | PASS | TypeScript `--noEmit` check passed. |
 | `bun run build:cli` | PASS | Собран `dist\agent-memory.exe`; `version` и `--help` работали. |
@@ -100,7 +100,7 @@ Manual skill install/uninstall через CLI работал, когда при�
 
 Smoke test использовал explicit temp memory directory через `--dir`.
 
-| Operation | Time | Result |
+| Операция | Время | Результат |
 |---|---:|---|
 | `init --json` | 195.4 ms | Created memory dir; qmd disabled |
 | `write --target long_term` | 147.3 ms | Wrote `MEMORY.md` |
@@ -133,7 +133,7 @@ Shared controlled result: `init`, long-term write, topic write, scratchpad add �
 
 Проверка выполнялась как manual markdown memory. Для каждого профиля использовался отдельный temp `--dir`; source files не индексировались. `search` проверялся только для фиксации `qmd` limitation.
 
-| Profile | Shape | Init | Write | Context | Search | qmd | Memory Size | Purge | Decision |
+| Profile | Shape | Init | Write | Context | Search | qmd | Memory Size | Очистка | Решение |
 |---|---|---:|---:|---:|---:|---|---:|---|---|
 | R2026-05-22-P01 | `go_service` | 122 ms | 109 ms | 132 ms | 100 ms | missing | 323 B | PASS | Manual notes only. |
 | R2026-05-22-P02 | `large_framework_app` | 122 ms | 118 ms | 121 ms | 107 ms | missing | 332 B | PASS | Manual notes only. |
@@ -151,15 +151,29 @@ Shared controlled result: `init`, long-term write, topic write, scratchpad add �
 
 Вывод по этому прогону: project shape не влияет на ценность tool, потому что это manual note directory. Без `qmd` нет usable retrieval. Рекомендация остаётся docs-only/manual notes.
 
-## Scope И Privacy
+## Локальный Прогон На Real Project Roots (2026-05-23)
+
+Проверка выполнялась как manual markdown memory с отдельным temp `--dir` на каждый profile. Source files не индексировались. Команды запускались в форме `agent-memory <command> --dir <path> --json`; важный CLI caveat - если поставить `--dir` перед command, CLI печатает help и может завершиться без полезной операции, поэтому smoke должен проверять marker/file content, а не только exit code.
+
+| Profile | Shape | Init | Write | Read | Context | Status | Marker Found | Решение |
+|---|---|---:|---:|---:|---:|---:|---|---|
+| real-profile-01 | `large_legacy_web_app` | 123 ms | 124 ms | 128 ms | 306 ms | 113 ms | yes | Manual notes only. |
+| real-profile-02 | `go_service` | 94 ms | 99 ms | 116 ms | 94 ms | 98 ms | yes | Manual notes only. |
+| real-profile-03 | `large_framework_app` | 97 ms | 100 ms | 94 ms | 96 ms | 98 ms | yes | Manual notes only. |
+| real-profile-04 | `multi_app_workspace` | 97 ms | 99 ms | 147 ms | 99 ms | 131 ms | yes | Manual notes only. |
+| real-profile-05 | `small_microservice` | 100 ms | 119 ms | 106 ms | 96 ms | 110 ms | yes | Manual notes only. |
+
+Вывод не меняется: tool быстрый и пригоден как local markdown notebook, но это не project retrieval provider и он не оправдывает AIFHub integration.
+
+## Границы И Privacy
 
 Explicit `--dir` - хороший механизм. Он ограничивает storage выбранной memory directory и не требует project-source indexing.
 
-Risk comes from optional skills/global setup, `postinstall` hook behavior и semantic search dependencies. Эти варианты не приняты как default integration behavior.
+Риск связан с optional skills/global setup, `postinstall` hook behavior и semantic search dependencies. Эти варианты не приняты как default integration behavior.
 
-## Purge
+## Очистка
 
-Purge - удалить выбранную memory directory или файлы. Для controlled manual-memory case отдельная purge command не нужна.
+Очистка - удалить выбранную memory directory или файлы. Для controlled manual-memory case отдельная purge command не нужна.
 
 ## Вывод
 

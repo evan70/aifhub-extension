@@ -1,66 +1,71 @@
-[Previous Page](usage.md) | [Back to Documentation](README.md) | [Next Page](memory-tool-recommendations.md)
+[Предыдущая страница](usage.md) | [К документации](README.md) | [Следующая страница](memory-tool-recommendations.md)
 
-# Context Providers
+# Провайдеры Контекста
 
-AIFHub may use optional provider output as supporting context when a user has already produced or reviewed it. Providers help agents inspect a project or external documentation, but they do not become AIFHub dependencies, gates, canonical evidence, generated rules input, or runtime requirements.
+AIFHub может использовать optional provider output как supporting context, когда пользователь уже создал или проверил этот output. Providers помогают агентам исследовать проект или внешнюю документацию, но не становятся dependencies, gates, canonical evidence, generated rules input или runtime requirements для AIFHub.
 
-Provider availability is always degraded behavior: missing tools, missing reports, missing MCP servers, missing API credentials, or unsupported local runtimes must not fail `/aif-explore`, `/aif-plan`, `/aif-review`, `/aif-implement`, `/aif-verify`, `/aif-done`, or any other AIFHub command by themselves.
+Provider availability всегда является degraded behavior: отсутствующие tools, reports, MCP servers, API credentials или неподдерживаемые local runtimes сами по себе не должны ломать `/aif-explore`, `/aif-plan`, `/aif-review`, `/aif-implement`, `/aif-verify`, `/aif-done` или любую другую AIFHub command.
 
-## Provider Roles
+## Роли Providers
 
-Graphify is the optional repository architecture and relation-discovery provider. It can help identify dependencies, ownership paths, and impact areas before direct repository inspection.
+Graphify - optional provider для repository architecture и relation discovery. Он может помочь найти dependencies, ownership paths и impact areas перед прямой проверкой репозитория.
 
-Context7 is the optional documentation provider for current library/API docs. It can help reduce uncertainty around version-sensitive API behavior, framework migration details, and third-party usage patterns.
+Context7 - optional documentation provider для актуальных library/API docs. Он снижает неопределенность вокруг version-sensitive API behavior, framework migration details и third-party usage patterns.
 
-Both providers are supporting only. Final plans, review findings, generated rules, verification status, done status, and roadmap completion must remain source-grounded in canonical OpenSpec artifacts, source files, tests, runtime state, QA evidence, generated rules trace metadata, or other direct repository evidence.
+Оба provider являются только supporting context. Final plans, review findings, generated rules, verification status, done status и roadmap completion должны оставаться source-grounded в canonical OpenSpec artifacts, source files, tests, runtime state, QA evidence, generated rules trace metadata или другом direct repository evidence.
 
-## AIFHub Boundaries
+## Границы AIFHub
 
-AIFHub Extension must not:
+AIFHub Extension не должен:
 
-- install provider CLIs or packages, including `ctx7` or `@upstash/context7-mcp`;
-- run provider setup commands;
-- start or register provider MCP servers automatically;
-- add provider package dependencies or manifest dependencies;
-- add Context7 MCP templates to `extension.json`;
-- mutate `.mcp.json`, `.cursor/mcp.json`, `.opencode.json`, agent rules, agent skills, or runtime MCP settings for a provider;
-- turn provider availability into validation, verification, review, rules, security, done, or commit gates.
+- устанавливать provider CLIs или packages, включая `ctx7` или `@upstash/context7-mcp`;
+- запускать provider setup commands;
+- автоматически запускать или регистрировать provider MCP servers;
+- добавлять provider package dependencies или manifest dependencies;
+- добавлять Context7 MCP templates в `extension.json`;
+- менять `.mcp.json`, `.cursor/mcp.json`, `.opencode.json`, agent rules, agent skills или runtime MCP settings для provider;
+- превращать provider availability в validation, verification, review, rules, security, done или commit gates.
 
-Future runtime features such as a `context_provider_suggestion` metadata field may recommend manual provider usage, but they must not change the user-owned setup boundary.
+Будущие runtime features вроде metadata field `context_provider_suggestion` могут рекомендовать manual provider usage, но не должны менять user-owned setup boundary.
 
-For installed-project diagnostics and metadata-driven recommendations, use:
+Для installed-project diagnostics и metadata-driven recommendations используйте:
 
 ```bash
 ai-factory aifhub-memory-tools recommend --from-project --json
+ai-factory aifhub-memory-tools select --from-project --command aif-explore --json
 ai-factory aifhub-memory-tools status --json
 ai-factory aifhub-memory-tools metadata --json
 ```
 
-The recommender reads only local installed metadata and must not fetch GitHub or the internet.
+Recommender читает только local installed metadata и не должен обращаться к GitHub или internet. Follow-on skills должны использовать `select`, а затем только returned `selected_tools`; project config хранит accepted provider ids в `utilities.context_tools.enabled`.
+
+## Защищенные Validation Artifacts
+
+Context и compression tools не должны rewrite validation artifacts и не должны compress protected artifacts in place. Protected validation artifacts: `aif-gate-result`, `coverage.json`, `done-readiness.json`, `openspec/specs/**`, generated-rules traces и exact evidence snippets.
 
 ## Context7
 
-Use Context7 only when current library/API documentation can materially reduce uncertainty. Common cases include framework version changes, package migration notes, deprecations, generated client APIs, or a review finding that depends on a third-party contract.
+Используйте Context7 только когда актуальная library/API documentation materially снижает неопределенность. Типовые случаи: framework version changes, package migration notes, deprecations, generated client APIs или review finding, который зависит от third-party contract.
 
-Do not install `ctx7` or `@upstash/context7-mcp`, run `ctx7`, run `ctx7 setup`, add Context7 dependencies, add Context7 MCP templates to `extension.json`, or start/register Context7 MCP automatically from AIFHub commands or sidecars.
+Не устанавливайте `ctx7` или `@upstash/context7-mcp`, не запускайте `ctx7`, не запускайте `ctx7 setup`, не добавляйте Context7 dependencies, не добавляйте Context7 MCP templates в `extension.json`, не запускайте и не регистрируйте Context7 MCP automatically из AIFHub commands или sidecars.
 
-Manual CLI usage is user-owned. Users may run Context7 with `npx`:
+Manual CLI usage принадлежит пользователю. Пользователь может запускать Context7 через `npx`:
 
 ```bash
 npx ctx7 library <name> <query>
 npx ctx7 docs <libraryId> <query>
 ```
 
-If the user already installed the CLI, the equivalent commands may be:
+Если CLI уже установлен пользователем, equivalent commands:
 
 ```bash
 ctx7 library <name> <query>
 ctx7 docs <libraryId> <query>
 ```
 
-The Context7 CLI requires a suitable local Node.js runtime. If `npx ctx7` or `ctx7` is unavailable, too old, unauthenticated, or rate-limited, AIFHub guidance should continue with degraded documentation context.
+Context7 CLI требует подходящий local Node.js runtime. Если `npx ctx7` или `ctx7` недоступен, слишком старый, unauthenticated или rate-limited, AIFHub guidance должен продолжить с degraded documentation context.
 
-Context7 library IDs can vary by source and version. Common examples include:
+Context7 library IDs могут зависеть от source и version. Примеры:
 
 - `/org/project`
 - `/org/project/version`
@@ -70,31 +75,31 @@ Context7 library IDs can vary by source and version. Common examples include:
 
 Treat exact IDs as provider output, not stable AIFHub schema.
 
-Context7 MCP setup is also user-owned. If a user has already configured a Context7 MCP server, agents may use available MCP tools as optional read-only documentation context. The usual lookup flow is `resolve-library-id` followed by a docs retrieval tool. The docs retrieval tool name may be `get-library-docs` or `query-docs` depending on the Context7 client/server version, so prompt guidance must tolerate both names.
+Context7 MCP setup тоже user-owned. Если пользователь уже настроил Context7 MCP server, agents могут использовать доступные MCP tools как optional read-only documentation context. Обычный lookup flow: `resolve-library-id`, затем docs retrieval tool. Docs retrieval tool может называться `get-library-docs` или `query-docs` в зависимости от версии Context7 client/server, поэтому prompt guidance должен поддерживать оба имени.
 
-Do not run `ctx7 setup`. That command may write files such as `.mcp.json`, `.cursor/mcp.json`, `.opencode.json`, agent rules, or agent skills. AIFHub guidance may mention this as user-owned setup, but AIFHub commands and sidecars must not execute it or mutate those files.
+Не запускайте `ctx7 setup`. Эта команда может писать `.mcp.json`, `.cursor/mcp.json`, `.opencode.json`, agent rules или agent skills. AIFHub guidance может упоминать это как user-owned setup, но AIFHub commands и sidecars не должны выполнять ее или менять эти files.
 
-Allowed durable storage for reviewed Context7 notes:
+Разрешенное durable storage для reviewed Context7 notes:
 
-- `.ai-factory/references/context7/` for project-wide documentation notes.
-- `.ai-factory/state/<change-id>/context7/` for change-scoped documentation notes.
+- `.ai-factory/references/context7/` для project-wide documentation notes.
+- `.ai-factory/state/<change-id>/context7/` для change-scoped documentation notes.
 
-A reviewed Context7 note should be concise and include the library name, resolved library ID when known, package version or docs version when known, query, retrieval date, source URL if available, and the short conclusion relevant to the AIFHub task.
+Reviewed Context7 note должен быть кратким и включать library name, resolved library ID если известен, package/docs version если известна, query, retrieval date, source URL если доступен, и короткий conclusion, relevant для AIFHub task.
 
-Forbidden storage for raw Context7 output, MCP transcripts, API responses, setup output, or generated provider configuration:
+Forbidden storage для raw Context7 output, MCP transcripts, API responses, setup output или generated provider configuration:
 
 - `openspec/changes/<change-id>/`
 - `openspec/specs/`
 - `.ai-factory/rules/generated/`
 - `.ai-factory/qa/<change-id>/`
 
-Do not persist `CONTEXT7_API_KEY`, API keys, tokens, raw authorization headers, credential helper output, private provider diagnostics, private backend diagnostics, or unreviewed sensitive output in `.ai-factory/`, `openspec/`, docs, runtime state, QA evidence, generated rules, or Context7 reference copies.
+Не persist `CONTEXT7_API_KEY`, API keys, tokens, raw authorization headers, credential helper output, private provider diagnostics, private backend diagnostics или unreviewed sensitive output в `.ai-factory/`, `openspec/`, docs, runtime state, QA evidence, generated rules или Context7 reference copies.
 
 ## Graphify
 
-Graphify remains the optional repository research provider. AIFHub Extension does not require Graphify, does not install `graphifyy`, does not run `graphify`, does not add Graphify to extension dependencies, and does not start or register Graphify MCP automatically.
+Graphify остается optional repository research provider. AIFHub Extension не требует Graphify, не устанавливает `graphifyy`, не запускает `graphify`, не добавляет Graphify в extension dependencies и не запускает или регистрирует Graphify MCP automatically.
 
-Manual Graphify usage, outside AIFHub command ownership:
+Manual Graphify usage вне AIFHub command ownership:
 
 ```powershell
 uv --version
@@ -103,13 +108,33 @@ graphify install
 graphify .
 ```
 
-Use `graphify .` in PowerShell; do not prefix it as `/graphify .`.
+В PowerShell используйте `graphify .`; не добавляйте prefix `/graphify .`.
 
-Allowed durable storage for reviewed Graphify context:
+Для private real roots предпочтительно запускать Graphify на sanitized temporary copy, если пользователь явно не принял local `graphify-out/` files в project root. Safety smoke от 2026-05-23 использовал `graphify update <temp-copy> --no-cluster` и не запускал semantic/LLM extraction.
 
-- `.ai-factory/references/graphify/` for project-wide reference copies.
-- `.ai-factory/state/<change-id>/graphify/` for change-scoped runtime copies.
+Разрешенное durable storage для reviewed Graphify context:
 
-Do not store raw Graphify generated files such as `GRAPH_REPORT.md`, `graph.json`, or `graph.html` under `openspec/changes/<change-id>/`, `openspec/specs/`, `.ai-factory/rules/generated/`, or `.ai-factory/qa/<change-id>/`.
+- `.ai-factory/references/graphify/` для project-wide reference copies.
+- `.ai-factory/state/<change-id>/graphify/` для change-scoped runtime copies.
 
-See [Usage](usage.md) and [Context Loading Policy](context-loading-policy.md) for command-specific Graphify guidance.
+Не храните raw Graphify generated files вроде `GRAPH_REPORT.md`, `graph.json` или `graph.html` в `openspec/changes/<change-id>/`, `openspec/specs/`, `.ai-factory/rules/generated/` или `.ai-factory/qa/<change-id>/`.
+
+См. [Usage](usage.md) и [Context Loading Policy](context-loading-policy.md) для command-specific Graphify guidance.
+
+## CodeGraph
+
+CodeGraph - manual CLI-only repo graph provider для broad analyze/explore questions. Local metadata фиксирует его как `manual_cli_only` с `suggest_manual_cli_for_repo_graph_when_enabled_or_explicit`.
+
+Allowed availability probes для AIFHub automation ограничены:
+
+```bash
+codegraph --version
+codegraph --help
+codegraph status
+```
+
+Manual safety testing 2026-05-23 проверил explicit-path CLI `init`, `index --quiet`, `status`, JSON `query` и `uninit --force` на 29 real local project roots без protected agent/config mutations и без leftover `.codegraph/` directories.
+
+`/aif-analyze` может рекомендовать CodeGraph, когда metadata показывает, что broad repo graph полезен. `/aif-explore` может использовать scoped CLI lifecycle только когда `select --command aif-explore --json` возвращает CodeGraph в `selected_tools` с `manual_purged_cli_execution`, и только с purge command из returned `execution` field перед завершением.
+
+AIFHub commands не должны auto-install CodeGraph, запускать `codegraph install`, запускать `codegraph sync`, запускать `codegraph serve --mcp`, mutate agent configuration, register MCP automatically или treat CodeGraph output as canonical OpenSpec evidence. Manual `init/index/query/uninit` разрешен только в `/aif-explore` с explicit path, command-specific permission и purge.

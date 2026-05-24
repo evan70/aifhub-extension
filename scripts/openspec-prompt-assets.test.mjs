@@ -281,7 +281,6 @@ function assertGraphifyOptionalContextGuidance(source, label) {
     '.ai-factory/qa/<change-id>/',
     'supporting',
     'degraded',
-    'extracted, inferred, ambiguous, or confidence-labeled',
     'direct repository evidence',
     'API keys',
     'tokens',
@@ -291,9 +290,14 @@ function assertGraphifyOptionalContextGuidance(source, label) {
     assertIncludes(source, expected, label);
   }
 
-  assert.match(source, /do(?:es)? not .*install `?graphifyy`?|must not .*install `?graphifyy`?/i, `${label} should forbid automatic graphifyy install`);
-  assert.match(source, /do(?:es)? not .*run `?graphify`?|must not .*run `?graphify`?/i, `${label} should forbid automatic graphify execution`);
-  assert.match(source, /Graphify MCP automatically/i, `${label} should forbid automatic Graphify MCP registration`);
+  assert.match(
+    source,
+    /extracted, inferred, ambiguous, or confidence-labeled|extracted, inferred, ambiguous или confidence-labeled/i,
+    `${label} should warn that Graphify relationships are hypotheses`
+  );
+  assert.match(source, /do(?:es)? not .*install `?graphifyy`?|must not .*install `?graphifyy`?|не (?:устанавливает|устанавливайте|должны.*устанавливать).*`?graphifyy`?/i, `${label} should forbid automatic graphifyy install`);
+  assert.match(source, /do(?:es)? not .*run `?graphify`?|must not .*run `?graphify`?|не (?:запускает|запускайте|должны.*запускать).*`?graphify`?/i, `${label} should forbid automatic graphify execution`);
+  assert.match(source, /Graphify MCP automatically|регистрировать Graphify MCP automatically|регистрирует Graphify MCP automatically/i, `${label} should forbid automatic Graphify MCP registration`);
 }
 
 function assertContext7OptionalDocumentationGuidance(source, label) {
@@ -328,9 +332,21 @@ function assertContext7OptionalDocumentationGuidance(source, label) {
     assertIncludes(source, expected, label);
   }
 
-  assert.match(source, /do(?:es)? not .*install `?ctx7`?|must not .*install `?ctx7`?/i, `${label} should forbid automatic Context7 CLI install`);
-  assert.match(source, /do(?:es)? not .*run `?ctx7 setup`?|must not .*run `?ctx7 setup`?/i, `${label} should forbid automatic Context7 setup`);
-  assert.match(source, /Context7 MCP automatically|automatic(?:ally)? .*Context7 MCP/i, `${label} should forbid automatic Context7 MCP registration`);
+  assert.match(
+    source,
+    /do(?:es)? not .*install `?ctx7`?|must not .*install `?ctx7`?|не (?:устанавливайте|устанавливает|должны.*устанавливать).*`?ctx7`?/i,
+    `${label} should forbid automatic Context7 CLI install`
+  );
+  assert.match(
+    source,
+    /do(?:es)? not .*run `?ctx7 setup`?|must not .*run `?ctx7 setup`?|не (?:запускайте|запускает|должны.*запускать).*`?ctx7 setup`?/i,
+    `${label} should forbid automatic Context7 setup`
+  );
+  assert.match(
+    source,
+    /Context7 MCP automatically|automatic(?:ally)? .*Context7 MCP|не .*регистрируйте Context7 MCP|не .*регистрирует Context7 MCP/i,
+    `${label} should forbid automatic Context7 MCP registration`
+  );
 }
 
 describe('OpenSpec-native prompt asset contract', () => {
@@ -533,7 +549,7 @@ describe('OpenSpec-native prompt asset contract', () => {
       'uv tool install graphifyy',
       'graphify install',
       'graphify .',
-      'do not prefix it as `/graphify .`',
+      'не добавляйте prefix `/graphify .`',
       'graphify-out/graph.html',
       'graphify query',
       'graphify path',
@@ -543,8 +559,8 @@ describe('OpenSpec-native prompt asset contract', () => {
       'install: uv tool install graphifyy',
       'activate: graphify install',
       'report_command: graphify .',
-      'AIFHub Extension does not require Graphify',
-      'does not add Graphify to extension dependencies'
+      'AIFHub Extension не требует Graphify',
+      'не добавляет Graphify в extension dependencies'
     ]) {
       assertIncludes(usage, expected, 'docs/usage.md');
     }

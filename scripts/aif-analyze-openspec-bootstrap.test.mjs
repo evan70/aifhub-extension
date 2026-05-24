@@ -146,6 +146,7 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
       '### Step 2.1: Optional Context/Memory Tool Recommendations',
       'recommendation-metadata.yaml',
       'ai-factory aifhub-memory-tools recommend --from-project --json',
+      'ai-factory aifhub-memory-tools select --from-project --command aif-explore --json',
       'ai-factory aifhub-memory-tools status --json',
       'ai-factory aifhub-memory-tools metadata --json',
       'exact_file_or_symbol_lookup',
@@ -153,25 +154,80 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
       'resume_previous_work',
       'large_command_output_compression',
       'version_sensitive_library_docs',
+      'codegraph',
       'codex-mem',
       'eagle-mem',
       'Provider output is supporting context only, never canonical OpenSpec evidence.',
+      'allowed command scopes',
+      'forbidden command scopes',
+      'command-specific permission',
+      'execution guidance',
+      'privacy caveat',
+      'protected validation artifacts',
+      'utilities.context_tools.enabled',
+      'accepted tool ids',
+      'selected_tools',
       'utilities.graphify.enabled',
+      'utilities.codegraph.enabled',
       'backward-compatible preference',
       'uv --version',
       'uv tool install graphifyy',
       'graphify install',
       'graphify .',
       'utilities:',
+      'context_tools:',
+      'enabled: []',
       'graphify:',
       'enabled: false',
       'uv_check: uv --version',
       'install: uv tool install graphifyy',
       'activate: graphify install',
       'report_command: graphify .',
+      'codegraph:',
+      'command: codegraph',
+      'status: codegraph status',
+      'init: codegraph init .',
+      'index: codegraph index --quiet .',
+      'query: codegraph query --path . --limit 10 --json',
+      'purge: codegraph uninit --force .',
       'Do not install `graphifyy`, run `graphify`'
     ]) {
       assertIncludes(combined, expected, 'aif-analyze Graphify utility guidance');
+    }
+  });
+
+  it('documents compression guardrails and CodeGraph manual CLI-only status', async () => {
+    const combined = [
+      await readRepoFile('skills/aif-analyze/SKILL.md'),
+      await readRepoFile('docs/context-providers.md'),
+      await readRepoFile('docs/context-loading-policy.md'),
+      await readRepoFile('docs/memory-tool-recommendations.md'),
+      await readRepoFile('docs/memory-tools-research/README.md')
+    ].join('\n');
+
+    for (const expected of [
+      'CodeGraph',
+      'manual_cli_only',
+      'suggest_manual_cli_for_repo_graph_when_enabled_or_explicit',
+      'codegraph --version',
+      'codegraph --help',
+      'codegraph status',
+      'codegraph init <project>',
+      'codegraph index --quiet <project>',
+      'codegraph query --path <project>',
+      'codegraph uninit --force <project>',
+      'Do not run `codegraph install`',
+      'serve --mcp',
+      'aif-gate-result',
+      'coverage.json',
+      'done-readiness.json',
+      'openspec/specs/**',
+      'generated-rules traces',
+      'exact evidence snippets',
+      'must not rewrite validation artifacts',
+      'must not compress protected artifacts in place'
+    ]) {
+      assertIncludes(combined, expected, 'context/memory provider guardrails');
     }
   });
 

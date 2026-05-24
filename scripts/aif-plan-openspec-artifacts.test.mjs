@@ -174,4 +174,25 @@ describe('aif-plan OpenSpec-native planning contract', () => {
       'docs/openspec-compatibility.md'
     );
   });
+
+  it('uses CLI-selected optional tools for /aif-plan instead of a prompt-owned provider list', async () => {
+    const injection = await readRepoFile('injections/core/aif-plan-plan-folder.md');
+
+    for (const expected of [
+      'Enabled optional tool use',
+      'ai-factory aifhub-memory-tools select --from-project --command aif-plan --json',
+      'selected_tools',
+      'not_selected_tools',
+      'tool_id',
+      'permission',
+      'execution',
+      'forbidden_operations',
+      'protected_artifacts',
+      'Do not use tools that are absent from `selected_tools`',
+      'This provider-specific boundary applies only when `selected_tools` includes Graphify',
+      'This provider-specific boundary applies only when `selected_tools` includes Context7'
+    ]) {
+      assertIncludes(injection, expected, 'aif-plan enabled optional tool use');
+    }
+  });
 });

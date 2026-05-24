@@ -53,6 +53,10 @@ paths:
 # ============================================================================
 # Optional, user-owned tools that can provide extra context.
 utilities:
+  context_tools:
+    # User-accepted optional context tool ids from /aif-analyze recommendations.
+    # Follow-on skills call aifhub-memory-tools select and use only selected_tools.
+    enabled: []
   graphify:
     # Recommended for large or unfamiliar repositories.
     # AIFHub never installs or runs Graphify automatically.
@@ -61,6 +65,16 @@ utilities:
     install: uv tool install graphifyy
     activate: graphify install
     report_command: graphify .
+  codegraph:
+    # Manual CLI-only repo graph preference for broad /aif-explore research.
+    # AIFHub never runs codegraph install, MCP serving, or agent config mutation.
+    enabled: false
+    command: codegraph
+    status: codegraph status
+    init: codegraph init .
+    index: codegraph index --quiet .
+    query: codegraph query --path . --limit 10 --json
+    purge: codegraph uninit --force .
 
 # ============================================================================
 # WORKFLOW SETTINGS

@@ -1,4 +1,4 @@
-[Back to Documentation](README.md) | [Back to README](../README.md) | [Next Page](context-providers.md)
+[К документации](README.md) | [К README](../README.md) | [Следующая страница](context-providers.md)
 
 # Usage
 
@@ -49,28 +49,40 @@ The `aifhub-extension` package repository stays artifact-light: root `openspec/`
 
 AIFHub commands request OpenSpec validation, status, instructions, and archive through `scripts/openspec-runner.mjs` when the CLI is available. Slash-command runtimes should keep using `/aif-*` commands. Codex app uses `$aif-*` skill invocations, as shown in the Recommended Codex App Flow. This extension does not install or rely on OpenSpec slash commands.
 
-## Optional Context Providers
+## Опциональные Context Providers
 
-Context providers are manual, user-owned research aids. AIFHub may read reviewed provider notes as optional supporting context, but provider availability is degraded behavior and never a validation, verification, review, rules, security, done, or commit gate.
+Context providers - ручные, user-owned research aids. AIFHub может читать reviewed provider notes как optional supporting context, но provider availability всегда degraded behavior и никогда не является validation, verification, review, rules, security, done или commit gate.
 
-See [Context Providers](context-providers.md) for the central policy and [Memory Tool Recommendations](memory-tool-recommendations.md) for local metadata-driven recommendation diagnostics.
+Центральная policy описана в [Context Providers](context-providers.md), local metadata-driven recommendation diagnostics - в [Memory Tool Recommendations](memory-tool-recommendations.md).
 
-Installed projects can inspect optional recommendations with:
+Installed projects могут проверить optional recommendations так:
 
 ```bash
 ai-factory aifhub-memory-tools recommend --from-project --json
+ai-factory aifhub-memory-tools select --from-project --command aif-explore --json
+ai-factory aifhub-memory-tools select --from-project --command aif-plan --json
 ai-factory aifhub-memory-tools status --json
 ai-factory aifhub-memory-tools metadata --json
 ```
 
-### Graphify
-
-Graphify can be used as a manual, user-owned repository research aid before or during AIFHub work. AIFHub Extension does not require Graphify, does not install `graphifyy`, does not run `graphify`, does not add Graphify to extension dependencies, and does not start or register Graphify MCP automatically.
-
-`/aif-analyze` keeps the Graphify shared utility config only as a backward-compatible preference. New optional tool recommendations come from local `recommendation-metadata.yaml` through the installed wrapper command, not from a provider config abstraction. The compatibility config shape remains:
+`/aif-analyze` записывает user-accepted provider ids в `utilities.context_tools.enabled`. Последующие skills вызывают `select` и используют только `selected_tools` для своей команды:
 
 ```yaml
 utilities:
+  context_tools:
+    enabled: []
+```
+
+### Graphify
+
+Graphify можно использовать как manual, user-owned repository research aid до или во время AIFHub work. AIFHub Extension не требует Graphify, не устанавливает `graphifyy`, не запускает `graphify`, не добавляет Graphify в extension dependencies и не запускает или регистрирует Graphify MCP automatically.
+
+`/aif-analyze` хранит shared utility config Graphify только как backward-compatible preference. Новые optional tool recommendations приходят из local `recommendation-metadata.yaml` через installed wrapper command, а не из provider config abstraction. Compatibility config shape:
+
+```yaml
+utilities:
+  context_tools:
+    enabled: []
   graphify:
     enabled: false
     uv_check: uv --version
@@ -79,9 +91,9 @@ utilities:
     report_command: graphify .
 ```
 
-Set `utilities.graphify.enabled: true` only after the project chooses to use manually generated Graphify reports. The setting does not install Graphify and does not replace metadata-driven recommendations.
+Устанавливайте `utilities.graphify.enabled: true` только после того, как project выбрал использование manually generated Graphify reports. Эта настройка не устанавливает Graphify и не заменяет metadata-driven recommendations.
 
-Manual usage, outside AIFHub command ownership:
+Manual usage вне AIFHub command ownership:
 
 ```powershell
 uv --version
@@ -90,65 +102,94 @@ graphify install
 graphify .
 ```
 
-Use `graphify .` in PowerShell; do not prefix it as `/graphify .`.
+В PowerShell используйте `graphify .`; не добавляйте prefix `/graphify .`.
 
-Graphify writes local outputs under `graphify-out/`, including:
+Graphify пишет local outputs в `graphify-out/`, включая:
 
 - `graphify-out/GRAPH_REPORT.md`
 - `graphify-out/graph.json`
 - `graphify-out/graph.html`
 
-Its CLI may also expose research commands such as `graphify query`, `graphify path`, and `graphify explain`.
+CLI также может expose research commands вроде `graphify query`, `graphify path` и `graphify explain`.
 
-When `graphify-out/GRAPH_REPORT.md` already exists, AIFHub commands may read it as optional supporting context. To keep reviewed output for later context loading, copy it only to:
+Когда `graphify-out/GRAPH_REPORT.md` уже существует, AIFHub commands могут читать его как optional supporting context. Для дальнейшей context loading храните reviewed output только здесь:
 
-- `.ai-factory/references/graphify/` for project-wide reference context.
-- `.ai-factory/state/<change-id>/graphify/` for change-scoped runtime context.
+- `.ai-factory/references/graphify/` для project-wide reference context.
+- `.ai-factory/state/<change-id>/graphify/` для change-scoped runtime context.
 
-Do not store Graphify generated files under `openspec/changes/<change-id>/`, `openspec/specs/`, `.ai-factory/rules/generated/`, or `.ai-factory/qa/<change-id>/`.
+Не храните Graphify generated files в `openspec/changes/<change-id>/`, `openspec/specs/`, `.ai-factory/rules/generated/` или `.ai-factory/qa/<change-id>/`.
 
-Treat Graphify findings as supporting evidence only. Reports can include extracted, inferred, ambiguous, or confidence-labeled relationships, so final plans, review findings, verification status, generated rules, and roadmap completion still need direct repository evidence from canonical OpenSpec artifacts, source files, tests, runtime state, or QA evidence.
+Считайте Graphify findings только supporting evidence. Reports могут включать extracted, inferred, ambiguous или confidence-labeled relationships, поэтому final plans, review findings, verification status, generated rules и roadmap completion все равно требуют direct repository evidence из canonical OpenSpec artifacts, source files, tests, runtime state или QA evidence.
 
-Before copying a report into `.ai-factory/`, review it for sensitive information. Do not persist API keys, tokens, raw authorization headers, credential helper output, private backend diagnostics, or unreviewed sensitive output in AIFHub artifacts.
+Перед копированием report в `.ai-factory/` проверьте его на sensitive information. Не persist API keys, tokens, raw authorization headers, credential helper output, private backend diagnostics или unreviewed sensitive output в AIFHub artifacts.
+
+### CodeGraph
+
+CodeGraph - manual CLI-only repo graph support для broad architecture, impact или multirepo mapping. `/aif-analyze` может рекомендовать его из local metadata; `/aif-explore` может запускать его только когда `select --command aif-explore --json` возвращает его в `selected_tools` с `manual_purged_cli_execution`.
+
+Protocol-neutral preference shape:
+
+```yaml
+utilities:
+  codegraph:
+    enabled: false
+    command: codegraph
+    status: codegraph status
+    init: codegraph init .
+    index: codegraph index --quiet .
+    query: codegraph query --path . --limit 10 --json
+    purge: codegraph uninit --force .
+```
+
+Разрешенный `/aif-explore` lifecycle:
+
+```bash
+codegraph init <project>
+codegraph index --quiet <project>
+codegraph query --path <project> --limit 10 --json "<query>"
+codegraph uninit --force <project>
+```
+
+Не запускайте `codegraph install`, `codegraph sync`, `codegraph serve`, `codegraph serve --mcp`, hooks, background services или agent configuration mutation. Если pre-existing `.codegraph/` уже существует, считайте его user-owned state и не удаляйте/не reinitialize silently.
 
 ### Context7
 
-Context7 can be used as a manual, user-owned documentation research aid for current library/API docs. AIFHub Extension does not require Context7, does not install `ctx7` or `@upstash/context7-mcp`, does not run `ctx7`, does not run `ctx7 setup`, does not add Context7 to extension dependencies, does not add Context7 MCP templates to `extension.json`, and does not start or register Context7 MCP automatically.
+Context7 можно использовать как manual, user-owned documentation research aid для current library/API docs. AIFHub Extension не требует Context7, не устанавливает `ctx7` или `@upstash/context7-mcp`, не запускает `ctx7`, не запускает `ctx7 setup`, не добавляет Context7 в extension dependencies, не добавляет Context7 MCP templates в `extension.json` и не запускает или регистрирует Context7 MCP automatically.
 
-Use Context7 when version-sensitive API documentation can materially reduce uncertainty during `/aif-explore`, `/aif-plan full`, or `/aif-review`. Examples include framework migrations, deprecations, third-party client behavior, package-specific configuration, or review findings that depend on current upstream docs.
+Используйте Context7, когда version-sensitive API documentation materially снижает неопределенность во время `/aif-explore`, `/aif-plan full` или `/aif-review`. Примеры: framework migrations, deprecations, third-party client behavior, package-specific configuration или review findings, зависящие от current upstream docs.
 
-Manual CLI usage, outside AIFHub command ownership:
+Manual CLI usage вне AIFHub command ownership:
 
 ```bash
 npx ctx7 library <name> <query>
 npx ctx7 docs <libraryId> <query>
 ```
 
-If the user already installed Context7, equivalent local commands may be:
+Если пользователь уже установил Context7, equivalent local commands:
 
 ```bash
 ctx7 library <name> <query>
 ctx7 docs <libraryId> <query>
 ```
 
-Context7 CLI usage requires a suitable local Node.js runtime. If `npx ctx7` or a user-installed `ctx7` is unavailable, too old, unauthenticated, rate-limited, or missing provider access, continue with degraded documentation context and use repository evidence plus local package docs instead.
+Context7 CLI usage требует подходящий local Node.js runtime. Если `npx ctx7` или user-installed `ctx7` недоступен, слишком старый, unauthenticated, rate-limited или без provider access, продолжайте с degraded documentation context и используйте repository evidence плюс local package docs.
 
-Context7 library IDs are provider output and may include forms such as `/org/project`, `/org/project/version`, `/org/project@version`, `/packages/<name>`, or `/websites/<name>`. Treat exact IDs as unstable external references rather than AIFHub schema.
+Context7 library IDs являются provider output и могут иметь формы `/org/project`, `/org/project/version`, `/org/project@version`, `/packages/<name>` или `/websites/<name>`. Treat exact IDs as unstable external references, а не AIFHub schema.
 
-If the user has already configured Context7 MCP, agents may use it as optional read-only documentation context. The usual MCP flow is `resolve-library-id` followed by a docs retrieval tool; depending on client/server version, that docs retrieval tool may be named `get-library-docs` or `query-docs`.
+Если пользователь уже настроил Context7 MCP, agents могут использовать его как optional read-only documentation context. Обычный MCP flow: `resolve-library-id`, затем docs retrieval tool; в зависимости от client/server version tool может называться `get-library-docs` или `query-docs`.
 
-Do not run `ctx7 setup` from AIFHub commands or sidecars. It can mutate `.mcp.json`, `.cursor/mcp.json`, `.opencode.json`, agent rules, or agent skills. AIFHub guidance may mention it only as user-owned setup.
+Не запускайте `ctx7 setup` из AIFHub commands или sidecars. Он может mutate `.mcp.json`, `.cursor/mcp.json`, `.opencode.json`, agent rules или agent skills. AIFHub guidance может упоминать его только как user-owned setup.
 
-To keep reviewed Context7 notes for later context loading, write concise summaries only to:
+Для будущего context loading пишите concise summaries reviewed Context7 notes только сюда:
 
-- `.ai-factory/references/context7/` for project-wide documentation context.
-- `.ai-factory/state/<change-id>/context7/` for change-scoped runtime context.
+- `.ai-factory/references/context7/` для project-wide documentation context.
+- `.ai-factory/state/<change-id>/context7/` для change-scoped runtime context.
 
-Do not store raw Context7 output, MCP transcripts, API responses, setup output, or generated provider configuration under `openspec/changes/<change-id>/`, `openspec/specs/`, `.ai-factory/rules/generated/`, or `.ai-factory/qa/<change-id>/`.
+Не храните raw Context7 output, MCP transcripts, API responses, setup output или generated provider configuration в `openspec/changes/<change-id>/`, `openspec/specs/`, `.ai-factory/rules/generated/` или `.ai-factory/qa/<change-id>/`.
 
-Treat Context7 output as supporting evidence only. Plans, review findings, verification status, generated rules, and completion decisions must remain source-grounded in direct repository evidence from canonical OpenSpec artifacts, source files, tests, runtime state, QA evidence, generated rules, or package files in the repository.
+Считайте Context7 output только supporting evidence. Plans, review findings, verification status, generated rules и completion decisions должны оставаться source-grounded в direct repository evidence из canonical OpenSpec artifacts, source files, tests, runtime state, QA evidence, generated rules или package files в repository.
 
-Do not persist `CONTEXT7_API_KEY`, API keys, tokens, raw authorization headers, credential helper output, private provider diagnostics, private backend diagnostics, or unreviewed sensitive output in AIFHub artifacts.
+Не persist `CONTEXT7_API_KEY`, API keys, tokens, raw authorization headers, credential helper output, private provider diagnostics, private backend diagnostics или unreviewed sensitive output в AIFHub artifacts.
 
 ## Bug Fix Workflows
 
@@ -298,7 +339,7 @@ If localization questions run first, `/aif-analyze` carries those answers forwar
 
 The selected artifact protocol owns its config profile. Legacy `artifactProtocol: ai-factory` configs do not include `aifhub.openspec` settings or OpenSpec runtime path defaults; OpenSpec-native `artifactProtocol: openspec` configs include those settings and paths explicitly.
 
-Shared protocol-neutral settings such as `utilities.graphify.enabled` may appear in either profile. They record optional tooling preferences and do not make that tool an AIFHub dependency. Optional memory/context tool recommendations are resolved from local installed metadata with `ai-factory aifhub-memory-tools recommend --from-project --json`; missing metadata is degraded context and leaves `rg` as the baseline.
+Shared protocol-neutral settings such as `utilities.context_tools.enabled`, `utilities.graphify.enabled`, and `utilities.codegraph.enabled` may appear in either profile. They record optional tooling preferences and do not make that tool an AIFHub dependency. Optional memory/context tool recommendations are resolved from local installed metadata with `ai-factory aifhub-memory-tools recommend --from-project --json`; runtime tool selection uses `ai-factory aifhub-memory-tools select --from-project --command <skill> --json`. Missing metadata is degraded context and leaves `rg` as the baseline.
 
 ### `/aif-plan full`
 

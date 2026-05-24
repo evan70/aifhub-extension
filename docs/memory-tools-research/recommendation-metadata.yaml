@@ -8,11 +8,250 @@ default_policy:
   require_purge_path: true
   baseline_tool: rg
   privacy_rule: "Не предлагать инструмент, если read scope не ограничен или purge path не проверен."
+skill_usage_matrix:
+  aif-analyze:
+    allowed:
+      - rg
+      - graphify
+      - context7
+      - codex-agent-mem
+      - context-mode
+      - codegraph
+    forbidden:
+      - codex-mem
+      - eagle-mem
+    notes: "Recommend only; do not install, setup, index, register MCP, mutate provider config, or treat provider output as evidence."
+  aif-explore:
+    allowed:
+      - rg
+      - graphify
+      - context7
+      - codex-agent-mem
+      - context-mode
+      - codegraph
+    forbidden:
+      - codex-mem
+      - eagle-mem
+    notes: "Read existing reviewed provider output, or use explicitly enabled tools only when metadata grants command-specific permission and purge is defined."
+  aif-plan:
+    allowed:
+      - rg
+      - graphify
+      - context7
+    forbidden:
+      - codex-agent-mem
+      - context-mode
+      - codex-mem
+      - eagle-mem
+      - codegraph
+    notes: "Optional supporting context before writing canonical OpenSpec artifacts; final plan must use direct repository evidence."
+  aif-review:
+    allowed:
+      - rg
+      - graphify
+      - context7
+      - codex-agent-mem
+    forbidden:
+      - context-mode
+      - codex-mem
+      - eagle-mem
+      - codegraph
+    notes: "Optional supporting context for impact/docs/closure checks only."
+  aif-rules-check:
+    allowed:
+      - rg
+      - context7
+    forbidden:
+      - graphify
+      - codex-agent-mem
+      - context-mode
+      - codex-mem
+      - eagle-mem
+      - codegraph
+    notes: "Context7 may support version-sensitive external docs only; generated rules and source evidence remain authoritative."
+  aif-implement:
+    allowed:
+      - rg
+    forbidden:
+      - graphify
+      - context7
+      - codex-agent-mem
+      - context-mode
+      - codex-mem
+      - eagle-mem
+      - codegraph
+    notes: "Implementation commands must not use optional context providers by default."
+  aif-fix:
+    allowed:
+      - rg
+    forbidden:
+      - graphify
+      - context7
+      - codex-agent-mem
+      - context-mode
+      - codex-mem
+      - eagle-mem
+      - codegraph
+    notes: "Fix commands must use QA evidence, source files, and canonical OpenSpec context."
+  aif-verify:
+    allowed:
+      - rg
+    forbidden:
+      - graphify
+      - context7
+      - codex-agent-mem
+      - context-mode
+      - codex-mem
+      - eagle-mem
+      - codegraph
+    notes: "Verification must stay source-grounded and provider-independent."
+  aif-done:
+    allowed:
+      - rg
+    forbidden:
+      - graphify
+      - context7
+      - codex-agent-mem
+      - context-mode
+      - codex-mem
+      - eagle-mem
+      - codegraph
+    notes: "Done/finalization must not depend on optional provider availability or output."
+  aif-commit:
+    allowed:
+      - rg
+    forbidden:
+      - graphify
+      - context7
+      - codex-agent-mem
+      - context-mode
+      - codex-mem
+      - eagle-mem
+      - codegraph
+    notes: "Commit freshness checks may use direct repository and local artifact evidence only."
+permissions:
+  recommend_only:
+    description: "May suggest manual usage; cannot run setup, indexing, MCP registration, sync, hooks, or background services."
+  read_existing_reviewed_output:
+    description: "May read already-created reviewed notes or reports from allowed paths."
+  safe_availability_probe:
+    description: "May run local non-mutating --version, --help, doctor, or status probes."
+  manual_user_owned_execution:
+    description: "User may run manually outside AIFHub command ownership."
+  manual_purged_cli_execution:
+    description: "May run a scoped CLI lifecycle against an explicit project path only when the selection CLI returns the tool for this command, then purge the tool-owned local index before finishing."
+  forbidden:
+    description: "Do not suggest or use for this command."
+tool_permissions:
+  rg:
+    aif-analyze: safe_availability_probe
+    aif-explore: safe_availability_probe
+    aif-plan: safe_availability_probe
+    aif-review: safe_availability_probe
+    aif-rules-check: safe_availability_probe
+    aif-implement: safe_availability_probe
+    aif-fix: safe_availability_probe
+    aif-verify: safe_availability_probe
+    aif-done: safe_availability_probe
+    aif-commit: safe_availability_probe
+  graphify:
+    aif-analyze: recommend_only
+    aif-explore: read_existing_reviewed_output
+    aif-plan: read_existing_reviewed_output
+    aif-review: read_existing_reviewed_output
+    aif-rules-check: forbidden
+    aif-implement: forbidden
+    aif-fix: forbidden
+    aif-verify: forbidden
+    aif-done: forbidden
+    aif-commit: forbidden
+  context7:
+    aif-analyze: recommend_only
+    aif-explore: read_existing_reviewed_output
+    aif-plan: read_existing_reviewed_output
+    aif-review: read_existing_reviewed_output
+    aif-rules-check: read_existing_reviewed_output
+    aif-implement: forbidden
+    aif-fix: forbidden
+    aif-verify: forbidden
+    aif-done: forbidden
+    aif-commit: forbidden
+  codex-agent-mem:
+    aif-analyze: recommend_only
+    aif-explore: read_existing_reviewed_output
+    aif-plan: forbidden
+    aif-review: read_existing_reviewed_output
+    aif-rules-check: forbidden
+    aif-implement: forbidden
+    aif-fix: forbidden
+    aif-verify: forbidden
+    aif-done: forbidden
+    aif-commit: forbidden
+  context-mode:
+    aif-analyze: recommend_only
+    aif-explore: recommend_only
+    aif-plan: forbidden
+    aif-review: forbidden
+    aif-rules-check: forbidden
+    aif-implement: forbidden
+    aif-fix: forbidden
+    aif-verify: forbidden
+    aif-done: forbidden
+    aif-commit: forbidden
+  agent-memory:
+    default: recommend_only_if_user_requests_manual_notes
+  codex-mem:
+    default: forbidden
+  eagle-mem:
+    default: forbidden
+  codegraph:
+    aif-analyze: recommend_only
+    aif-explore: manual_purged_cli_execution
+    default: forbidden
+availability_probes:
+  rg:
+    - rg --version
+  uv:
+    - uv --version
+  graphify:
+    - graphify --version
+    - graphify --help
+  context7:
+    - ctx7 --version
+    - npx --no-install ctx7 --help
+  codex-agent-mem:
+    - codex-agent-mem-policy --help
+    - codex-agent-mem-smoke --help
+  context-mode:
+    - context-mode doctor
+  codegraph:
+    - codegraph --version
+    - codegraph --help
+    - codegraph status
+forbidden_operations:
+  - auto_install
+  - auto_run_setup
+  - auto_index_source
+  - auto_sync_memory
+  - auto_register_mcp
+  - mutate_provider_config
+  - install_hooks
+  - start_background_daemons
+  - rewrite_validation_artifacts
+protected_artifacts:
+  - aif-gate-result
+  - coverage.json
+  - done-readiness.json
+  - openspec/specs/**
+  - openspec/changes/**/specs/**
+  - .ai-factory/rules/generated/openspec-rules-trace-*.json
+  - exact evidence snippets
 project_shape_signals:
   large_legacy:
     description: "Большой legacy проект с плотными интеграциями, большим числом файлов и шумным literal search."
     conditional_tools:
       - graphify
+      - codegraph
     condition: "Предлагать только после baseline rg, если literal search даёт слишком много шума или нужен architecture/impact overview."
     avoid_tools:
       - codex-mem
@@ -21,6 +260,7 @@ project_shape_signals:
     description: "Работа идёт сразу по нескольким репозиториям или нужно понять surface между компонентами."
     suggest_tools:
       - graphify
+      - codegraph
     conditional_tools:
       - codex-agent-mem
     avoid_tools:
@@ -30,12 +270,14 @@ project_shape_signals:
     description: "Крупное web-приложение на framework stack, где нужны architecture/impact вопросы."
     suggest_tools:
       - graphify
+      - codegraph
     conditional_tools:
       - context-mode
   go_service:
     description: "Средний Go сервис с интеграциями."
     conditional_tools:
       - graphify
+      - codegraph
       - codex-agent-mem
     baseline_first:
       - rg
@@ -46,6 +288,7 @@ project_shape_signals:
       - rg
     avoid_tools:
       - graphify
+      - codegraph
       - context-mode
       - codex-mem
       - agent-memory
@@ -56,13 +299,16 @@ task_signals:
       - rg
     avoid:
       - graphify
+      - codegraph
       - context-mode
   architecture_or_impact_discovery:
     recommend:
       - graphify
+      - codegraph
   multirepo_surface_mapping:
     recommend:
       - graphify
+      - codegraph
   resume_previous_work:
     recommend:
       - codex-agent-mem
@@ -95,6 +341,19 @@ tools:
     mcp_status: works_after_installing_python_mcp
     read_scope: explicit_project_path
     purge_path: "delete graphify-out/ or run graphify uninstall --purge if installed"
+    allowed_in:
+      - aif-analyze
+      - aif-explore
+      - aif-plan
+      - aif-review
+    forbidden_in:
+      - aif-rules-check
+      - aif-implement
+      - aif-fix
+      - aif-verify
+      - aif-done
+      - aif-commit
+    privacy_caveat: "Reads only an explicit project path, but generated graph output can contain source-derived structure and must be reviewed before storage."
     recommended_for:
       project_shapes:
         - multirepo
@@ -115,6 +374,18 @@ tools:
         - exact_file_or_symbol_lookup
         - durable_session_memory
     suggestion_text: "Проект выглядит как large framework или multirepo; можно предложить Graphify как optional repo graph для architecture/impact анализа после baseline поиска через rg. Для legacy/go предлагать только если rg слишком шумный."
+    execution:
+      default:
+        mode: read_existing_reviewed_output
+        allowed_paths:
+          - graphify-out/GRAPH_REPORT.md
+          - graphify-out/graph.json
+          - .ai-factory/references/graphify/GRAPH_REPORT.md
+          - .ai-factory/state/<change-id>/graphify/GRAPH_REPORT.md
+        forbidden_commands:
+          - graphify install
+          - graphify .
+        notes: "Read existing reviewed reports only unless the user runs Graphify outside AIFHub command ownership."
   codex-agent-mem:
     display_name: codex-agent-mem
     doc: codex-agent-mem.md
@@ -128,6 +399,19 @@ tools:
     mcp_status: read_only_mcp_verified
     read_scope: explicit_sqlite_db_path
     purge_path: "delete configured SQLite DB and sidecar files"
+    allowed_in:
+      - aif-analyze
+      - aif-explore
+      - aif-review
+    forbidden_in:
+      - aif-plan
+      - aif-rules-check
+      - aif-implement
+      - aif-fix
+      - aif-verify
+      - aif-done
+      - aif-commit
+    privacy_caveat: "Reads only the configured SQLite memory DB in read-only/minimal mode; it is not a source code index and cannot satisfy OpenSpec gates."
     recommended_for:
       tasks:
         - resume_previous_work
@@ -145,6 +429,11 @@ tools:
         - exact_file_or_symbol_lookup
         - architecture_graphing
     suggestion_text: "Если нужен resume/open-work context между сессиями, можно предложить codex-agent-mem в read-only MCP mode с explicit DB path."
+    execution:
+      default:
+        mode: read_existing_reviewed_output
+        requires_explicit_path: true
+        notes: "Read only the configured SQLite DB or reviewed continuity notes."
   context-mode:
     display_name: context-mode
     doc: context-mode.md
@@ -158,6 +447,19 @@ tools:
     mcp_status: verified
     read_scope: explicit_indexed_content
     purge_path: "ctx_purge with session or project scope"
+    allowed_in:
+      - aif-analyze
+      - aif-explore
+    forbidden_in:
+      - aif-plan
+      - aif-review
+      - aif-rules-check
+      - aif-implement
+      - aif-fix
+      - aif-verify
+      - aif-done
+      - aif-commit
+    privacy_caveat: "Everything explicitly indexed becomes retrievable; never compress protected validation artifacts in place and always purge temporary content."
     recommended_for:
       tasks:
         - large_command_output_compression
@@ -169,6 +471,10 @@ tools:
       project_shapes:
         - small_microservice
     suggestion_text: "Если анализ генерирует очень большой output, можно предложить context-mode как manual temporary index с обязательным purge."
+    execution:
+      default:
+        mode: recommend_only
+        notes: "Recommend temporary explicit-output indexing only; do not compress protected artifacts in place."
   context7:
     display_name: Context7
     doc: ../context-providers.md
@@ -182,6 +488,19 @@ tools:
     mcp_status: user_configured_optional
     read_scope: explicit_library_or_docs_query
     purge_path: "delete reviewed notes under .ai-factory/references/context7/ or .ai-factory/state/<change-id>/context7/"
+    allowed_in:
+      - aif-analyze
+      - aif-explore
+      - aif-plan
+      - aif-review
+      - aif-rules-check
+    forbidden_in:
+      - aif-implement
+      - aif-fix
+      - aif-verify
+      - aif-done
+      - aif-commit
+    privacy_caveat: "Queries external documentation by explicit library/query only; do not persist API keys, raw MCP transcripts, or provider diagnostics."
     recommended_for:
       tasks:
         - version_sensitive_library_docs
@@ -192,6 +511,13 @@ tools:
         - validation_gate
         - automatic_mcp_registration
     suggestion_text: "Если вопрос зависит от актуальных library/API docs, можно предложить Context7 как optional docs provider; setup и MCP registration остаются user-owned."
+    execution:
+      default:
+        mode: read_existing_reviewed_output
+        allowed_paths:
+          - .ai-factory/references/context7/
+          - .ai-factory/state/<change-id>/context7/
+        notes: "Use configured docs tools or reviewed notes only; do not run setup or mutate MCP config."
   codex-mem:
     display_name: codex-mem
     doc: codex-mem.md
@@ -205,6 +531,19 @@ tools:
     mcp_status: verified_but_unsafe_by_default
     read_scope: broad_codex_history_unless_fully_isolated
     purge_path: "delete configured SQLite DB and sidecar files"
+    allowed_in: []
+    forbidden_in:
+      - aif-analyze
+      - aif-explore
+      - aif-plan
+      - aif-review
+      - aif-rules-check
+      - aif-implement
+      - aif-fix
+      - aif-verify
+      - aif-done
+      - aif-commit
+    privacy_caveat: "Default scope can ingest broad Codex history across projects unless fully isolated."
     avoid_reason: "Default scope может ingest cross-project Codex history; isolation слишком fragile для default recommendation."
   agent-memory:
     display_name: agent-memory
@@ -219,6 +558,19 @@ tools:
     mcp_status: not_found
     read_scope: explicit_memory_dir
     purge_path: "delete selected memory directory"
+    allowed_in:
+      - manual_notes_only
+    forbidden_in:
+      - aif-analyze_without_manual_notes_request
+      - aif-plan
+      - aif-review
+      - aif-rules-check
+      - aif-implement
+      - aif-fix
+      - aif-verify
+      - aif-done
+      - aif-commit
+    privacy_caveat: "Manual markdown notes in an explicit directory only; not a code retrieval or MCP provider."
     recommended_for:
       tasks:
         - manual_durable_notes
@@ -241,7 +593,87 @@ tools:
     mcp_status: not_proven
     read_scope: not_proven
     purge_path: not_proven
+    allowed_in: []
+    forbidden_in:
+      - aif-analyze
+      - aif-explore
+      - aif-plan
+      - aif-review
+      - aif-rules-check
+      - aif-implement
+      - aif-fix
+      - aif-verify
+      - aif-done
+      - aif-commit
+    privacy_caveat: "Scoped read and purge are not proven, and lifecycle surface includes hooks/background lanes."
     avoid_reason: "Слишком широкий lifecycle surface: hooks, background lanes, user-home runtime и неvalidated purge/read scope."
+  codegraph:
+    display_name: CodeGraph
+    doc: codegraph.md
+    repository: "https://github.com/colbymchenry/codegraph"
+    tested_version: "@colbymchenry/codegraph 0.9.3"
+    decision: manual_cli_only
+    recommendation_action: suggest_manual_cli_for_repo_graph_when_enabled_or_explicit
+    integration_role: manual_cli_repo_graph_provider
+    install_policy: explicit_user_opt_in_only
+    stable_cli: verified_for_version_help_status_init_index_query_uninit
+    mcp_status: not_enabled
+    read_scope: explicit_project_path_verified_for_cli_init_index_status_query
+    purge_path: "codegraph uninit --force <project> verified"
+    allowed_in:
+      - aif-analyze
+      - aif-explore
+    forbidden_in:
+      - aif-plan
+      - aif-review
+      - aif-rules-check
+      - aif-implement
+      - aif-fix
+      - aif-verify
+      - aif-done
+      - aif-commit
+    privacy_caveat: "Local CLI indexing creates .codegraph/ under the explicit project path until purged; install/MCP/agent configuration mutation surfaces are not accepted."
+    recommended_for:
+      project_shapes:
+        - multirepo
+        - large_framework_app
+      tasks:
+        - architecture_or_impact_discovery
+        - multirepo_surface_mapping
+    conditional_for:
+      project_shapes:
+        - large_legacy
+        - go_service
+      condition: "Только после baseline rg, только для broad repo graph questions, and only with explicit project path plus purge."
+    do_not_recommend_for:
+      project_shapes:
+        - small_microservice
+      tasks:
+        - exact_file_or_symbol_lookup
+        - validation_gate
+        - implementation
+        - automatic_mcp_registration
+    suggestion_text: "Для broad architecture/impact или multirepo mapping можно предложить CodeGraph как manual CLI-only repo graph: probe, run explicit path init/index/query, then purge with codegraph uninit --force <project>. Do not run codegraph install, sync, serve, serve --mcp, or mutate agent config."
+    execution:
+      aif-explore:
+        mode: manual_purged_cli_execution
+        safe_probes:
+          - codegraph --version
+          - codegraph --help
+          - codegraph status
+        commands:
+          - codegraph init <project>
+          - codegraph index --quiet <project>
+          - codegraph query --path <project> --limit 10 --json "<query>"
+          - codegraph uninit --force <project>
+        purge:
+          - codegraph uninit --force <project>
+        forbidden_commands:
+          - codegraph install
+          - codegraph sync
+          - codegraph serve
+          - codegraph serve --mcp
+        pre_existing_state: "If .codegraph/ already exists, treat it as user-owned and do not delete or reinitialize it silently."
 evidence_runs:
   - id: local-anonymous-profiles-2026-05-22
     date: "2026-05-22"
@@ -296,3 +728,127 @@ evidence_runs:
         help_doctor_passed_with_git_bash: 13
         full_install_tested: false
         recommendation_update: "Оставить reject/defer; scoped read and purge evidence not proven."
+  - id: local-real-project-roots-2026-05-23
+    date: "2026-05-23"
+    scope: "5 real local project roots using anonymous profile ids only. rg baseline read source; provider smokes used temp DB/data dirs or temp copies."
+    privacy: "Docs contain only anonymous profile ids, shape labels, counts, timings, and aggregate graph sizes; real project names, paths, snippets, and temp paths are excluded."
+    sanitization:
+      graphify:
+        mode: "temporary copy only"
+        excluded:
+          - ".git"
+          - ".env*"
+          - "node_modules"
+          - "vendor"
+          - "build/cache/storage artifacts"
+          - "lock files"
+        semantic_extraction: false
+      memory_tools:
+        source_indexing: false
+        storage: "explicit temp DB/data dirs per profile"
+    profile_counts:
+      large_legacy_web_app: 1
+      go_service: 1
+      large_framework_app: 1
+      multi_app_workspace: 1
+      small_microservice: 1
+    baseline:
+      tool: rg
+      files_range: "59-874"
+      query_latency_ms_range: "95-294"
+      hit_sample_limit: 80
+      recommendation_update: "rg remains default baseline for exact search and small projects."
+    outcomes:
+      graphify:
+        tested_profiles: 5
+        ast_update_temp_copy_passed: 5
+        semantic_extraction_run: false
+        update_latency_ms_range: "2147-78826"
+        reported_graph_range: "549-16071 nodes / 1247-19382 edges"
+        recommendation_update: "Optional only for broad architecture/impact mapping; do not write graphify-out into real roots without explicit opt-in."
+      codex-agent-mem:
+        tested_profiles: 5
+        smoke_passed: 5
+        source_indexing_run: false
+        recommendation_update: "Safe with explicit DB path; continuity-only recommendation unchanged."
+      context-mode:
+        tested_profiles: 5
+        mcp_index_search_purge_passed: 5
+        source_indexing_run: false
+        recommendation_update: "Manual helper for explicit generated output only; do not install hooks/register MCP automatically."
+      codex-mem:
+        tested_profiles: 5
+        isolated_save_search_stats_passed: 5
+        sync_run: false
+        recommendation_update: "Full isolation works; reject_default remains because default Codex history scope is broad."
+      agent-memory:
+        tested_profiles: 5
+        manual_context_passed: 5
+        cli_caveat: "Global flags must follow the command; validate marker/file content, not exit code alone."
+        recommendation_update: "Docs-only/manual notes; not a project retrieval provider."
+      eagle-mem:
+        safe_probes_only: true
+        direct_wsl_help_passed: true
+        doctor_state: "not installed; SQLite missing; hooks absent"
+        full_install_tested: false
+        recommendation_update: "Reject/defer remains; scoped read, purge, and clean disablement not proven."
+      codegraph:
+        safe_probes_attempted:
+          - "codegraph --version"
+          - "codegraph --help"
+          - "codegraph status"
+        available_on_path: false
+        recommendation_update: "Superseded by local-real-project-codegraph-safety-2026-05-23; enable manual_cli_only recommendations for analyze/explore while keeping install/MCP/agent-config surface forbidden."
+  - id: local-real-project-codegraph-safety-2026-05-23
+    date: "2026-05-23"
+    scope: "29 real local project roots selected as git roots or top-level marker roots under the user-requested project folders."
+    privacy: "Docs contain only anonymous local ids, counts, timings, aggregate index sizes, and mutation outcomes; real project names, local paths, snippets, query output, and temp paths are excluded."
+    project_selection:
+      included:
+        - "git roots"
+        - "top-level marker roots"
+      excluded:
+        - "nested vendor/template/cache/config roots"
+        - "dependency folders"
+        - "installed extension copies"
+    install:
+      command: "npm install -g @colbymchenry/codegraph"
+      user_requested: true
+      version: "0.9.3"
+    per_root_commands:
+      - "codegraph init <project>"
+      - "codegraph index --quiet <project>"
+      - "codegraph status <project>"
+      - "codegraph query --path <project> --limit 3 --json main"
+      - "codegraph uninit --force <project>"
+    not_run:
+      - "codegraph install"
+      - "codegraph sync"
+      - "codegraph serve"
+      - "codegraph serve --mcp"
+      - "agent configuration mutation commands"
+      - "hooks/background services"
+    protected_snapshot_files:
+      - ".mcp.json"
+      - ".codex/config.toml"
+      - ".codex/hooks.json"
+      - ".cursor/mcp.json"
+      - ".cursor/settings.json"
+      - ".opencode.json"
+      - "opencode.json"
+      - "AGENTS.md"
+      - "CLAUDE.md"
+    outcomes:
+      codegraph:
+        roots_tested: 29
+        lifecycle_passed: 29
+        command_failures: 0
+        query_failures: 0
+        protected_config_mutations: 0
+        leftover_codegraph_dirs: 0
+        roots_with_no_recognized_source_nodes: 3
+        index_latency_ms_range: "583-25077"
+        index_latency_ms_average: 6261
+        transient_index_db_mb_range: "0.13-32.65"
+        transient_index_db_mb_total_before_purge: 177.11
+        recommendation_update: "CLI scoped read and purge accepted for explicit user-requested local experiments. Use manual_cli_only for /aif-analyze recommendation and /aif-explore enabled execution; install/MCP/agent configuration mutation remains forbidden and provider output remains noncanonical."

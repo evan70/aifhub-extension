@@ -1,8 +1,8 @@
 # eagle-mem
 
-Repository: [eagleisbatman/eagle-mem](https://github.com/eagleisbatman/eagle-mem)
+Репозиторий: [eagleisbatman/eagle-mem](https://github.com/eagleisbatman/eagle-mem)
 
-Tested package: `eagle-mem 4.9.10`.
+Проверенный package: `eagle-mem 4.9.10`.
 
 ## Мета Для Анализа
 
@@ -46,7 +46,7 @@ Usable MCP provider не проверен.
 
 Trial намеренно не выполнял full install, потому что installation touch hooks и global/user agent configuration.
 
-| Check | Result |
+| Проверка | Результат |
 |---|---|
 | npm install | PASS |
 | Windows wrapper | FAIL/PARTIAL |
@@ -54,7 +54,7 @@ Trial намеренно не выполнял full install, потому что
 | doctor | Reports not installed |
 | MCP | Not proven |
 | Scoped read root | Not proven |
-| Purge/delete index | Not proven |
+| Очистка/delete index | Not proven |
 
 ## Результаты По Project Profiles (2026-05-22)
 
@@ -72,7 +72,7 @@ Trial намеренно не выполнял full install, потому что
 
 Проверка выполнялась только как `help` + `doctor` под isolated `HOME`/`USERPROFILE` через Git Bash. Full install, hooks, background lanes, source scan и DB setup намеренно не запускались.
 
-| Profile | Shape | Help | Doctor | Install State | Runtime Bytes | Purge | Decision |
+| Profile | Shape | Help | Doctor | Install State | Runtime Bytes | Очистка | Решение |
 |---|---|---:|---:|---|---:|---|---|
 | R2026-05-22-P01 | `go_service` | 282 ms | 3.1 s | not installed | 0 B | PASS | Reject/defer; install/hooks not tested. |
 | R2026-05-22-P02 | `large_framework_app` | 439 ms | 2.8 s | not installed | 0 B | PASS | Reject/defer; install/hooks not tested. |
@@ -90,13 +90,25 @@ Trial намеренно не выполнял full install, потому что
 
 Вывод по этому прогону: isolated `doctor` подтверждает, что без install tool не имеет scoped retrieval evidence. Windows `.cmd` wrapper через default WSL bash падал; явный Git Bash работал. Рекомендация остаётся reject/defer.
 
-## Scope И Privacy
+## Локальный Прогон На Real Project Roots (2026-05-23)
+
+Для real project roots выполнялись только safe probes, потому что full install включает hooks, runtime setup, DB migrations, background automation и possible agent lifecycle ownership. Source scan/index не запускался.
+
+| Probe | Isolation | Результат | Заметки |
+|---|---|---|---|
+| Windows `.cmd --help` | default shell bridge | FAIL | Wrapper вызвал WSL bash с Windows path, который WSL не смог resolved. |
+| Direct WSL `help` | isolated `HOME`, isolated `EAGLE_MEM_DIR`, hooks/auto-update disabled | PASS | Command list был readable; install не выполнялся. |
+| Direct WSL `doctor` | isolated `HOME`, isolated `EAGLE_MEM_DIR`, hooks/auto-update disabled | PARTIAL/PASS exit | Reported `Overall: Not installed`, SQLite missing, hooks not found, manifest missing. |
+
+Этот run намеренно не создавал source indexes или project memories. Результат усиливает предыдущее решение: scoped read root, purge path и clean disablement не доказаны для optional-provider model AIFHub.
+
+## Границы И Privacy
 
 Дизайн tool включает automatic hooks, project scanning, source indexing, session summaries, guardrails и shared agent memory. Этот surface слишком широкий для optional provider model в AIFHub.
 
 Для AIFHub основной риск не в конкретной leak, наблюдавшейся в trial. Риск в lifecycle ownership: global hooks и background automation усложняют гарантии bounded read scope и clean disablement.
 
-## Purge
+## Очистка
 
 Not proven. Так как full install был intentionally skipped, purge behavior не validated.
 

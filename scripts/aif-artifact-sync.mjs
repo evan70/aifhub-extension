@@ -1638,12 +1638,22 @@ function renderBlockOrDefault(blocks, key, fallback) {
 function renderUtilitiesBlock(blocks) {
   const fallback = [
     'utilities:',
+    '  context_tools:',
+    '    enabled: []',
     '  graphify:',
     '    enabled: false',
     '    uv_check: uv --version',
     '    install: uv tool install graphifyy',
     '    activate: graphify install',
-    '    report_command: graphify .'
+    '    report_command: graphify .',
+    '  codegraph:',
+    '    enabled: false',
+    '    command: codegraph',
+    '    status: codegraph status',
+    '    init: codegraph init .',
+    '    index: codegraph index --quiet .',
+    '    query: codegraph query --path . --limit 10 --json',
+    '    purge: codegraph uninit --force .'
   ].join('\n');
   const existing = blocks.find((block) => block.key === 'utilities')?.text.trimEnd();
 
@@ -1655,18 +1665,43 @@ function renderUtilitiesBlock(blocks) {
     return existing;
   }
 
-  if (/^  graphify:(?:\s|$)/m.test(existing)) {
+  const additions = [];
+  if (!/^  context_tools:(?:\s|$)/m.test(existing)) {
+    additions.push(
+      '  context_tools:',
+      '    enabled: []'
+    );
+  }
+  if (!/^  graphify:(?:\s|$)/m.test(existing)) {
+    additions.push(
+      '  graphify:',
+      '    enabled: false',
+      '    uv_check: uv --version',
+      '    install: uv tool install graphifyy',
+      '    activate: graphify install',
+      '    report_command: graphify .'
+    );
+  }
+  if (!/^  codegraph:(?:\s|$)/m.test(existing)) {
+    additions.push(
+      '  codegraph:',
+      '    enabled: false',
+      '    command: codegraph',
+      '    status: codegraph status',
+      '    init: codegraph init .',
+      '    index: codegraph index --quiet .',
+      '    query: codegraph query --path . --limit 10 --json',
+      '    purge: codegraph uninit --force .'
+    );
+  }
+
+  if (additions.length === 0) {
     return existing;
   }
 
   return [
     existing,
-    '  graphify:',
-    '    enabled: false',
-    '    uv_check: uv --version',
-    '    install: uv tool install graphifyy',
-    '    activate: graphify install',
-    '    report_command: graphify .'
+    ...additions
   ].join('\n');
 }
 

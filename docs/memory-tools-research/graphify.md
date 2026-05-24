@@ -1,8 +1,8 @@
 # Graphify
 
-Repository: [safishamsi/graphify](https://github.com/safishamsi/graphify)
+Репозиторий: [safishamsi/graphify](https://github.com/safishamsi/graphify)
 
-Tested package: `graphifyy 0.8.14` с дополнительным `mcp 1.27.1` для поддержки MCP server.
+Проверенный package: `graphifyy 0.8.14` с дополнительным `mcp 1.27.1` для поддержки MCP server.
 
 ## Мета Для Анализа
 
@@ -88,7 +88,7 @@ MCP не был готов сразу после установки `graphifyy`:
 
 Все профили были скопированы в sanitized temp fixtures. Graphify запускался только на temp path; `graphify-out/` оставался внутри temp fixture и удаляется как derived index.
 
-| Profile | Shape | Files | Cold Index | Query | Graph | Benchmark Query Tokens | Reduction | Quality | Decision |
+| Profile | Shape | Files | Cold Index | Query | Graph | Benchmark Query Tokens | Reduction | Quality | Решение |
 |---|---|---:|---:|---:|---|---:|---:|---|---|
 | R2026-05-22-P01 | `go_service` | 534 | 15.9 s | 5.4 s | 3328 nodes / 8785 edges | ~44226 | 5.1x | partial | Только после `rg` и ручной validation. |
 | R2026-05-22-P02 | `large_framework_app` | 681 | 31.2 s | 3.2 s | 16056 nodes / 25592 edges | ~8193 | 120.9x | good | Optional для broad analysis. |
@@ -106,7 +106,27 @@ MCP не был готов сразу после установки `graphifyy`:
 
 Вывод по этому прогону: Graphify стоит предлагать для `large_framework_app` и `multirepo`, где broad `rg` output дорогой или шумный. Для `large_legacy` и `go_service` польза есть, но результат требует ручной проверки. Для `small_microservice` overhead не оправдан даже при красивом token reduction.
 
-## Scope И Privacy
+## Локальный Прогон На Real Project Roots (2026-05-23)
+
+Проверка выполнялась на временных копиях пяти real project roots. Оригинальные roots не изменялись. Команда была только AST-only:
+
+```text
+graphify update <temp-copy> --no-cluster
+```
+
+`graphify extract` и semantic/LLM backend не запускались. `graphify-out/` создавался только внутри temp copy.
+
+| Profile | Shape | Files In Baseline | Copy | AST Update | Reported Graph | Результат | Решение |
+|---|---|---:|---:|---:|---|---|---|
+| real-profile-01 | `large_legacy_web_app` | 874 | 6.8 s | 78.8 s | 4,188 nodes / 7,641 edges | PASS | Optional только после `rg`; broad graph может быть дорогим. |
+| real-profile-02 | `go_service` | 583 | 3.0 s | 18.2 s | 3,863 nodes / 9,451 edges | PASS | Optional только для broad impact discovery. |
+| real-profile-03 | `large_framework_app` | 558 | 3.2 s | 51.2 s | 16,071 nodes / 19,382 edges | PASS | Optional для broad architecture/impact mapping. |
+| real-profile-04 | `multi_app_workspace` | 330 | 2.6 s | 8.6 s | 981 nodes / 1,656 edges | PASS | Optional для surface mapping. |
+| real-profile-05 | `small_microservice` | 59 | 0.4 s | 2.1 s | 549 nodes / 1,247 edges | PASS | Не рекомендовать по умолчанию; `rg` достаточно. |
+
+Operational finding: у `graphify update` нет `--out` flag, и он пишет `graphify-out/` рядом с target path. Для real private projects guidance AIFHub должен либо использовать sanitized/temp copy, либо требовать explicit user acceptance перед записью derived graph data в project root.
+
+## Границы И Privacy
 
 Read scope явный: project path, переданный Graphify. Output хранится в `graphify-out/`.
 
@@ -117,9 +137,9 @@ Safety constraints:
 - Не запускать `graphify install` по умолчанию; он может добавлять agent/hook integrations.
 - Предпочитать CLI/MCP usage с explicit `graph.json` path.
 
-## Purge
+## Очистка
 
-Purge простой:
+Очистка простая:
 
 - Удалить `graphify-out/`.
 - Или использовать `graphify uninstall --purge`, если Graphify был installed в проект.

@@ -1,4 +1,4 @@
-[Previous Page](memory-tool-recommendations.md) | [Back to Documentation](README.md) | [Next Page](openspec-compatibility.md)
+[Предыдущая страница](memory-tool-recommendations.md) | [К документации](README.md) | [Следующая страница](openspec-compatibility.md)
 
 # Context Loading Policy
 
@@ -75,21 +75,23 @@ Generated rules and generated trace metadata are derived guidance only. If gener
 
 Runner output from OpenSpec CLI commands is runtime guidance or evidence. It does not replace the canonical filesystem artifacts under `openspec/`.
 
-## Optional Context Providers
+## Опциональные Context Providers
 
-Optional providers are read-only supporting context. They are not command prerequisites, dependency requirements, generated rules input, QA evidence, verification gates, done gates, or canonical OpenSpec sources.
+Optional providers - это read-only supporting context. Они не являются command prerequisites, dependency requirements, generated rules input, QA evidence, verification gates, done gates или canonical OpenSpec sources.
 
-Provider output can be copied into `.ai-factory/` only after user review and only as concise notes or reviewed summaries. Raw provider output, MCP transcripts, setup output, generated provider configuration, and unreviewed sensitive output must stay out of canonical OpenSpec, generated rules, runtime QA, and validation artifacts.
+Provider output можно копировать в `.ai-factory/` только после user review и только как concise notes или reviewed summaries. Raw provider output, MCP transcripts, setup output, generated provider configuration и unreviewed sensitive output должны оставаться вне canonical OpenSpec, generated rules, runtime QA и validation artifacts.
 
-See [Context Providers](context-providers.md) for the central provider guide and [Memory Tool Recommendations](memory-tool-recommendations.md) for local metadata-driven recommendation diagnostics.
+Central provider guide находится в [Context Providers](context-providers.md), local metadata-driven recommendation diagnostics - в [Memory Tool Recommendations](memory-tool-recommendations.md).
 
-## Optional Graphify Context
+Context/compression providers не должны rewrite validation artifacts и не должны compress protected artifacts in place. Protected validation artifacts включают `aif-gate-result`, `coverage.json`, `done-readiness.json`, `openspec/specs/**`, generated-rules traces и exact evidence snippets.
 
-Graphify is an optional context/research provider. AIFHub commands may use existing Graphify output as supporting context, but they must not make Graphify a required extension dependency, install `graphifyy`, run `graphify`, add Graphify manifest dependencies, start or register Graphify MCP automatically, or turn Graphify availability into a verification gate.
+## Опциональный Graphify Context
 
-Project preference is recorded in `.ai-factory/config.yaml` as `utilities.graphify.enabled` only for backward compatibility. New `/aif-analyze` recommendations should come from local installed recommendation metadata through `ai-factory aifhub-memory-tools recommend --from-project --json`. If Graphify is recommended, the recommendation is advisory only and must not trigger installation, execution, dependency changes, indexing, or MCP registration.
+Graphify - optional context/research provider. AIFHub commands могут использовать existing Graphify output как supporting context, но не должны делать Graphify required extension dependency, устанавливать `graphifyy`, запускать `graphify`, добавлять Graphify manifest dependencies, запускать или регистрировать Graphify MCP automatically, или превращать Graphify availability в verification gate.
 
-Allowed Graphify inputs are existing local or copied outputs:
+Project preference записывается в `.ai-factory/config.yaml` как `utilities.context_tools.enabled`; `utilities.graphify.enabled` остается backward-compatible. Новые `/aif-analyze` recommendations должны приходить из local installed recommendation metadata через `ai-factory aifhub-memory-tools recommend --from-project --json`. Follow-on skills должны использовать `ai-factory aifhub-memory-tools select --from-project --command <skill> --json` и только returned `selected_tools`. Если Graphify рекомендован, рекомендация остается advisory only и не должна запускать installation, execution, dependency changes, indexing или MCP registration.
+
+Allowed Graphify inputs - existing local или copied outputs:
 
 - `graphify-out/GRAPH_REPORT.md`
 - `graphify-out/graph.json`
@@ -98,47 +100,57 @@ Allowed Graphify inputs are existing local or copied outputs:
 - `.ai-factory/state/<change-id>/graphify/GRAPH_REPORT.md`
 - `.ai-factory/state/<change-id>/graphify/graph.json`
 
-If Graphify is unavailable, or if no `graphify-out/GRAPH_REPORT.md` or copied report exists, commands continue normally and report Graphify context as unavailable or degraded rather than failing.
+Если Graphify недоступен или нет `graphify-out/GRAPH_REPORT.md`/copied report, команды продолжают нормально и сообщают Graphify context как unavailable/degraded, а не fail.
 
-Graphify output remains supporting evidence only. `GRAPH_REPORT.md` may include extracted, inferred, ambiguous, or confidence-labeled relationships; commands must treat those graph-derived claims as hypotheses for further inspection. Final requirements, plans, findings, completion status, roadmap status, generated rules, and QA verdicts must be grounded in canonical OpenSpec artifacts, source files, tests, runtime state, QA evidence, or other direct repository evidence.
+Graphify output остается только supporting evidence. `GRAPH_REPORT.md` может включать extracted, inferred, ambiguous или confidence-labeled relationships; команды должны treat graph-derived claims как hypotheses for further inspection. Final requirements, plans, findings, completion status, roadmap status, generated rules и QA verdicts должны быть grounded in canonical OpenSpec artifacts, source files, tests, runtime state, QA evidence или другом direct repository evidence.
 
-Allowed durable storage for reviewed Graphify context:
+Allowed durable storage для reviewed Graphify context:
 
-- `.ai-factory/references/graphify/` for project-wide reference copies.
-- `.ai-factory/state/<change-id>/graphify/` for change-scoped runtime copies.
+- `.ai-factory/references/graphify/` для project-wide reference copies.
+- `.ai-factory/state/<change-id>/graphify/` для change-scoped runtime copies.
 
-Forbidden storage for Graphify generated files such as `GRAPH_REPORT.md`, `graph.json`, or `graph.html`:
-
-- `openspec/changes/<change-id>/`
-- `openspec/specs/`
-- `.ai-factory/rules/generated/`
-- `.ai-factory/qa/<change-id>/`
-
-Before copying Graphify output into `.ai-factory/`, review it for sensitive information. AIFHub guidance must not persist API keys, tokens, raw authorization headers, credential helper output, private backend diagnostics, or unreviewed sensitive output in `.ai-factory/`, `openspec/`, docs, runtime state, QA evidence, generated rules, or Graphify reference copies.
-
-## Optional Context7 Documentation Context
-
-Context7 is an optional documentation provider for current library/API docs. AIFHub commands and sidecars may use existing user-provided or reviewed Context7 notes as supporting context, but they must not make Context7 a required extension dependency, install `ctx7` or `@upstash/context7-mcp`, run `ctx7`, run `ctx7 setup`, add Context7 manifest dependencies, add Context7 MCP templates to `extension.json`, start or register Context7 MCP automatically, mutate `.mcp.json`, `.cursor/mcp.json`, `.opencode.json`, agent rules, or agent skills, or turn Context7 availability into a verification gate.
-
-Manual CLI examples such as `npx ctx7 library <name> <query>` and `npx ctx7 docs <libraryId> <query>` are outside AIFHub command ownership. If a user-installed `ctx7` CLI is already available, the equivalent `ctx7 library <name> <query>` and `ctx7 docs <libraryId> <query>` commands are also user-owned. If Context7 is unavailable, unauthenticated, rate-limited, missing provider access, or blocked by local Node.js runtime constraints, commands continue normally and report Context7 context as unavailable or degraded rather than failing.
-
-If the user has already configured Context7 MCP, agents may use it as optional read-only documentation context. The common flow is `resolve-library-id` followed by a docs retrieval tool. The retrieval tool name may be `get-library-docs` or `query-docs` depending on the Context7 client/server version.
-
-Context7 output remains supporting evidence only. Library IDs such as `/org/project`, `/org/project/version`, `/org/project@version`, `/packages/<name>`, and `/websites/<name>` are provider output, not stable AIFHub schema. Final requirements, plans, review findings, completion status, roadmap status, generated rules, and QA verdicts must be source-grounded in canonical OpenSpec artifacts, source files, tests, runtime state, QA evidence, generated rules trace metadata, or other direct repository evidence.
-
-Allowed durable storage for reviewed Context7 notes:
-
-- `.ai-factory/references/context7/` for project-wide documentation notes.
-- `.ai-factory/state/<change-id>/context7/` for change-scoped runtime notes.
-
-Forbidden storage for raw Context7 output, MCP transcripts, API responses, setup output, or generated provider configuration:
+Forbidden storage для Graphify generated files вроде `GRAPH_REPORT.md`, `graph.json` или `graph.html`:
 
 - `openspec/changes/<change-id>/`
 - `openspec/specs/`
 - `.ai-factory/rules/generated/`
 - `.ai-factory/qa/<change-id>/`
 
-Before copying Context7 notes into `.ai-factory/`, review them for sensitive information. AIFHub guidance must not persist `CONTEXT7_API_KEY`, API keys, tokens, raw authorization headers, credential helper output, private provider diagnostics, private backend diagnostics, or unreviewed sensitive output in `.ai-factory/`, `openspec/`, docs, runtime state, QA evidence, generated rules, or Context7 reference copies.
+Перед копированием Graphify output в `.ai-factory/` проверьте его на sensitive information. AIFHub guidance не должен persist API keys, tokens, raw authorization headers, credential helper output, private backend diagnostics или unreviewed sensitive output в `.ai-factory/`, `openspec/`, docs, runtime state, QA evidence, generated rules или Graphify reference copies.
+
+## Опциональный CodeGraph Context
+
+CodeGraph - manual CLI-only optional provider для broad repo graph questions. Metadata хранит его как `manual_cli_only` с `suggest_manual_cli_for_repo_graph_when_enabled_or_explicit`. Explicit CLI scoped read и purge verified, но `install`/MCP/agent configuration mutation behavior не принят для AIFHub automation.
+
+Safe probes ограничены `codegraph --version`, `codegraph --help` и `codegraph status`.
+
+`/aif-analyze` может рекомендовать CodeGraph только из local metadata. `/aif-explore` может run CodeGraph только когда `ai-factory aifhub-memory-tools select --from-project --command aif-explore --json` возвращает его в `selected_tools` с `manual_purged_cli_execution`. Command lifecycle приходит из field `execution` в этом CLI output. Если pre-existing `.codegraph/` уже есть, считайте его user-owned state и не delete/reinitialize silently.
+
+AIFHub commands не должны запускать CodeGraph installer, sync, MCP server, hooks или agent configuration mutation commands. CodeGraph output не должен заменять `rg`, canonical OpenSpec artifacts, generated rules, QA evidence или verification/done gates.
+
+## Опциональный Context7 Documentation Context
+
+Context7 - optional documentation provider для current library/API docs. AIFHub commands и sidecars могут использовать existing user-provided или reviewed Context7 notes как supporting context, но не должны делать Context7 required extension dependency, устанавливать `ctx7` или `@upstash/context7-mcp`, запускать `ctx7`, запускать `ctx7 setup`, добавлять Context7 manifest dependencies, добавлять Context7 MCP templates в `extension.json`, start/register Context7 MCP automatically, mutate `.mcp.json`, `.cursor/mcp.json`, `.opencode.json`, agent rules или agent skills, или превращать Context7 availability в verification gate.
+
+Manual CLI examples вроде `npx ctx7 library <name> <query>` и `npx ctx7 docs <libraryId> <query>` находятся вне AIFHub command ownership. Если user-installed `ctx7` CLI уже доступен, equivalent commands `ctx7 library <name> <query>` и `ctx7 docs <libraryId> <query>` тоже user-owned. Если Context7 unavailable, unauthenticated, rate-limited, missing provider access или blocked by local Node.js runtime constraints, команды продолжают нормально и report Context7 context как unavailable/degraded, а не fail.
+
+Если пользователь уже configured Context7 MCP, agents могут использовать его как optional read-only documentation context. Common flow: `resolve-library-id`, затем docs retrieval tool. Retrieval tool может называться `get-library-docs` или `query-docs` в зависимости от Context7 client/server version.
+
+Context7 output остается только supporting evidence. Library IDs вроде `/org/project`, `/org/project/version`, `/org/project@version`, `/packages/<name>` и `/websites/<name>` являются provider output, а не stable AIFHub schema. Final requirements, plans, review findings, completion status, roadmap status, generated rules и QA verdicts должны быть source-grounded in canonical OpenSpec artifacts, source files, tests, runtime state, QA evidence, generated rules trace metadata или другом direct repository evidence.
+
+Allowed durable storage для reviewed Context7 notes:
+
+- `.ai-factory/references/context7/` для project-wide documentation notes.
+- `.ai-factory/state/<change-id>/context7/` для change-scoped runtime notes.
+
+Forbidden storage для raw Context7 output, MCP transcripts, API responses, setup output или generated provider configuration:
+
+- `openspec/changes/<change-id>/`
+- `openspec/specs/`
+- `.ai-factory/rules/generated/`
+- `.ai-factory/qa/<change-id>/`
+
+Перед копированием Context7 notes в `.ai-factory/` проверьте их на sensitive information. AIFHub guidance не должен persist `CONTEXT7_API_KEY`, API keys, tokens, raw authorization headers, credential helper output, private provider diagnostics, private backend diagnostics или unreviewed sensitive output в `.ai-factory/`, `openspec/`, docs, runtime state, QA evidence, generated rules или Context7 reference copies.
 
 ## Bug Fix Context
 
