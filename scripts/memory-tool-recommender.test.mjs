@@ -437,6 +437,44 @@ describe('recommendation results', () => {
     assert.match(skippedCodegraph.reason, /forbidden/i);
   });
 
+  it('selects enabled tools from inline YAML config lists', async () => {
+    await mkdir(path.join(tmpDir, '.ai-factory'), { recursive: true });
+    await writeFile(
+      path.join(tmpDir, '.ai-factory', 'config.yaml'),
+      [
+        'utilities:',
+        '  context_tools:',
+        '    enabled: [codegraph, graphify]',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const result = await runMemoryToolRecommender([
+      'select',
+      '--shape',
+      'large_framework_app',
+      '--task',
+      'architecture_or_impact_discovery',
+      '--command',
+      'aif-explore',
+      '--metadata',
+      REAL_METADATA,
+      '--json'
+    ], {
+      cwd: tmpDir,
+      stdout: [],
+      stderr: [],
+      exit: false,
+      probeRunner: async () => ({ availability: 'installed', command: 'tool --version' })
+    });
+
+    assert.equal(result.exitCode, 0);
+    assert.deepEqual(result.body.config.enabled_tools, ['codegraph', 'graphify']);
+    assert.ok(result.body.selected_tools.some((item) => item.tool_id === 'codegraph'));
+    assert.ok(result.body.selected_tools.some((item) => item.tool_id === 'graphify'));
+  });
+
   it('selects legacy utility-enabled tools as compatibility config', async () => {
     await mkdir(path.join(tmpDir, '.ai-factory'), { recursive: true });
     await writeFile(

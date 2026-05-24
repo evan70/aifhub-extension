@@ -1148,13 +1148,49 @@ function parseScalar(value) {
   }
 
   const lower = trimmed.toLowerCase();
-  if (trimmed === '[]') return [];
+  if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+    return parseInlineList(trimmed);
+  }
   if (lower === 'true') return true;
   if (lower === 'false') return false;
   if (lower === 'null') return null;
   if (/^-?\d+(?:\.\d+)?$/.test(trimmed)) return Number(trimmed);
 
   return trimmed;
+}
+
+function parseInlineList(value) {
+  const body = String(value ?? '').trim().slice(1, -1).trim();
+  if (!body) return [];
+  return splitInlineListItems(body).map((item) => parseScalar(item));
+}
+
+function splitInlineListItems(value) {
+  const items = [];
+  let quote = null;
+  let current = '';
+  const raw = String(value ?? '');
+
+  for (let index = 0; index < raw.length; index += 1) {
+    const char = raw[index];
+    if ((char === '"' || char === "'") && (index === 0 || raw[index - 1] !== '\\')) {
+      quote = quote === char ? null : quote ?? char;
+      current += char;
+      continue;
+    }
+    if (char === ',' && quote === null) {
+      items.push(current.trim());
+      current = '';
+      continue;
+    }
+    current += char;
+  }
+
+  if (current.trim().length > 0) {
+    items.push(current.trim());
+  }
+
+  return items;
 }
 
 function stripInlineComment(value) {
