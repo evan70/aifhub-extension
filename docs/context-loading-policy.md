@@ -202,6 +202,7 @@ GitHub access is non-blocking. If `gh`, connector data, network access, authenti
 | `/aif-security-checklist` | no | no |
 | `/aif-done` | `openspec/specs/**` only through OpenSpec CLI archive | `.ai-factory/qa/<change-id>/`, `.ai-factory/state/<change-id>/final-summary.md` |
 | `/aif-commit` | no | git commit only |
+| `/aif-distillation` | no | no |
 | `/aif-evolve` | no | skill-context or evolution artifacts only |
 
 `/aif-roadmap` writes only the configured roadmap artifact, `.ai-factory/ROADMAP.md` by default.
@@ -218,11 +219,27 @@ OpenSpec-native quality gates:
 | `/aif-verify` | canonical OpenSpec artifacts, generated rules, runtime state, gate outputs when available | `.ai-factory/qa/<change-id>/` |
 | `/aif-done` | passing verify evidence, verify gate result, OpenSpec change | final QA/state evidence and OpenSpec archive via CLI |
 | `/aif-commit` | staged changes, done evidence, final summary, OpenSpec archive/spec changes | git commit |
+| `/aif-distillation` | books, docs, folders, or URLs | generated skill packages in the current agent skills directory |
 | `/aif-evolve` | patches, evidence, skill-context inputs | skill-context/evolution artifacts |
 
 `/aif-done` owns OpenSpec lifecycle finalization. `/aif-commit` owns git commit creation. `/aif-evolve` owns learning/evolution.
 
 After `/aif-done`, `/aif-commit` may read finalization evidence, OpenSpec archive/spec mutations, the configured roadmap artifact, and optional GitHub issue/PR/milestone freshness context. It must not mutate OpenSpec lifecycle artifacts, `.ai-factory/ROADMAP.md`, runtime state, QA evidence, generated rules, or GitHub objects manually. If the roadmap is stale, `/aif-commit` reports a read-only freshness warning and hands off to `/aif-roadmap`; it still writes only the git commit after user confirmation.
+
+Generic `## Commit Plan` grouping is parent-owned in AI Factory 2.13+. In OpenSpec-native mode, an active `openspec/changes/<change-id>/tasks.md` may provide that `## Commit Plan` source. AIFHub adds only roadmap/GitHub freshness findings before the commit proposal. If no active change/plan resolves, `/aif-commit` keeps upstream staged-diff behavior and preserves upstream grouping options such as `Follow Commit Plan`, `Commit everything together`, and `Adjust grouping`.
+
+## Upstream Distillation Utility
+
+AI Factory 2.13+ includes `/aif-distillation`. It is an upstream utility skill for turning books, docs, folders, or URLs into reusable Agent Skills.
+
+`/aif-distillation` is not an AIFHub lifecycle stage. It does not create OpenSpec changes, and it must not write `openspec/changes/**`, `openspec/specs/**`, `.ai-factory/qa/**`, or `.ai-factory/rules/generated/**`.
+
+It writes generated skill packages to the current agent skills directory. Useful AIFHub inputs include:
+
+```text
+/aif-distillation docs/memory-tools-research --name aifhub-memory-tool-selection
+/aif-distillation docs/context-providers.md --name aifhub-context-providers
+```
 
 ## Legacy Artifact Boundaries
 

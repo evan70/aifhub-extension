@@ -6,10 +6,10 @@
   "sources": {
     "ai-factory": {
       "url": "https://github.com/lee-to/ai-factory",
-      "version": "2.12.0",
-      "baselineVersion": "2.12.0",
-      "lastSync": "2026-05-15",
-      "notes": "Validated against upstream 2.12.0 on the 2.x branch. AI Factory 2.12.0 adds the codex-app runtime, bundled Codex CLI native agents, audit-artifacts, sequential plan IDs, and language.technical_terms policy."
+      "version": "2.13.2",
+      "baselineVersion": "2.13.2",
+      "lastSync": "2026-05-24",
+      "notes": "Validated against upstream 2.13.2 on the 2.x branch. AI Factory 2.13.x adds plan-aware /aif-commit Commit Plan grouping and the built-in /aif-distillation skill for turning books, docs, folders, or URLs into reusable Agent Skills."
     },
     "openspec": {
       "url": "https://github.com/Fission-AI/OpenSpec",
