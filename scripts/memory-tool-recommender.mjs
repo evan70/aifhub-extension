@@ -744,7 +744,7 @@ async function probeCommand(command, args) {
     };
   } catch (err) {
     if (process.platform === 'win32' && (err?.code === 'ENOENT' || err?.code === 'EINVAL')) {
-      return probeWindowsShellCommand(command, args, commandLabel, err.code);
+      return probeWindowsShellCommand(command, args, commandLabel);
     }
     return {
       availability: err?.code === 'ENOENT' ? 'not_installed' : 'unknown',
@@ -754,7 +754,7 @@ async function probeCommand(command, args) {
   }
 }
 
-async function probeWindowsShellCommand(command, args, commandLabel, originalCode = null) {
+async function probeWindowsShellCommand(command, args, commandLabel) {
   const shell = process.env.ComSpec || 'cmd.exe';
   const commandLine = [command, ...args].map(quoteWindowsShellArg).join(' ');
   try {
@@ -769,14 +769,17 @@ async function probeWindowsShellCommand(command, args, commandLabel, originalCod
     };
   } catch (err) {
     const output = `${err?.stdout ?? ''}\n${err?.stderr ?? ''}`;
-    const notFound = /not recognized|cannot find|not found/i.test(output);
-    const directSpawnCouldNotResolve = originalCode === 'ENOENT' || originalCode === 'EINVAL';
+    const notFound = isWindowsShellCommandNotFound(output);
     return {
-      availability: notFound || directSpawnCouldNotResolve ? 'not_installed' : 'unknown',
+      availability: notFound ? 'not_installed' : 'unknown',
       command: commandLabel,
-      reason: notFound || directSpawnCouldNotResolve ? 'command-not-found' : 'probe-failed'
+      reason: notFound ? 'command-not-found' : 'probe-failed'
     };
   }
+}
+
+export function isWindowsShellCommandNotFound(output) {
+  return /not recognized|cannot find|not found/i.test(String(output ?? ''));
 }
 
 function quoteWindowsShellArg(value) {

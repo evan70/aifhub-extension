@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   buildRecommendationResult,
+  isWindowsShellCommandNotFound,
   loadRecommendationMetadata,
   parseRecommendationMetadata,
   resolveMetadataPath,
@@ -566,6 +567,21 @@ describe('CLI behavior', () => {
 
     const graphify = result.recommendations.find((item) => item.tool_id === 'graphify');
     assert.equal(graphify.availability, 'not_installed');
+  });
+
+  it('classifies Windows shell fallback failures only from explicit not-found output', () => {
+    assert.equal(
+      isWindowsShellCommandNotFound("'codegraph' is not recognized as an internal or external command."),
+      true
+    );
+    assert.equal(
+      isWindowsShellCommandNotFound('Error: project index is missing. Run codegraph init first.'),
+      false
+    );
+    assert.equal(
+      isWindowsShellCommandNotFound('The CLI returned exit code 1 because workspace state is invalid.'),
+      false
+    );
   });
 
   it('detects Windows npm command shims during status probes', { skip: process.platform !== 'win32' }, async () => {
