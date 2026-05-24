@@ -167,6 +167,21 @@ ai-factory audit-artifacts openspec .ai-factory/qa .ai-factory/state --json
 
 This audit bridge is diagnostic-only for AIFHub Extension. It may supplement `/aif-mode doctor` output when available, but it is not mandatory, not archive-blocking, and not a replacement for AIFHub generated rules, coverage, rules gate, verify gate, or OpenSpec archive readiness checks.
 
+## AI Factory 2.13 Commit Plan and Distillation
+
+AI Factory 2.13+ owns generic active plan `## Commit Plan` grouping in `/aif-commit`. AIFHub must not duplicate parent grouping logic. The AIFHub `aif-commit` injection remains a read-only roadmap/GitHub freshness overlay, and `/aif-commit` remains the only commit owner.
+
+In OpenSpec-native mode, an active `openspec/changes/<change-id>/tasks.md` file may be the plan source that contains `## Commit Plan`. If no active change/plan resolves, AIFHub keeps upstream staged-diff behavior. When upstream detects the plan, AIFHub must preserve the upstream grouping prompt and options such as `Follow Commit Plan`, `Commit everything together`, and `Adjust grouping`.
+
+AI Factory 2.13+ includes `/aif-distillation`. It is an upstream utility skill for turning books, docs, folders, or URLs into reusable Agent Skills. It is not an AIFHub lifecycle stage, does not create OpenSpec changes, and must not write `openspec/changes/**`, `openspec/specs/**`, `.ai-factory/qa/**`, or `.ai-factory/rules/generated/**`. It writes generated skill packages to the current agent skills directory.
+
+Examples:
+
+```text
+/aif-distillation docs/memory-tools-research --name aifhub-memory-tool-selection
+/aif-distillation docs/context-providers.md --name aifhub-context-providers
+```
+
 ## Artifact Sync Points
 
 Recommended sync points:

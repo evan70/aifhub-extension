@@ -681,6 +681,30 @@ Does not write:
 
 In OpenSpec-native mode, `/aif-commit` normally runs after `/aif-done`. It performs a read-only roadmap/GitHub freshness gate before the upstream commit prompt. Stale roadmap findings are warning-first unless strict checking was explicitly requested, and each stale finding should hand off to `/aif-roadmap`. The command still writes only the git commit after user confirmation.
 
+Generic `## Commit Plan` grouping is parent-owned in AI Factory 2.13+. AIFHub must not duplicate this grouping logic, and `/aif-commit` remains the only commit owner. The AIFHub `aif-commit` injection is only a read-only roadmap/GitHub freshness overlay.
+
+In OpenSpec-native mode, if an active OpenSpec change is available, commit planning should use `openspec/changes/<change-id>/tasks.md` as the source that may contain `## Commit Plan`. When upstream `/aif-commit` detects that plan section, preserve its grouping prompt and add only roadmap/GitHub freshness findings before the commit proposal. Do not remove or contradict upstream options: `Follow Commit Plan`, `Commit everything together`, or `Adjust grouping`.
+
+If no active change/plan resolves, keep upstream staged-diff behavior.
+
+### `/aif-distillation`
+
+AI Factory 2.13+ includes `/aif-distillation`. It is an upstream utility skill for turning books, docs, folders, or URLs into reusable Agent Skills.
+
+AIFHub boundaries:
+
+- `/aif-distillation` is not an AIFHub lifecycle stage.
+- It does not create OpenSpec changes.
+- It must not write `openspec/changes/**`, `openspec/specs/**`, `.ai-factory/qa/**`, or `.ai-factory/rules/generated/**`.
+- It writes generated skill packages to the current agent skills directory.
+
+Useful AIFHub inputs include `docs/memory-tools-research/`, `docs/context-providers.md`, and internal docs or external guides that should become reusable skills:
+
+```text
+/aif-distillation docs/memory-tools-research --name aifhub-memory-tool-selection
+/aif-distillation docs/context-providers.md --name aifhub-context-providers
+```
+
 ### `/aif-evolve`
 
 `/aif-evolve` is optional after commit/finalization. Use it when the implementation, fix, or finalization evidence contains durable lessons that should improve future skills or skill-context. It should not mutate OpenSpec canonical artifacts.

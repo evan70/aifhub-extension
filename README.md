@@ -105,6 +105,21 @@ OpenSpec validation overlay:
 
 It does not replace `/aif-commit`. After `/aif-done`, run `/aif-commit` or your normal git workflow to commit implementation changes, OpenSpec archive/spec changes, QA evidence, and final summaries.
 
+### AI Factory 2.13 Sync
+
+AI Factory 2.13+ owns generic active plan `## Commit Plan` grouping in `/aif-commit`. AIFHub must not duplicate that grouping logic, and `/aif-commit` remains the only commit owner; `/aif-done` finalizes OpenSpec lifecycle evidence but does not create git commits.
+
+The AIFHub `aif-commit` injection is only a read-only roadmap/GitHub freshness overlay. In OpenSpec-native mode, if an active OpenSpec change is available, commit planning should use `openspec/changes/<change-id>/tasks.md` as the source that may contain `## Commit Plan`. If no active change/plan resolves, keep upstream staged-diff behavior.
+
+AI Factory 2.13+ includes `/aif-distillation`. It is an upstream utility skill for turning books, docs, folders, or URLs into reusable Agent Skills. It is not an AIFHub lifecycle stage, does not create OpenSpec changes, and must not write `openspec/changes/**`, `openspec/specs/**`, `.ai-factory/qa/**`, or `.ai-factory/rules/generated/**`. It writes generated skill packages to the current agent skills directory.
+
+Useful AIFHub source examples:
+
+```text
+/aif-distillation docs/memory-tools-research --name aifhub-memory-tool-selection
+/aif-distillation docs/context-providers.md --name aifhub-context-providers
+```
+
 Validation gates:
 
 - Optional before verify in relaxed/manual workflow.
