@@ -1,5 +1,5 @@
 schema: aifhub.memory_tools.recommendation.v1
-updated: "2026-05-22"
+updated: "2026-05-25"
 purpose: "Метаданные для этапа анализа проекта: какие memory/retrieval инструменты можно предлагать пользователю, когда и с какими ограничениями."
 default_policy:
   install_policy: explicit_user_opt_in_only
@@ -332,7 +332,7 @@ tools:
     display_name: Graphify
     doc: graphify.md
     repository: "https://github.com/safishamsi/graphify"
-    tested_version: "graphifyy 0.8.14"
+    tested_version: "graphifyy 0.8.17"
     decision: optional
     recommendation_action: suggest_optional_install
     integration_role: repo_graph_provider
@@ -390,13 +390,13 @@ tools:
     display_name: codex-agent-mem
     doc: codex-agent-mem.md
     repository: "https://github.com/MarceloCaporale/codex-agent-mem"
-    tested_version: "1.0.2"
+    tested_version: "Python source package 1.0.2 from GitHub"
     decision: optional
     recommendation_action: suggest_when_continuity_needed
     integration_role: read_only_continuity_memory
     install_policy: explicit_user_opt_in_only
-    stable_cli: true
-    mcp_status: read_only_mcp_verified
+    stable_cli: source_installable_from_github_and_cli_help_verified
+    mcp_status: source_install_and_read_only_minimal_mcp_verified
     read_scope: explicit_sqlite_db_path
     purge_path: "delete configured SQLite DB and sidecar files"
     allowed_in:
@@ -411,7 +411,7 @@ tools:
       - aif-verify
       - aif-done
       - aif-commit
-    privacy_caveat: "Reads only the configured SQLite memory DB in read-only/minimal mode; it is not a source code index and cannot satisfy OpenSpec gates."
+    privacy_caveat: "Reads only the configured SQLite memory DB in read-only/minimal mode; it is not a source code index and cannot satisfy OpenSpec gates. Use minimal profile by default; full read-only lists mutating tool names even though mutating calls return isError and do not write."
     recommended_for:
       tasks:
         - resume_previous_work
@@ -428,17 +428,17 @@ tools:
         - initial_code_discovery
         - exact_file_or_symbol_lookup
         - architecture_graphing
-    suggestion_text: "Если нужен resume/open-work context между сессиями, можно предложить codex-agent-mem в read-only MCP mode с explicit DB path."
+    suggestion_text: "Если нужен resume/open-work context между сессиями, можно предложить codex-agent-mem в read-only minimal MCP mode с explicit DB path. Install/setup остается user-owned; package source is GitHub/Python, not npm."
     execution:
       default:
         mode: read_existing_reviewed_output
         requires_explicit_path: true
-        notes: "Read only the configured SQLite DB or reviewed continuity notes."
+        notes: "Read only the configured SQLite DB or reviewed continuity notes. Prefer codex-agent-mem-mcp --read-only --profile minimal --response-mode compact; do not use full profile as the default low-impact mode."
   context-mode:
     display_name: context-mode
     doc: context-mode.md
     repository: "https://github.com/mksglu/context-mode"
-    tested_version: "1.0.146"
+    tested_version: "1.0.151"
     decision: manual_helper_only
     recommendation_action: suggest_only_for_large_temporary_outputs
     integration_role: temporary_output_index
@@ -477,14 +477,14 @@ tools:
         notes: "Recommend temporary explicit-output indexing only; do not compress protected artifacts in place."
   context7:
     display_name: Context7
-    doc: ../context-providers.md
+    doc: context7.md
     repository: "https://github.com/upstash/context7"
-    tested_version: "docs-provider guidance only"
+    tested_version: "ctx7 0.4.4"
     decision: optional
     recommendation_action: suggest_for_version_sensitive_docs
     integration_role: optional_docs_provider
     install_policy: explicit_user_opt_in_only
-    stable_cli: partial
+    stable_cli: true_for_help_and_lookup
     mcp_status: user_configured_optional
     read_scope: explicit_library_or_docs_query
     purge_path: "delete reviewed notes under .ai-factory/references/context7/ or .ai-factory/state/<change-id>/context7/"
@@ -611,7 +611,7 @@ tools:
     display_name: CodeGraph
     doc: codegraph.md
     repository: "https://github.com/colbymchenry/codegraph"
-    tested_version: "@colbymchenry/codegraph 0.9.3"
+    tested_version: "installed @colbymchenry/codegraph 0.9.3; npm latest 0.9.4 on 2026-05-24"
     decision: manual_cli_only
     recommendation_action: suggest_manual_cli_for_repo_graph_when_enabled_or_explicit
     integration_role: manual_cli_repo_graph_provider
@@ -852,3 +852,137 @@ evidence_runs:
         transient_index_db_mb_range: "0.13-32.65"
         transient_index_db_mb_total_before_purge: 177.11
         recommendation_update: "CLI scoped read and purge accepted for explicit user-requested local experiments. Use manual_cli_only for /aif-analyze recommendation and /aif-explore enabled execution; install/MCP/agent configuration mutation remains forbidden and provider output remains noncanonical."
+  - id: local-projects-temp-safe-set-2026-05-24
+    date: "2026-05-24"
+    scope: "55 anonymous profiles discovered under the user-selected local projects root and copied to sanitized temp fixtures before tool execution."
+    privacy: "Docs contain only anonymous profile ids, shape labels, counts, timings, aggregate output sizes, and status summaries; real project names, local paths, snippets, credentials, and temp paths are excluded."
+    harness:
+      script: "scripts/memory-tool-field-run.mjs"
+      roots_argument: "local projects root"
+      output_scope: "temp-run-dir"
+      hard_guard: "recursive copy/delete targets must resolve inside the selected temp run dir"
+      safe_set:
+        - rg
+        - git-gh
+        - codegraph
+        - graphify
+        - context7
+        - context-mode
+        - codex-agent-mem
+      rejected_full_installs:
+        - codex-mem
+        - eagle-mem
+        - agent-memory
+    sanitization:
+      excluded:
+        - ".git"
+        - ".env*"
+        - "node_modules"
+        - "vendor"
+        - "dist/build/cache/storage artifacts"
+        - "lock files"
+        - "temp dirs"
+      source_indexing_for_context_memory_tools: false
+    profile_counts:
+      large_framework_app: 46
+      multirepo: 1
+      go_service: 6
+      small_microservice: 2
+    baseline:
+      tool: rg
+      files_total: 19984
+      token_estimate_method: "ceil(chars / 4)"
+      aggregate_query_token_estimate: 1598556
+      recommendation_update: "rg remains baseline; broad literal queries can produce very large output on some large profiles."
+    outcomes:
+      git-gh:
+        availability_probe_only: true
+        git_available: true
+        gh_available: true
+      codegraph:
+        tested_profiles: 55
+        installed_version: "0.9.3"
+        npm_latest: "0.9.4"
+        lifecycle_passed: 55
+        purge_passed: 55
+        slowest_lifecycle_ms: 75820
+        recommendation_update: "manual_cli_only unchanged; record version drift and temp-copy lifecycle pass."
+      graphify:
+        tested_profiles: 55
+        version: "graphify 0.8.17"
+        ast_update_passed: 54
+        ast_update_failed: 1
+        cleanup_passed: 55
+        slowest_success_ms: 112558
+        failed_elapsed_ms: 180687
+        semantic_extraction_run: false
+        recommendation_update: "optional broad repo graph unchanged, with timeout risk on large profiles."
+      context7:
+        version: "ctx7 0.4.4"
+        help_passed: true
+        explicit_docs_lookup_passed: true
+        setup_run: false
+        mcp_registration_run: false
+        recommendation_update: "Add dedicated Context7 research doc and keep optional docs-provider recommendation."
+      context-mode:
+        version: "1.0.151"
+        doctor_passed: true
+        mcp_initialize_passed: true
+        index_generated_rg_summary_passed: true
+        search_passed: true
+        purge_passed: true
+        indexed_input_chars: 11417
+        source_indexing_run: false
+        recommendation_update: "manual helper only; temp MCP index/search/purge verified for generated output."
+      codex-agent-mem:
+        python_source_package: true
+        version: "1.0.2"
+        temp_repo_probe_passed: true
+        source_indexing_run: false
+        sqlite_smoke_run: false
+        recommendation_update: "Correct npm-probe interpretation: GitHub/Python source package is available; recommendation remains optional continuity-only with user-owned install/setup and explicit DB path."
+  - id: codex-agent-mem-isolated-source-install-2026-05-25
+    date: "2026-05-25"
+    scope: "GitHub repo cloned into an isolated temp directory; Python venv, editable install, temp SQLite DB, CLI smoke, upstream tests, and MCP stdio probes were run without touching real project roots."
+    privacy: "Docs contain only package version, commit id, aggregate counts, tool names, and pass/fail status; real project names, local paths, smoke payload output, snippets, credentials, and temp paths are excluded."
+    source:
+      repository: "https://github.com/MarceloCaporale/codex-agent-mem"
+      commit: "d594c8a86207fb9a8a5b48a6aab323349680707a"
+      package: "codex-agent-mem"
+      version: "1.0.2"
+      requires_python: ">=3.12"
+    not_run:
+      - "source indexing"
+      - "global Codex config mutation"
+      - "MCP registration"
+      - "hooks"
+      - "background daemon lifecycle"
+    outcomes:
+      codex-agent-mem:
+        editable_install_passed: true
+        cli_help_passed:
+          - codex-agent-mem-smoke
+          - codex-agent-mem-mcp
+          - codex-agent-mem-policy
+        sqlite_smoke_passed: true
+        smoke_counts:
+          sessions: 1
+          turns: 1
+          observations: 3
+          active_decisions: 1
+          health_score: 100
+        upstream_pytest: "121 passed"
+        ruff_check: "All checks passed"
+        mcp_minimal_read_only:
+          initialized: true
+          version: "1.0.2"
+          exposed_tool_count: 7
+          mutating_tools_exposed: 0
+          calls_passed:
+            - mem_session_list
+            - mem_completion_check
+            - mem_context_pack
+            - mem_health_runtime
+        mcp_full_read_only_caveat: "tools/list exposes mutating tool names, but mutating tools/call returns isError and did not increase recent item count."
+        cleanup_passed: true
+        recommendation_update: "Keep optional continuity-only recommendation, but make minimal/read-only the default safe MCP mode and avoid full profile for low-impact roadmap/explore support."

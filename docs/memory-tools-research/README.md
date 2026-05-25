@@ -12,6 +12,7 @@
 - если проект маленький или нужен точный file/symbol lookup, оставить baseline `rg`;
 - `codex-mem` и `eagle-mem` не предлагать по умолчанию из-за scope/privacy risks.
 - `CodeGraph` можно предлагать только как `manual_cli_only` для `/aif-analyze` и использовать в `/aif-explore` только когда `select --command aif-explore --json` возвращает его в `selected_tools` с purge-командой; `install`/MCP/agent-config surface не принят.
+- `Context7` можно предлагать как optional docs provider для version-sensitive library/API вопросов; `ctx7 setup` и MCP registration остаются user-owned.
 
 Эта meta не разрешает auto-install. Любой инструмент из списка должен предлагаться пользователю только как explicit opt-in с объяснением read scope, purge path и privacy tradeoff.
 
@@ -74,13 +75,14 @@ README содержит только общую сводку и итоговую
 
 | Tool | Repository | Проверенная версия | Где подходит | Решение |
 |---|---|---:|---|---|
-| [Graphify](graphify.md) | [safishamsi/graphify](https://github.com/safishamsi/graphify) | `graphifyy 0.8.14` | Repo graph / architecture / impact discovery. Не memory. | Оставить как optional guidance для больших/legacy/multirepo проектов. |
-| [codex-agent-mem](codex-agent-mem.md) | [MarceloCaporale/codex-agent-mem](https://github.com/MarceloCaporale/codex-agent-mem) | `1.0.2` | Cross-session continuity, open work, closure checks, compact context packs. | Основной кандидат для optional read-only continuity memory. |
-| [context-mode](context-mode.md) | [mksglu/context-mode](https://github.com/mksglu/context-mode) | `1.0.146` | Temporary output/context indexing and compression. | Только docs-only optional helper, не persistent AIFHub memory. |
+| [Graphify](graphify.md) | [safishamsi/graphify](https://github.com/safishamsi/graphify) | `graphifyy 0.8.17` | Repo graph / architecture / impact discovery. Не memory. | Оставить как optional guidance для больших/legacy/multirepo проектов; temp-copy run 2026-05-24 показал 54/55 AST PASS. |
+| [Context7](context7.md) | [upstash/context7](https://github.com/upstash/context7) | `ctx7 0.4.4` | Version-sensitive library/API docs. | Optional docs provider; setup/MCP registration не выполнять из AIFHub. |
+| [codex-agent-mem](codex-agent-mem.md) | [MarceloCaporale/codex-agent-mem](https://github.com/MarceloCaporale/codex-agent-mem) | Python source package `1.0.2` | Cross-session continuity, open work, closure checks, compact context packs. | Optional read-only continuity provider; source-installable from GitHub, isolated install/pytest/ruff/minimal MCP PASS on 2026-05-25. |
+| [context-mode](context-mode.md) | [mksglu/context-mode](https://github.com/mksglu/context-mode) | `1.0.151` | Temporary output/context indexing and compression. | Только docs-only optional helper, не persistent AIFHub memory; temp MCP index/search/purge PASS. |
 | [codex-mem](codex-mem.md) | package не содержит repository metadata; ближайший проверенный публичный repo: [Just-Boring-Cat/codex-mem](https://github.com/Just-Boring-Cat/codex-mem) | `0.1.1` | Codex session/history memory. | Reject as default; privacy risk без строгой изоляции. |
 | [agent-memory](agent-memory.md) | [jayzeng/agentmemory](https://github.com/jayzeng/agentmemory) | `myagentmemory 0.4.12` | Manual markdown memory. | Docs-only/manual notes, без интеграции. |
 | [eagle-mem](eagle-mem.md) | [eagleisbatman/eagle-mem](https://github.com/eagleisbatman/eagle-mem) | `4.9.10` | Shared memory + hooks + guardrails + lanes. | Reject/defer; слишком широкий surface для issue #85. |
-| [CodeGraph](codegraph.md) | [colbymchenry/codegraph](https://github.com/colbymchenry/codegraph) | `@colbymchenry/codegraph 0.9.3` | Manual CLI-only repo graph для broad analyze/explore questions. | `manual_cli_only`; scoped CLI read/purge verified, но `install`/MCP/agent-config surface не принят. |
+| [CodeGraph](codegraph.md) | [colbymchenry/codegraph](https://github.com/colbymchenry/codegraph) | installed `0.9.3`, npm `0.9.4` | Manual CLI-only repo graph для broad analyze/explore questions. | `manual_cli_only`; scoped CLI read/purge verified, но `install`/MCP/agent-config surface не принят. |
 
 ## Итоговая Рекомендация
 
@@ -91,6 +93,7 @@ README содержит только общую сводку и итоговую
 - `rg` остаётся baseline для literal search, точного поиска файлов и маленьких проектов.
 - `codex-agent-mem` можно документировать как optional read-only MCP continuity provider.
 - `Graphify` можно документировать как optional repo-graph provider для исследования больших кодовых баз.
+- `Context7` можно документировать как optional docs provider для актуальных library/API вопросов.
 - `context-mode` может остаться manual helper для temporary indexing больших command outputs.
 - `codex-mem`, `agent-memory` и `eagle-mem` не должны становиться default AIFHub integrations.
 - `CodeGraph` можно рекомендовать из `/aif-analyze` как manual CLI-only opt-in и использовать из `/aif-explore` только когда selection CLI возвращает его в `selected_tools`; `install`/MCP/agent-config surface не принят.

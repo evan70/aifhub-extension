@@ -2,7 +2,7 @@
 
 Репозиторий: [MarceloCaporale/codex-agent-mem](https://github.com/MarceloCaporale/codex-agent-mem)
 
-Проверенный package: `codex-agent-mem 1.0.2`.
+Проверенный package: Python source package `codex-agent-mem 1.0.2` из GitHub repo. Safe field run 2026-05-24 ошибочно проверял npm registry; npm/PyPI registry package может быть недоступен, но это не означает, что GitHub source install path сломан. Изолированный source-install test 2026-05-25 подтвердил рабочий Python/MCP path.
 
 ## Мета Для Анализа
 
@@ -141,6 +141,44 @@ Shared controlled result: smoke DB работал за 794.4 ms, live read-only 
 
 Вывод не изменился: tool безопасно работает с explicit DB path, но он не помогает initial code discovery. Для поиска по коду baseline остаётся `rg`, для broad repo graph - optional Graphify.
 
+## Source Repo Probe В Safe Field Run (2026-05-24)
+
+Повторный прогон проверял availability без source indexing. Важно: `codex-agent-mem` - Python package, а не npm package. Старый npm-probe вернул unavailable, но GitHub repo clone/probe прошел, а `pyproject.toml` defines package name `codex-agent-mem`, version `1.0.2` и CLI scripts.
+
+| Проверка | Результат |
+|---|---:|
+| GitHub repo source | available |
+| Python package metadata | `codex-agent-mem 1.0.2` |
+| CLI scripts in source | present |
+| npm registry probe | not applicable |
+| Source indexing | no |
+| Explicit temp SQLite DB smoke | not run in this probe |
+| Recommendation impact | no change; continuity-only optional provider |
+
+Вывод: прежняя рекомендация как continuity-only provider остается применимой. AIFHub не должен auto-install или mutate MCP config, но может корректно описывать user-owned install path как Python source install from the GitHub repository with explicit DB path.
+
+## Isolated Source Install And MCP Probe (2026-05-25)
+
+Проверка выполнялась в isolated temp directory: GitHub repo clone, Python venv, editable source install, temp SQLite DB и MCP stdio server. Real project roots, global Codex config, hooks, MCP registration и source indexing не использовались.
+
+| Проверка | Результат |
+|---|---|
+| GitHub source clone | PASS, commit `d594c8a86207fb9a8a5b48a6aab323349680707a` |
+| Package metadata | `codex-agent-mem 1.0.2`, Python `>=3.12` |
+| Editable install | PASS через `pip install -e .[dev]` в temp venv |
+| CLI help | PASS для `codex-agent-mem-smoke`, `codex-agent-mem-mcp`, `codex-agent-mem-policy` |
+| CLI smoke with explicit temp DB | PASS: 1 session, 1 turn, 3 observations, 1 active decision, health score 100, snapshot created |
+| Upstream tests | PASS: `121 passed` |
+| Ruff | PASS: `All checks passed` |
+| MCP stdio minimal/read-only | PASS: initialized as version `1.0.2`, exposed 7 tools, no mutating tools exposed |
+| MCP read-only calls | PASS: `mem_session_list`, `mem_completion_check`, `mem_context_pack`, `mem_health_runtime` returned without call errors |
+| MCP full/read-only caveat | `tools/list` still exposes mutating tool names, but `tools/call mem_note_create` returned `isError: true` and did not increase recent item count |
+| Source indexing | Not run |
+| Global config/hooks/registration | Not run |
+| Cleanup | PASS: temp repo, venv, DBs and sidecars removed |
+
+Safe-use conclusion: `codex-agent-mem` работает, но AIFHub should recommend only user-owned install/setup with explicit DB path. Для low-impact roadmap/explore support использовать `codex-agent-mem-mcp --read-only --profile minimal --response-mode compact`; не использовать `full` profile как default, потому что он advertises mutating tool names even though read-only calls are blocked.
+
 ## Границы И Privacy
 
 Safe configuration использует:
@@ -151,6 +189,8 @@ Safe configuration использует:
 - Compact response mode.
 
 В этом mode MCP не exposes mutating tools и не читает source files. Он читает только configured memory database.
+
+Не использовать `--profile full` как default low-impact mode: в read-only режиме mutating calls блокируются, но сами mutating tool names остаются visible в `tools/list`.
 
 Избегать default/global setup, пока пользователь явно не opt-in. Bootstrap был safe в trial, потому что он печатал config snippet и не мутировал Codex config automatically.
 

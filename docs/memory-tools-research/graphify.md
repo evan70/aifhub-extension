@@ -2,7 +2,7 @@
 
 Репозиторий: [safishamsi/graphify](https://github.com/safishamsi/graphify)
 
-Проверенный package: `graphifyy 0.8.14` с дополнительным `mcp 1.27.1` для поддержки MCP server.
+Проверенный package: `graphifyy 0.8.17` в safe field run 2026-05-24; более ранний MCP smoke использовал `graphifyy 0.8.14` с дополнительным `mcp 1.27.1`.
 
 ## Мета Для Анализа
 
@@ -125,6 +125,22 @@ graphify update <temp-copy> --no-cluster
 | real-profile-05 | `small_microservice` | 59 | 0.4 s | 2.1 s | 549 nodes / 1,247 edges | PASS | Не рекомендовать по умолчанию; `rg` достаточно. |
 
 Operational finding: у `graphify update` нет `--out` flag, и он пишет `graphify-out/` рядом с target path. Для real private projects guidance AIFHub должен либо использовать sanitized/temp copy, либо требовать explicit user acceptance перед записью derived graph data в project root.
+
+## Повторный Safe Field Run На Temp Copies (2026-05-24)
+
+Прогон выполнен через `scripts/memory-tool-field-run.mjs` на sanitized temp copies 55 anonymous profiles из локального projects root. `graphifyy` устанавливался только во временный Python venv через bundled Python. Запуск был AST-only: `graphify update <temp-copy> --no-cluster`; semantic/LLM extraction не запускался.
+
+| Проверка | Результат |
+|---|---:|
+| Profiles | 55 |
+| Проверенная версия | `graphify 0.8.17` |
+| AST update PASS | 54/55 |
+| Timeout/failure | 1/55 |
+| Slowest successful update | 112,558 ms |
+| Failed profile elapsed | 180,687 ms |
+| `graphify-out/` cleanup | 55/55 PASS |
+
+Вывод усиливает прежнюю рекомендацию: Graphify полезен как optional broad architecture/impact graph на больших профилях, но может быть дорогим и имеет timeout risk на отдельных больших roots. Для private roots запускать только на sanitized temp copy или после explicit acceptance на derived `graphify-out/`.
 
 ## Границы И Privacy
 

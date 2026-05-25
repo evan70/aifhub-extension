@@ -2,7 +2,7 @@
 
 Репозиторий: [mksglu/context-mode](https://github.com/mksglu/context-mode)
 
-Проверенный package: `context-mode 1.0.146`.
+Проверенный package: `context-mode 1.0.151` в safe field run 2026-05-24; более ранние results ниже использовали `1.0.146`.
 
 ## Мета Для Анализа
 
@@ -84,7 +84,7 @@ Shared controlled result: explicit indexed canary был retrievable before purg
 
 ## Локальный Прогон На Anonymous Profiles (2026-05-22)
 
-Проверка выполнялась только на explicit generated text: anonymous profile summary + canary. Source files не индексировались. Для каждого профиля использовался отдельный `CONTEXT_MODE_DATA_DIR`, затем выполнялся `ctx_purge({ confirm: true, scope: "project" })`.
+Проверка выполнялась только на explicit generated text: anonymous profile summary + canary. Source files не индексировались. Для каждого профиля использовался отдельный `CONTEXT_MODE_DIR`, затем выполнялся `ctx_purge({ confirm: true, scope: "project" })`.
 
 | Profile | Shape | Indexed Tokens | Index | Search | Found | Очистка | Решение |
 |---|---|---:|---:|---:|---|---|---|
@@ -106,7 +106,7 @@ Shared controlled result: explicit indexed canary был retrievable before purg
 
 ## Локальный Прогон На Real Project Roots (2026-05-23)
 
-Проверка выполнялась через MCP SDK на пяти real project roots, но индексировались только generated profile summaries из `rg` baseline. Source snippets, paths, secrets и validation artifacts не передавались в `ctx_index`. Для каждого профиля использовался отдельный `CONTEXT_MODE_DATA_DIR`, затем выполнялся `ctx_purge({ confirm: true, scope: "project" })`.
+Проверка выполнялась через MCP SDK на пяти real project roots, но индексировались только generated profile summaries из `rg` baseline. Source snippets, paths, secrets и validation artifacts не передавались в `ctx_index`. Для каждого профиля использовался отдельный `CONTEXT_MODE_DIR`, затем выполнялся `ctx_purge({ confirm: true, scope: "project" })`.
 
 | Profile | Shape | MCP Connect | `ctx_index` | `ctx_search` | `ctx_purge` | Результат | Решение |
 |---|---|---:|---:|---:|---:|---|---|
@@ -117,6 +117,24 @@ Shared controlled result: explicit indexed canary был retrievable before purg
 | real-profile-05 | `small_microservice` | 1.73 s | 46 ms | 8 ms | 10 ms | PASS | Обычно не нужен для малых проектов. |
 
 `context-mode doctor` также прошел runtime/server/FTS5 checks, а Codex hook registration failed/warned, потому что hooks намеренно не устанавливались. Для AIFHub docs это ожидаемо: не устанавливать hooks и не register MCP automatically.
+
+## Повторный Safe Field Run На Temp Copies (2026-05-24)
+
+Прогон выполнен через `scripts/memory-tool-field-run.mjs` на sanitized temp copies 55 anonymous profiles. `context-mode` устанавливался только во временный npm prefix. Source files не индексировались: harness индексировал только generated `rg` summary text без локальных путей и snippets, затем выполнял `ctx_search` и `ctx_purge`.
+
+| Проверка | Результат |
+|---|---:|
+| Проверенная версия | `context-mode 1.0.151` |
+| `context-mode doctor` | PASS |
+| MCP initialize | PASS |
+| `ctx_index` generated rg summary | PASS |
+| Indexed input size | 11,417 chars |
+| `ctx_search` | PASS |
+| `ctx_purge scope=project` | PASS |
+| Source indexing | no |
+| Hooks/setup/MCP registration | no |
+
+Вывод не меняет роль: `context-mode` остается manual helper для explicit generated output. Новое evidence подтверждает актуальную CLI/MCP версию и temp-only index/search/purge flow, но не доказывает его как source-code retrieval provider.
 
 ## Границы И Privacy
 
