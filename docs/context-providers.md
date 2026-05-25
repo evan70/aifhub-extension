@@ -65,6 +65,8 @@ ctx7 docs <libraryId> <query>
 
 Context7 CLI требует подходящий local Node.js runtime. Если `npx ctx7` или `ctx7` недоступен, слишком старый, unauthenticated или rate-limited, AIFHub guidance должен продолжить с degraded documentation context.
 
+Safe field run 2026-05-24 установил `ctx7 0.4.4` только во временный npm prefix, проверил `ctx7 --help` и выполнил один explicit docs lookup. `ctx7 setup`, MCP registration, config mutation и raw output persistence не запускались. Детали: [memory-tools-research/context7.md](memory-tools-research/context7.md).
+
 Context7 library IDs могут зависеть от source и version. Примеры:
 
 - `/org/project`
@@ -112,6 +114,8 @@ graphify .
 
 Для private real roots предпочтительно запускать Graphify на sanitized temporary copy, если пользователь явно не принял local `graphify-out/` files в project root. Safety smoke от 2026-05-23 использовал `graphify update <temp-copy> --no-cluster` и не запускал semantic/LLM extraction.
 
+Safe field run 2026-05-24 повторил этот режим на 55 anonymous temp copies с `graphify 0.8.17`: AST update прошел на 54/55, один large profile hit timeout, cleanup `graphify-out/` прошел для всех profiles.
+
 Разрешенное durable storage для reviewed Graphify context:
 
 - `.ai-factory/references/graphify/` для project-wide reference copies.
@@ -134,6 +138,8 @@ codegraph status
 ```
 
 Manual safety testing 2026-05-23 проверил explicit-path CLI `init`, `index --quiet`, `status`, JSON `query` и `uninit --force` на 29 real local project roots без protected agent/config mutations и без leftover `.codegraph/` directories.
+
+Safe field run 2026-05-24 повторил scoped lifecycle на 55 anonymous temp copies. Installed CLI был `0.9.3`, npm latest `0.9.4`; lifecycle и purge прошли на всех profiles. Это подтверждает `manual_cli_only`, но не расширяет разрешения на install/MCP/agent-config mutation.
 
 `/aif-analyze` может рекомендовать CodeGraph, когда metadata показывает, что broad repo graph полезен. `/aif-explore` может использовать scoped CLI lifecycle только когда `select --command aif-explore --json` возвращает CodeGraph в `selected_tools` с `manual_purged_cli_execution`, и только с purge command из returned `execution` field перед завершением.
 

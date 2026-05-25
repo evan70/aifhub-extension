@@ -2,7 +2,7 @@
 
 Репозиторий: [colbymchenry/codegraph](https://github.com/colbymchenry/codegraph)
 
-Проверенный package: `@colbymchenry/codegraph 0.9.3`; установлен global по явному запросу пользователя и протестирован 2026-05-23.
+Проверенный package: installed `@colbymchenry/codegraph 0.9.3`; npm latest на 2026-05-24: `0.9.4`. Global install был выполнен по явному запросу пользователя в предыдущем прогоне.
 
 ## Мета Для Анализа
 
@@ -137,6 +137,22 @@ Anonymous per-root results:
 | cg-root-27 | PASS | 982 ms | 1.30 MB | PASS | JSON query вернул results. |
 | cg-root-28 | PASS | 790 ms | 0.43 MB | PASS | JSON query вернул results. |
 | cg-root-29 | PASS | 2,191 ms | 0.36 MB | PASS | JSON query вернул results. |
+
+## Повторный Safe Field Run На Temp Copies (2026-05-24)
+
+Прогон выполнен через `scripts/memory-tool-field-run.mjs` на sanitized temp copies 55 anonymous profiles из локального projects root. Реальные roots не изменялись; `.codegraph/` создавался только внутри temp copies и удалялся через `codegraph uninit --force <temp-copy>`.
+
+| Проверка | Результат |
+|---|---:|
+| Profiles | 55 |
+| Installed CLI | `0.9.3` |
+| Current npm version | `0.9.4` |
+| `init/index/query/uninit` lifecycle | 55/55 PASS |
+| Slowest lifecycle | 75,820 ms |
+| Leftover `.codegraph/` in temp copies | 0 detected by lifecycle purge |
+| Protected config mutation test | not needed; run used temp copies only |
+
+Вывод не меняет permission model: CodeGraph остается `manual_cli_only`. Новое evidence добавляет version drift (`0.9.3` installed vs `0.9.4` npm latest) и подтверждает, что scoped lifecycle работает на temp copies across broad local profile set. AIFHub все еще не должен запускать `codegraph install`, MCP serving, agent config mutation или использовать output как canonical evidence.
 
 ## Очистка
 

@@ -2,7 +2,7 @@
 
 Репозиторий: [MarceloCaporale/codex-agent-mem](https://github.com/MarceloCaporale/codex-agent-mem)
 
-Проверенный package: `codex-agent-mem 1.0.2`.
+Проверенный package в раннем smoke: `codex-agent-mem 1.0.2`. Safe field run 2026-05-24 показал, что npm package под старым именем `codex-agent-mem` сейчас недоступен; GitHub repo probe прошел только как degraded availability check.
 
 ## Мета Для Анализа
 
@@ -140,6 +140,20 @@ Shared controlled result: smoke DB работал за 794.4 ms, live read-only 
 | real-profile-05 | `small_microservice` | 951 ms | yes | no | PASS | Usually unnecessary unless session continuity matters. |
 
 Вывод не изменился: tool безопасно работает с explicit DB path, но он не помогает initial code discovery. Для поиска по коду baseline остаётся `rg`, для broad repo graph - optional Graphify.
+
+## Registry/Repo Probe В Safe Field Run (2026-05-24)
+
+Повторный прогон не смог установить package по старому npm имени `codex-agent-mem`: registry probe вернул unavailable. По плану full install/source indexing не выполнялись. Harness сделал только temp clone/probe GitHub repo и не создавал source index.
+
+| Проверка | Результат |
+|---|---:|
+| npm package `codex-agent-mem` | unavailable |
+| Temp GitHub clone/probe | PASS |
+| Source indexing | no |
+| Explicit temp SQLite DB smoke | not run in this probe |
+| Recommendation impact | degraded availability |
+
+Вывод: прежняя рекомендация как continuity-only provider остается применимой только для уже проверенной/user-owned установки или explicit DB notes. AIFHub не должен предлагать установку по старому npm имени, пока актуальный package/install path не будет заново подтвержден.
 
 ## Границы И Privacy
 

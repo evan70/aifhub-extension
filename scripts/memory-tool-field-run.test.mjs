@@ -1,0 +1,137 @@
+// memory-tool-field-run.test.mjs - safety contract for optional context tool field runs
+import { describe, it, beforeEach, afterEach } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+
+import {
+  assertWithinDirectory,
+  buildPublicRunSummary,
+  discoverProjectRoots,
+  getToolPlan,
+  hasSensitivePathLeak,
+  prepareSanitizedCopy,
+  runMemoryToolFieldRun,
+  safeRemoveWithin
+} from './memory-tool-field-run.mjs';
+
+let tmpDir;
+
+beforeEach(async () => {
+  tmpDir = await mkdtemp(path.join(os.tmpdir(), 'memory-tool-field-run-'));
+});
+
+afterEach(async () => {
+  await rm(tmpDir, { recursive: true, force: true });
+});
+
+async function writeFixtureFile(relativePath, content = 'fixture') {
+  const target = path.join(tmpDir, relativePath);
+  await mkdir(path.dirname(target), { recursive: true });
+  await writeFile(target, content, 'utf8');
+  return target;
+}
+
+describe('project discovery', () => {
+  it('returns anonymous profiles without leaking project names in public summaries', async () => {
+    await writeFixtureFile(path.join('secret-product', 'package.json'), '{"name":"secret-product"}');
+    await writeFixtureFile(path.join('another-private-service', 'go.mod'), 'module private.local/service');
+
+    const profiles = await discoverProjectRoots([tmpDir], { maxProfiles: 10 });
+    const summary = buildPublicRunSummary({ profiles, rootInputs: [tmpDir], tools: getToolPlan('safe') });
+    const encoded = JSON.stringify(summary);
+
+    assert.equal(profiles.length, 2);
+    assert.deepEqual(profiles.map((profile) => profile.id), ['field-profile-01', 'field-profile-02']);
+    assert.equal(encoded.includes('secret-product'), false);
+    assert.equal(encoded.includes('another-private-service'), false);
+    assert.equal(hasSensitivePathLeak(summary, [tmpDir]), false);
+  });
+});
+
+describe('sanitized copies', () => {
+  it('excludes protected directories, env files, lock files, and build artifacts', async () => {
+    const sourceRoot = path.join(tmpDir, 'source-project');
+    await writeFixtureFile(path.join('source-project', 'package.json'), '{}');
+    await writeFixtureFile(path.join('source-project', 'src', 'index.js'), 'console.log("ok");');
+    await writeFixtureFile(path.join('source-project', '.git', 'config'), 'private git config');
+    await writeFixtureFile(path.join('source-project', '.env'), 'TOKEN=secret');
+    await writeFixtureFile(path.join('source-project', 'node_modules', 'pkg', 'index.js'), 'dependency');
+    await writeFixtureFile(path.join('source-project', 'package-lock.json'), '{}');
+    await writeFixtureFile(path.join('source-project', 'dist', 'bundle.js'), 'built');
+
+    const outDir = path.join(tmpDir, 'run-output');
+    await mkdir(outDir, { recursive: true });
+    const copy = await prepareSanitizedCopy({
+      profile: { id: 'field-profile-01', sourceRoot },
+      outDir
+    });
+
+    assert.equal(await exists(path.join(copy.copyPath, 'src', 'index.js')), true);
+    assert.equal(await exists(path.join(copy.copyPath, '.git', 'config')), false);
+    assert.equal(await exists(path.join(copy.copyPath, '.env')), false);
+    assert.equal(await exists(path.join(copy.copyPath, 'node_modules')), false);
+    assert.equal(await exists(path.join(copy.copyPath, 'package-lock.json')), false);
+    assert.equal(await exists(path.join(copy.copyPath, 'dist')), false);
+  });
+});
+
+describe('path guards', () => {
+  it('rejects copy and delete targets outside the selected run directory', async () => {
+    const runDir = path.join(tmpDir, 'run');
+    await mkdir(runDir, { recursive: true });
+
+    assert.throws(
+      () => assertWithinDirectory(runDir, path.join(tmpDir, 'outside'), 'test target'),
+      /outside/i
+    );
+    await assert.rejects(
+      () => safeRemoveWithin(runDir, path.join(tmpDir, 'outside')),
+      /outside/i
+    );
+  });
+});
+
+describe('tool plan', () => {
+  it('keeps rejected providers out of safe full-install runs', () => {
+    const plan = getToolPlan('safe');
+    const installed = plan.filter((tool) => tool.fullInstall).map((tool) => tool.id);
+    const ids = plan.map((tool) => tool.id);
+
+    assert.deepEqual(ids, ['rg', 'git-gh', 'codegraph', 'graphify', 'context7', 'context-mode', 'codex-agent-mem']);
+    assert.equal(installed.includes('codex-mem'), false);
+    assert.equal(installed.includes('eagle-mem'), false);
+    assert.equal(installed.includes('agent-memory'), false);
+  });
+});
+
+describe('cli', () => {
+  it('prints help without starting discovery or installs', async () => {
+    const stdout = [];
+    const result = await runMemoryToolFieldRun(['--help'], { stdout, exit: false });
+
+    assert.equal(result.exitCode, 0);
+    assert.match(stdout.join(''), /--dry-run/);
+    assert.match(stdout.join(''), /--roots <dir>/);
+  });
+});
+
+describe('public summaries', () => {
+  it('detects direct local path leaks before writing docs', () => {
+    const summary = {
+      profiles: [{ id: 'field-profile-01', note: 'copied from C:\\projects\\private-root' }]
+    };
+
+    assert.equal(hasSensitivePathLeak(summary, ['C:\\projects']), true);
+  });
+});
+
+async function exists(targetPath) {
+  try {
+    await stat(targetPath);
+    return true;
+  } catch {
+    return false;
+  }
+}

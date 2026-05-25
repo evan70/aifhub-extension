@@ -1,0 +1,1037 @@
+#!/usr/bin/env node
+// memory-tool-field-run.mjs - isolated field runner for optional memory/context tools
+import { execFile, spawn } from 'node:child_process';
+import {
+  cp,
+  lstat,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  stat,
+  writeFile
+} from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import process from 'node:process';
+import { promisify } from 'node:util';
+import { fileURLToPath } from 'node:url';
+
+const execFileAsync = promisify(execFile);
+
+export const FIELD_RUN_SCHEMA = 'aifhub.memory_tools.field_run.v1';
+export const SAFE_TOOL_IDS = [
+  'rg',
+  'git-gh',
+  'codegraph',
+  'graphify',
+  'context7',
+  'context-mode',
+  'codex-agent-mem'
+];
+export const REJECTED_FULL_INSTALL_IDS = new Set(['codex-mem', 'agent-memory', 'eagle-mem']);
+
+const DEFAULT_QUERIES = ['architecture', 'workflow', 'OpenSpec', 'TODO'];
+const MANIFEST_NAMES = new Set([
+  'package.json',
+  'go.mod',
+  'pyproject.toml',
+  'requirements.txt',
+  'Cargo.toml',
+  'composer.json',
+  'pom.xml',
+  'build.gradle',
+  'extension.json'
+]);
+const IGNORE_DIR_NAMES = new Set([
+  '.git',
+  '.hg',
+  '.svn',
+  'node_modules',
+  'vendor',
+  'dist',
+  'build',
+  'coverage',
+  '.cache',
+  '.next',
+  '.turbo',
+  'target',
+  'tmp',
+  'temp',
+  'graphify-out',
+  '.codegraph'
+]);
+const LOCK_FILE_NAMES = new Set([
+  'package-lock.json',
+  'npm-shrinkwrap.json',
+  'pnpm-lock.yaml',
+  'yarn.lock',
+  'bun.lockb',
+  'Cargo.lock',
+  'composer.lock',
+  'poetry.lock',
+  'Pipfile.lock',
+  'uv.lock'
+]);
+
+export async function runMemoryToolFieldRun(args = [], options = {}) {
+  const parsed = parseArgs(args);
+  if (parsed.help) {
+    return emitText(getCliUsage(), 0, options);
+  }
+
+  const outDir = path.resolve(parsed.out ?? await mkdtemp(path.join(os.tmpdir(), 'aifhub-memory-tools-')));
+  await mkdir(outDir, { recursive: true });
+
+  const rootInputs = parsed.roots.length > 0 ? parsed.roots : [process.cwd()];
+  const tools = getToolPlan(parsed.tools);
+  const profiles = await discoverProjectRoots(rootInputs, { maxProfiles: parsed.maxProfiles });
+  const selectedProfiles = parsed.dryRun ? profiles : profiles;
+  const toolResults = [];
+  const copies = [];
+
+  if (!parsed.dryRun) {
+    for (const profile of selectedProfiles) {
+      const copy = await prepareSanitizedCopy({ profile, outDir });
+      copies.push(copy);
+    }
+  }
+
+  const runtime = {
+    outDir,
+    copies,
+    toolsDir: path.join(outDir, 'tools'),
+    timeoutMs: parsed.timeoutMs,
+    python: parsed.python,
+    npm: parsed.npm
+  };
+  await mkdir(runtime.toolsDir, { recursive: true });
+
+  for (const tool of tools) {
+    const result = parsed.dryRun
+      ? dryRunToolResult(tool)
+      : await runTool(tool, runtime);
+    toolResults.push(result);
+  }
+
+  const summary = buildPublicRunSummary({
+    profiles: selectedProfiles,
+    rootInputs,
+    tools,
+    toolResults,
+    copies,
+    outDir,
+    dryRun: parsed.dryRun
+  });
+
+  if (hasSensitivePathLeak(summary, rootInputs)) {
+    throw new Error('Public field-run summary contains a sensitive local path.');
+  }
+
+  if (parsed.writeJson) {
+    const outputPath = path.join(outDir, 'field-run-summary.json');
+    assertWithinDirectory(outDir, outputPath, 'field-run summary');
+    await writeFile(outputPath, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
+  }
+
+  return emit(summary, 0, options);
+}
+
+export async function discoverProjectRoots(rootInputs, options = {}) {
+  const roots = [];
+  const seen = new Set();
+  const maxProfiles = Number.isFinite(options.maxProfiles) ? options.maxProfiles : null;
+
+  for (const input of rootInputs) {
+    const root = path.resolve(input);
+    if (!await pathExists(root)) continue;
+    const entries = await readdir(root, { withFileTypes: true }).catch(() => []);
+
+    if (await isProjectRoot(root)) {
+      addRoot(roots, seen, root);
+    }
+
+    for (const entry of entries) {
+      if (!entry.isDirectory() || shouldIgnoreDirectory(entry.name)) continue;
+      const candidate = path.join(root, entry.name);
+      addRoot(roots, seen, candidate);
+      for (const nested of await findNestedProjectRoots(candidate, { maxDepth: 3 })) {
+        addRoot(roots, seen, nested);
+      }
+    }
+  }
+
+  const limited = maxProfiles ? roots.slice(0, maxProfiles) : roots;
+  return limited.map((sourceRoot, index) => ({
+    id: `field-profile-${String(index + 1).padStart(2, '0')}`,
+    sourceRoot,
+    shape: classifyShapeFromPath(sourceRoot),
+    source_kind: 'local-project-root'
+  }));
+}
+
+export async function prepareSanitizedCopy({ profile, outDir }) {
+  const resolvedOutDir = path.resolve(outDir);
+  const copyPath = path.join(resolvedOutDir, 'fixtures', profile.id);
+  assertWithinDirectory(resolvedOutDir, copyPath, 'sanitized copy');
+  await safeRemoveWithin(resolvedOutDir, copyPath);
+  await mkdir(copyPath, { recursive: true });
+  await copySanitizedDirectory(profile.sourceRoot, copyPath);
+
+  return {
+    profile_id: profile.id,
+    copyPath,
+    copied: true
+  };
+}
+
+export function getToolPlan(scope = 'safe') {
+  if (scope !== 'safe') {
+    throw new Error(`Unsupported tool scope: ${scope}`);
+  }
+  return [
+    { id: 'rg', fullInstall: false, role: 'baseline_search' },
+    { id: 'git-gh', fullInstall: false, role: 'read_only_repo_context' },
+    { id: 'codegraph', fullInstall: false, role: 'repo_graph_cli' },
+    { id: 'graphify', fullInstall: true, role: 'repo_graph_ast' },
+    { id: 'context7', fullInstall: true, role: 'docs_lookup' },
+    { id: 'context-mode', fullInstall: true, role: 'temporary_output_index' },
+    { id: 'codex-agent-mem', fullInstall: false, role: 'continuity_memory_probe' }
+  ].filter((tool) => !REJECTED_FULL_INSTALL_IDS.has(tool.id));
+}
+
+export function buildPublicRunSummary({
+  profiles = [],
+  rootInputs = [],
+  tools = [],
+  toolResults = [],
+  copies = [],
+  outDir = null,
+  dryRun = false
+} = {}) {
+  const copyByProfile = new Map(copies.map((copy) => [copy.profile_id, copy]));
+  return {
+    schema: FIELD_RUN_SCHEMA,
+    generated_at: new Date().toISOString(),
+    dry_run: Boolean(dryRun),
+    root_input_count: rootInputs.length,
+    output_scope: outDir ? 'temp-run-dir' : null,
+    profiles: profiles.map((profile) => {
+      const copy = copyByProfile.get(profile.id);
+      return {
+        id: profile.id,
+        shape: profile.shape,
+        source_kind: profile.source_kind,
+        copied: Boolean(copy?.copied)
+      };
+    }),
+    tools: tools.map((tool) => ({
+      id: tool.id,
+      role: tool.role,
+      full_install: Boolean(tool.fullInstall)
+    })),
+    results: toolResults.map(sanitizeToolResult)
+  };
+}
+
+export function hasSensitivePathLeak(value, roots = []) {
+  const encoded = JSON.stringify(value);
+  const normalizedEncoded = normalizeForLeakCheck(encoded);
+  const sensitiveRoots = roots.map((root) => normalizeForLeakCheck(path.resolve(root)));
+
+  if (/[A-Za-z]:[\\/]{2}?projects[\\/]/i.test(encoded) || /C:\\\\projects\\\\/i.test(encoded)) {
+    return true;
+  }
+
+  return sensitiveRoots.some((root) => root && normalizedEncoded.includes(root));
+}
+
+export function assertWithinDirectory(baseDir, targetPath, label = 'target') {
+  const base = path.resolve(baseDir);
+  const target = path.resolve(targetPath);
+  const relative = path.relative(base, target);
+  if (relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative))) {
+    return target;
+  }
+  throw new Error(`${label} resolves outside the selected run directory.`);
+}
+
+export async function safeRemoveWithin(baseDir, targetPath) {
+  const target = assertWithinDirectory(baseDir, targetPath, 'delete target');
+  await rm(target, { recursive: true, force: true });
+}
+
+async function runTool(tool, runtime) {
+  try {
+    if (tool.id === 'rg') return await runRgBaseline(tool, runtime);
+    if (tool.id === 'git-gh') return await runGitGhProbe(tool, runtime);
+    if (tool.id === 'codegraph') return await runCodeGraph(tool, runtime);
+    if (tool.id === 'graphify') return await runGraphify(tool, runtime);
+    if (tool.id === 'context7') return await runContext7(tool, runtime);
+    if (tool.id === 'context-mode') return await runContextMode(tool, runtime);
+    if (tool.id === 'codex-agent-mem') return await runCodexAgentMem(tool, runtime);
+    return skipped(tool, 'unsupported-tool');
+  } catch (err) {
+    return {
+      tool_id: tool.id,
+      status: 'error',
+      message: err?.message ?? String(err)
+    };
+  }
+}
+
+async function runRgBaseline(tool, runtime) {
+  const profiles = [];
+  for (const copy of runtime.copies) {
+    const started = performance.now();
+    const files = await execSafe('rg', ['--files', '.'], { cwd: copy.copyPath, timeoutMs: runtime.timeoutMs });
+    const queryResults = [];
+    for (const query of DEFAULT_QUERIES) {
+      const queryStart = performance.now();
+      const result = await execSafe('rg', ['-n', '--max-count', '80', query, '.'], {
+        cwd: copy.copyPath,
+        timeoutMs: runtime.timeoutMs,
+        allowFailure: true
+      });
+      const chars = `${result.stdout}\n${result.stderr}`.length;
+      queryResults.push({
+        query,
+        exit_code: result.exitCode,
+        elapsed_ms: elapsedMs(queryStart),
+        output_chars: chars,
+        token_estimate: Math.ceil(chars / 4)
+      });
+    }
+    profiles.push({
+      profile_id: copy.profile_id,
+      elapsed_ms: elapsedMs(started),
+      file_count: splitLines(files.stdout).length,
+      queries: queryResults
+    });
+  }
+  const result = { tool_id: tool.id, status: 'pass', profiles };
+  runtime.rgSummaryText = formatRgSummaryForIndex(result);
+  return result;
+}
+
+async function runGitGhProbe(tool, runtime) {
+  const git = await execSafe('git', ['--version'], { timeoutMs: runtime.timeoutMs, allowFailure: true });
+  const gh = await execSafe('gh', ['--version'], { timeoutMs: runtime.timeoutMs, allowFailure: true });
+  return {
+    tool_id: tool.id,
+    status: git.exitCode === 0 || gh.exitCode === 0 ? 'pass' : 'degraded',
+    git_available: git.exitCode === 0,
+    gh_available: gh.exitCode === 0,
+    notes: 'availability probe only; no GitHub or git mutations'
+  };
+}
+
+async function runCodeGraph(tool, runtime) {
+  const codegraph = defaultCommandName('codegraph');
+  const version = await execCommandShim(codegraph, ['--version'], { timeoutMs: runtime.timeoutMs, allowFailure: true });
+  const npmVersion = await execNpm(runtime, ['view', '@colbymchenry/codegraph', 'version'], {
+    timeoutMs: runtime.timeoutMs,
+    allowFailure: true
+  });
+
+  if (version.exitCode !== 0) {
+    return {
+      tool_id: tool.id,
+      status: 'unavailable',
+      installed_available: false,
+      npm_version: firstLine(npmVersion.stdout)
+    };
+  }
+
+  const profiles = [];
+  for (const copy of runtime.copies) {
+    const started = performance.now();
+    const init = await execCommandShim(codegraph, ['init', copy.copyPath], {
+      timeoutMs: runtime.timeoutMs,
+      allowFailure: true
+    });
+    const index = init.exitCode === 0
+      ? await execCommandShim(codegraph, ['index', '--quiet', copy.copyPath], {
+        timeoutMs: Math.max(runtime.timeoutMs, 120000),
+        allowFailure: true
+      })
+      : { exitCode: 1 };
+    const query = index.exitCode === 0
+      ? await execCommandShim(codegraph, ['query', '--path', copy.copyPath, '--limit', '3', '--json', 'main'], {
+        timeoutMs: runtime.timeoutMs,
+        allowFailure: true
+      })
+      : { exitCode: 1, stdout: '' };
+    const purge = await execCommandShim(codegraph, ['uninit', '--force', copy.copyPath], {
+      timeoutMs: runtime.timeoutMs,
+      allowFailure: true
+    });
+    profiles.push({
+      profile_id: copy.profile_id,
+      elapsed_ms: elapsedMs(started),
+      lifecycle_passed: init.exitCode === 0 && index.exitCode === 0 && query.exitCode === 0 && purge.exitCode === 0,
+      query_output_chars: String(query.stdout ?? '').length,
+      purge_passed: purge.exitCode === 0
+    });
+  }
+
+  return {
+    tool_id: tool.id,
+    status: 'pass',
+    installed_version: firstLine(version.stdout),
+    npm_version: firstLine(npmVersion.stdout),
+    profiles
+  };
+}
+
+async function runGraphify(tool, runtime) {
+  const python = runtime.python ?? process.env.AIFHUB_FIELD_PYTHON ?? 'python';
+  const venvDir = path.join(runtime.toolsDir, 'graphify-venv');
+  assertWithinDirectory(runtime.toolsDir, venvDir, 'graphify venv');
+
+  const venv = await execSafe(python, ['-m', 'venv', venvDir], {
+    timeoutMs: 120000,
+    allowFailure: true
+  });
+  if (venv.exitCode !== 0) {
+    return { tool_id: tool.id, status: 'unavailable', reason: 'python-venv-failed' };
+  }
+
+  const pip = path.join(venvDir, process.platform === 'win32' ? 'Scripts' : 'bin', process.platform === 'win32' ? 'pip.exe' : 'pip');
+  const graphify = path.join(venvDir, process.platform === 'win32' ? 'Scripts' : 'bin', process.platform === 'win32' ? 'graphify.exe' : 'graphify');
+  const install = await execSafe(pip, ['install', 'graphifyy'], {
+    timeoutMs: 240000,
+    allowFailure: true
+  });
+  if (install.exitCode !== 0) {
+    return { tool_id: tool.id, status: 'unavailable', reason: 'temp-install-failed' };
+  }
+
+  const version = await execSafe(graphify, ['--version'], { timeoutMs: runtime.timeoutMs, allowFailure: true });
+  const profiles = [];
+  for (const copy of runtime.copies) {
+    const started = performance.now();
+    const update = await execSafe(graphify, ['update', '.', '--no-cluster'], {
+      cwd: copy.copyPath,
+      timeoutMs: Math.max(runtime.timeoutMs, 180000),
+      allowFailure: true
+    });
+    const graphifyOut = path.join(copy.copyPath, 'graphify-out');
+    const graphExists = await pathExists(path.join(graphifyOut, 'graph.json'));
+    await safeRemoveWithin(copy.copyPath, graphifyOut);
+    profiles.push({
+      profile_id: copy.profile_id,
+      elapsed_ms: elapsedMs(started),
+      ast_update_passed: update.exitCode === 0,
+      graph_json_created: graphExists,
+      cleanup_passed: !await pathExists(graphifyOut)
+    });
+  }
+
+  return {
+    tool_id: tool.id,
+    status: profiles.some((profile) => profile.ast_update_passed) ? 'pass' : 'degraded',
+    version: firstLine(version.stdout || version.stderr),
+    profiles
+  };
+}
+
+async function runContext7(tool, runtime) {
+  const prefix = path.join(runtime.toolsDir, 'context7');
+  assertWithinDirectory(runtime.toolsDir, prefix, 'context7 install prefix');
+  await mkdir(prefix, { recursive: true });
+  const registry = await execNpm(runtime, ['view', 'ctx7', 'version'], {
+    timeoutMs: runtime.timeoutMs,
+    allowFailure: true
+  });
+  const install = await execNpm(runtime, ['install', '--prefix', prefix, 'ctx7'], {
+    timeoutMs: 180000,
+    allowFailure: true
+  });
+  if (install.exitCode !== 0) {
+    return {
+      tool_id: tool.id,
+      status: 'unavailable',
+      npm_version: firstLine(registry.stdout),
+      reason: 'temp-install-failed'
+    };
+  }
+
+  const cli = npmBin(prefix, 'ctx7');
+  const help = await execCommandShim(cli, ['--help'], { timeoutMs: runtime.timeoutMs, allowFailure: true });
+  const docsLookup = await runContext7Lookup(cli, runtime);
+  return {
+    tool_id: tool.id,
+    status: help.exitCode === 0 || docsLookup.attempted ? 'pass' : 'degraded',
+    npm_version: firstLine(registry.stdout),
+    help_available: help.exitCode === 0,
+    docs_lookup: docsLookup
+  };
+}
+
+async function runContextMode(tool, runtime) {
+  const prefix = path.join(runtime.toolsDir, 'context-mode');
+  assertWithinDirectory(runtime.toolsDir, prefix, 'context-mode install prefix');
+  await mkdir(prefix, { recursive: true });
+  const registry = await execNpm(runtime, ['view', 'context-mode', 'version'], {
+    timeoutMs: runtime.timeoutMs,
+    allowFailure: true
+  });
+  const install = await execNpm(runtime, ['install', '--prefix', prefix, 'context-mode'], {
+    timeoutMs: 180000,
+    allowFailure: true
+  });
+  if (install.exitCode !== 0) {
+    return {
+      tool_id: tool.id,
+      status: 'unavailable',
+      npm_version: firstLine(registry.stdout),
+      reason: 'temp-install-failed'
+    };
+  }
+  const cli = npmBin(prefix, 'context-mode');
+  const entrypoint = path.join(prefix, 'node_modules', 'context-mode', 'cli.bundle.mjs');
+  const dataDir = path.join(runtime.toolsDir, 'context-mode-data');
+  assertWithinDirectory(runtime.toolsDir, dataDir, 'context-mode data dir');
+  await mkdir(dataDir, { recursive: true });
+  const env = { CONTEXT_MODE_DIR: dataDir };
+  const doctor = await execSafe(process.execPath, [entrypoint, 'doctor'], {
+    timeoutMs: runtime.timeoutMs,
+    allowFailure: true,
+    env
+  });
+  const indexSmoke = doctor.exitCode === 0
+    ? await runContextModeIndexSmoke(entrypoint, runtime, dataDir)
+    : { attempted: false, reason: 'doctor-failed' };
+  return {
+    tool_id: tool.id,
+    status: doctor.exitCode === 0 && indexSmoke.index_passed ? 'pass' : 'degraded',
+    npm_version: firstLine(registry.stdout),
+    doctor_passed: doctor.exitCode === 0,
+    index_smoke: indexSmoke,
+    notes: 'MCP smoke indexed generated rg summary text only; source files were not indexed'
+  };
+}
+
+async function runCodexAgentMem(tool, runtime) {
+  const registry = await execNpm(runtime, ['view', 'codex-agent-mem', 'version'], {
+    timeoutMs: runtime.timeoutMs,
+    allowFailure: true
+  });
+  if (registry.exitCode === 0) {
+    return {
+      tool_id: tool.id,
+      status: 'pass',
+      npm_available: true,
+      npm_version: firstLine(registry.stdout),
+      notes: 'registry package exists; smoke intentionally not run against source files'
+    };
+  }
+
+  const cloneDir = path.join(runtime.toolsDir, 'codex-agent-mem-repo');
+  assertWithinDirectory(runtime.toolsDir, cloneDir, 'codex-agent-mem clone');
+  const clone = await execSafe('git', [
+    'clone',
+    '--depth',
+    '1',
+    'https://github.com/MarceloCaporale/codex-agent-mem.git',
+    cloneDir
+  ], {
+    timeoutMs: 120000,
+    allowFailure: true
+  });
+  const packageJson = clone.exitCode === 0
+    ? await readPackageJsonSummary(path.join(cloneDir, 'package.json'))
+    : null;
+  return {
+    tool_id: tool.id,
+    status: clone.exitCode === 0 ? 'degraded' : 'unavailable',
+    npm_available: false,
+    repo_clone_available: clone.exitCode === 0,
+    package: packageJson,
+    notes: 'npm package name unavailable; temp clone inspected only, no source indexing'
+  };
+}
+
+async function runContextModeIndexSmoke(entrypoint, runtime, dataDir) {
+  const content = runtime.rgSummaryText ?? '# Field run rg summary\nNo rg summary was available.';
+  const source = 'aifhub-field-run-rg-summary';
+  const result = {
+    attempted: true,
+    input_chars: content.length,
+    source,
+    index_passed: false,
+    search_passed: false,
+    purge_passed: false
+  };
+
+  const client = await createMcpStdioClient(process.execPath, [entrypoint], {
+    timeoutMs: Math.max(runtime.timeoutMs, 45000),
+    env: { CONTEXT_MODE_DIR: dataDir }
+  });
+
+  try {
+    const init = await client.request('initialize', {
+      protocolVersion: '2024-11-05',
+      capabilities: {},
+      clientInfo: { name: 'aifhub-memory-tool-field-run', version: '0.0.0' }
+    });
+    result.initialize_passed = !init.error;
+    client.notify('notifications/initialized', {});
+
+    const index = await client.request('tools/call', {
+      name: 'ctx_index',
+      arguments: { content, source }
+    });
+    result.index_passed = !index.error;
+    result.index_output_chars = JSON.stringify(index.result ?? index.error ?? {}).length;
+
+    const search = await client.request('tools/call', {
+      name: 'ctx_search',
+      arguments: { queries: ['architecture workflow'], limit: 2, source }
+    });
+    result.search_passed = !search.error;
+    result.search_output_chars = JSON.stringify(search.result ?? search.error ?? {}).length;
+
+    const purge = await client.request('tools/call', {
+      name: 'ctx_purge',
+      arguments: { confirm: true, scope: 'project' }
+    });
+    result.purge_passed = !purge.error;
+    result.purge_output_chars = JSON.stringify(purge.result ?? purge.error ?? {}).length;
+  } catch (err) {
+    result.error = err?.message ?? String(err);
+  } finally {
+    await client.close();
+  }
+
+  return result;
+}
+
+async function runContext7Lookup(cli, runtime) {
+  const dependency = await detectFirstPackageDependency(runtime.copies);
+  if (!dependency) {
+    return { attempted: false, reason: 'no-package-dependency-detected' };
+  }
+  const lookup = await execCommandShim(cli, ['library', dependency, 'api'], {
+    timeoutMs: runtime.timeoutMs,
+    allowFailure: true
+  });
+  return {
+    attempted: true,
+    dependency,
+    exit_code: lookup.exitCode,
+    output_chars: `${lookup.stdout}\n${lookup.stderr}`.length,
+    passed: lookup.exitCode === 0
+  };
+}
+
+async function detectFirstPackageDependency(copies) {
+  for (const copy of copies) {
+    const packagePath = path.join(copy.copyPath, 'package.json');
+    if (!await pathExists(packagePath)) continue;
+    try {
+      const parsed = JSON.parse(await readFile(packagePath, 'utf8'));
+      const deps = {
+        ...(parsed.dependencies ?? {}),
+        ...(parsed.devDependencies ?? {})
+      };
+      const first = Object.keys(deps).find((name) => !name.startsWith('@types/'));
+      if (first) return first;
+    } catch {
+      // Ignore malformed package files in field fixtures.
+    }
+  }
+  return null;
+}
+
+async function readPackageJsonSummary(packagePath) {
+  try {
+    const parsed = JSON.parse(await readFile(packagePath, 'utf8'));
+    return {
+      name: parsed.name ?? null,
+      version: parsed.version ?? null,
+      bin_keys: parsed.bin && typeof parsed.bin === 'object' ? Object.keys(parsed.bin) : []
+    };
+  } catch {
+    return null;
+  }
+}
+
+function dryRunToolResult(tool) {
+  return {
+    tool_id: tool.id,
+    status: 'dry-run',
+    notes: 'tool was not executed'
+  };
+}
+
+function skipped(tool, reason) {
+  return {
+    tool_id: tool.id,
+    status: 'skipped',
+    reason
+  };
+}
+
+function sanitizeToolResult(result) {
+  return JSON.parse(JSON.stringify(result, (key, value) => {
+    if (typeof value !== 'string') return value;
+    if (/^[A-Za-z]:[\\/]/.test(value)) return '[redacted-local-path]';
+    return value;
+  }));
+}
+
+async function copySanitizedDirectory(sourceDir, targetDir) {
+  const entries = await readdir(sourceDir, { withFileTypes: true }).catch(() => []);
+  for (const entry of entries) {
+    if (shouldIgnoreEntry(entry.name, entry.isDirectory())) continue;
+    const source = path.join(sourceDir, entry.name);
+    const target = path.join(targetDir, entry.name);
+    const stats = await lstat(source).catch(() => null);
+    if (!stats || stats.isSymbolicLink()) continue;
+    if (stats.isDirectory()) {
+      await mkdir(target, { recursive: true });
+      await copySanitizedDirectory(source, target);
+    } else if (stats.isFile()) {
+      await mkdir(path.dirname(target), { recursive: true });
+      await cp(source, target, { force: false });
+    }
+  }
+}
+
+async function findNestedProjectRoots(root, options = {}) {
+  const results = [];
+  const maxDepth = options.maxDepth ?? 3;
+  async function walk(current, depth) {
+    if (depth > maxDepth) return;
+    const entries = await readdir(current, { withFileTypes: true }).catch(() => []);
+    for (const entry of entries) {
+      if (!entry.isDirectory() || shouldIgnoreDirectory(entry.name)) continue;
+      const candidate = path.join(current, entry.name);
+      if (await isProjectRoot(candidate)) {
+        results.push(candidate);
+        continue;
+      }
+      await walk(candidate, depth + 1);
+    }
+  }
+  await walk(root, 1);
+  return results;
+}
+
+async function isProjectRoot(candidate) {
+  if (await pathExists(path.join(candidate, '.git'))) return true;
+  for (const manifest of MANIFEST_NAMES) {
+    if (await pathExists(path.join(candidate, manifest))) return true;
+  }
+  return false;
+}
+
+function addRoot(roots, seen, root) {
+  const resolved = path.resolve(root);
+  const key = resolved.toLowerCase();
+  if (seen.has(key)) return;
+  seen.add(key);
+  roots.push(resolved);
+}
+
+function classifyShapeFromPath(sourceRoot) {
+  const name = path.basename(sourceRoot).toLowerCase();
+  if (/workspace|mono|multi/.test(name)) return 'multirepo';
+  if (/service|api|mcp/.test(name)) return 'go_service';
+  if (/test|tmp|stub/.test(name)) return 'small_microservice';
+  return 'large_framework_app';
+}
+
+function shouldIgnoreEntry(name, isDirectory) {
+  if (isDirectory) return shouldIgnoreDirectory(name);
+  return name.startsWith('.env') || LOCK_FILE_NAMES.has(name);
+}
+
+function shouldIgnoreDirectory(name) {
+  return IGNORE_DIR_NAMES.has(name) || name.startsWith('.env');
+}
+
+async function execSafe(command, args = [], options = {}) {
+  const started = performance.now();
+  try {
+    const result = await execFileAsync(command, args, {
+      cwd: options.cwd,
+      env: { ...process.env, ...(options.env ?? {}) },
+      windowsHide: true,
+      timeout: options.timeoutMs ?? 30000,
+      maxBuffer: 2 * 1024 * 1024
+    });
+    return {
+      exitCode: 0,
+      stdout: result.stdout ?? '',
+      stderr: result.stderr ?? '',
+      elapsed_ms: elapsedMs(started)
+    };
+  } catch (err) {
+    if (!options.allowFailure) throw err;
+    return {
+      exitCode: typeof err?.code === 'number' ? err.code : 1,
+      stdout: err?.stdout ?? '',
+      stderr: err?.stderr ?? err?.message ?? String(err),
+      elapsed_ms: elapsedMs(started)
+    };
+  }
+}
+
+async function execCommandShim(commandPath, args = [], options = {}) {
+  if (process.platform === 'win32' && commandPath.endsWith('.cmd')) {
+    return execSafe(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', quoteCmd(commandPath, args)], options);
+  }
+  return execSafe(commandPath, args, options);
+}
+
+async function execNpm(runtime, args, options = {}) {
+  return execCommandShim(runtime.npm ?? defaultCommandName('npm'), args, options);
+}
+
+function defaultCommandName(commandName) {
+  return process.platform === 'win32' ? `${commandName}.cmd` : commandName;
+}
+
+function npmBin(prefix, commandName) {
+  return path.join(
+    prefix,
+    'node_modules',
+    '.bin',
+    process.platform === 'win32' ? `${commandName}.cmd` : commandName
+  );
+}
+
+function quoteCmd(commandPath, args) {
+  return [quoteCmdToken(commandPath), ...args.map(quoteCmdToken)].join(' ');
+}
+
+function quoteCmdToken(value) {
+  const token = String(value);
+  if (!/[\s&()^|<>"]/.test(token)) return token;
+  return `"${token.replaceAll('"', '""')}"`;
+}
+
+function parseArgs(args) {
+  const parsed = {
+    help: false,
+    roots: [],
+    out: null,
+    tools: 'safe',
+    json: false,
+    writeJson: true,
+    dryRun: false,
+    maxProfiles: null,
+    timeoutMs: 30000,
+    python: null,
+    npm: null
+  };
+
+  for (let index = 0; index < args.length; index += 1) {
+    const token = args[index];
+    if (token === '--help' || token === '-h') {
+      parsed.help = true;
+    } else if (token === '--roots') {
+      parsed.roots.push(args[++index]);
+    } else if (token === '--out') {
+      parsed.out = args[++index];
+    } else if (token === '--tools') {
+      parsed.tools = args[++index];
+    } else if (token === '--json') {
+      parsed.json = true;
+    } else if (token === '--no-write-json') {
+      parsed.writeJson = false;
+    } else if (token === '--dry-run') {
+      parsed.dryRun = true;
+    } else if (token === '--max-profiles') {
+      parsed.maxProfiles = Number(args[++index]);
+    } else if (token === '--timeout-ms') {
+      parsed.timeoutMs = Number(args[++index]);
+    } else if (token === '--python') {
+      parsed.python = args[++index];
+    } else if (token === '--npm') {
+      parsed.npm = args[++index];
+    }
+  }
+  return parsed;
+}
+
+export function getCliUsage() {
+  return [
+    'Usage: node scripts/memory-tool-field-run.mjs --roots <dir> --out <temp-run-dir> --tools safe --json',
+    '',
+    'Options:',
+    '  --roots <dir>         Root directory to discover project profiles from. Repeatable.',
+    '  --out <dir>           Temp run directory for sanitized copies, tool installs, and JSON output.',
+    '  --tools safe          Run the safe optional-context-tool set.',
+    '  --json                Emit public JSON summary to stdout.',
+    '  --no-write-json       Do not write field-run-summary.json under --out.',
+    '  --dry-run             Discover profiles and planned tools without copying or installing.',
+    '  --max-profiles <n>    Limit profiles for smoke tests.',
+    '  --timeout-ms <n>      Per-command timeout.',
+    '  --python <path>       Python executable for temp Graphify venv.',
+    '  --npm <path>          npm executable for temp npm-prefix installs.'
+  ].join('\n');
+}
+
+function emit(body, exitCode, options = {}) {
+  const output = `${JSON.stringify(body, null, 2)}\n`;
+  if (Array.isArray(options.stdout)) {
+    options.stdout.push(output);
+  } else if (options.stdout && typeof options.stdout.write === 'function') {
+    options.stdout.write(output);
+  } else {
+    process.stdout.write(output);
+  }
+  if (options.exit !== false) process.exitCode = exitCode;
+  return { exitCode, body };
+}
+
+function emitText(text, exitCode, options = {}) {
+  const output = `${text}\n`;
+  if (Array.isArray(options.stdout)) {
+    options.stdout.push(output);
+  } else if (options.stdout && typeof options.stdout.write === 'function') {
+    options.stdout.write(output);
+  } else {
+    process.stdout.write(output);
+  }
+  if (options.exit !== false) process.exitCode = exitCode;
+  return { exitCode, body: text };
+}
+
+function normalizeForLeakCheck(value) {
+  return String(value ?? '').replaceAll('\\\\', '/').replaceAll('\\', '/').toLowerCase();
+}
+
+async function pathExists(targetPath) {
+  try {
+    await stat(targetPath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function splitLines(value) {
+  return String(value ?? '').split(/\r?\n/).filter(Boolean);
+}
+
+function formatRgSummaryForIndex(rgResult) {
+  const lines = ['# Field run rg summary'];
+  for (const profile of rgResult.profiles ?? []) {
+    lines.push(`## ${profile.profile_id}`);
+    lines.push(`files: ${profile.file_count}`);
+    for (const query of profile.queries ?? []) {
+      lines.push(
+        `query=${query.query}; exit=${query.exit_code}; chars=${query.output_chars}; tokens=${query.token_estimate}`
+      );
+    }
+  }
+  return `${lines.join('\n')}\n`;
+}
+
+function firstLine(value) {
+  return splitLines(value)[0] ?? null;
+}
+
+function elapsedMs(started) {
+  return Math.round((performance.now() - started) * 10) / 10;
+}
+
+async function createMcpStdioClient(command, args, options = {}) {
+  const child = spawn(command, args, {
+    env: { ...process.env, ...(options.env ?? {}) },
+    stdio: ['pipe', 'pipe', 'pipe'],
+    windowsHide: true
+  });
+  const timeoutMs = options.timeoutMs ?? 30000;
+  let stdoutBuffer = '';
+  let stderrBuffer = '';
+  let nextId = 1;
+  const pending = new Map();
+
+  child.stdout.on('data', (chunk) => {
+    stdoutBuffer += chunk.toString();
+    let newline;
+    while ((newline = stdoutBuffer.indexOf('\n')) >= 0) {
+      const line = stdoutBuffer.slice(0, newline).trim();
+      stdoutBuffer = stdoutBuffer.slice(newline + 1);
+      if (!line) continue;
+      let message;
+      try {
+        message = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      if (Object.hasOwn(message, 'id') && pending.has(message.id)) {
+        const waiter = pending.get(message.id);
+        clearTimeout(waiter.timer);
+        pending.delete(message.id);
+        waiter.resolve(message);
+      }
+    }
+  });
+
+  child.stderr.on('data', (chunk) => {
+    stderrBuffer = `${stderrBuffer}${chunk.toString()}`.slice(-4000);
+  });
+
+  child.on('error', (err) => rejectPending(err));
+  child.on('exit', (code) => {
+    if (pending.size > 0) {
+      rejectPending(new Error(`MCP server exited with code ${code}. ${firstLine(stderrBuffer) ?? ''}`));
+    }
+  });
+
+  function rejectPending(err) {
+    for (const [id, waiter] of pending.entries()) {
+      clearTimeout(waiter.timer);
+      pending.delete(id);
+      waiter.reject(err);
+    }
+  }
+
+  function writeMessage(message) {
+    child.stdin.write(`${JSON.stringify(message)}\n`);
+  }
+
+  return {
+    request(method, params = {}) {
+      const id = nextId;
+      nextId += 1;
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+          pending.delete(id);
+          reject(new Error(`MCP request timed out: ${method}. ${firstLine(stderrBuffer) ?? ''}`));
+        }, timeoutMs);
+        pending.set(id, { resolve, reject, timer });
+        writeMessage({ jsonrpc: '2.0', id, method, params });
+      });
+    },
+    notify(method, params = {}) {
+      writeMessage({ jsonrpc: '2.0', method, params });
+    },
+    async close() {
+      for (const [id, waiter] of pending.entries()) {
+        clearTimeout(waiter.timer);
+        pending.delete(id);
+        waiter.reject(new Error('MCP client closed.'));
+      }
+      child.stdin.end();
+      if (!child.killed) child.kill();
+    }
+  };
+}
+
+function isDirectRun() {
+  return process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+}
+
+if (isDirectRun()) {
+  const result = await runMemoryToolFieldRun(process.argv.slice(2));
+  process.exit(result.exitCode);
+}
