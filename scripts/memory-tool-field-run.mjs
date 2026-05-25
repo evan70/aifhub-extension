@@ -141,7 +141,9 @@ export async function runMemoryToolFieldRun(args = [], options = {}) {
 export async function discoverProjectRoots(rootInputs, options = {}) {
   const roots = [];
   const seen = new Set();
-  const maxProfiles = Number.isFinite(options.maxProfiles) ? options.maxProfiles : null;
+  const maxProfiles = Number.isFinite(options.maxProfiles) && options.maxProfiles >= 0
+    ? options.maxProfiles
+    : null;
 
   for (const input of rootInputs) {
     const root = path.resolve(input);
@@ -164,7 +166,7 @@ export async function discoverProjectRoots(rootInputs, options = {}) {
     }
   }
 
-  const limited = maxProfiles ? roots.slice(0, maxProfiles) : roots;
+  const limited = maxProfiles !== null ? roots.slice(0, maxProfiles) : roots;
   return limited.map((sourceRoot, index) => ({
     id: `field-profile-${String(index + 1).padStart(2, '0')}`,
     sourceRoot,
@@ -533,6 +535,7 @@ async function runCodexAgentMem(tool, runtime) {
 
   const cloneDir = path.join(runtime.toolsDir, 'codex-agent-mem-repo');
   assertWithinDirectory(runtime.toolsDir, cloneDir, 'codex-agent-mem clone');
+  await safeRemoveWithin(runtime.toolsDir, cloneDir);
   const clone = await execSafe('git', [
     'clone',
     '--depth',

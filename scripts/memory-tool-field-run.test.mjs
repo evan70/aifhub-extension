@@ -62,6 +62,15 @@ describe('project discovery', () => {
 
     assert.deepEqual(basenames, ['direct-service', 'nested-service']);
   });
+
+  it('honors maxProfiles 0 as an empty profile cap', async () => {
+    await writeFixtureFile(path.join('first-service', 'package.json'), '{}');
+    await writeFixtureFile(path.join('second-service', 'go.mod'), 'module private.local/second');
+
+    const profiles = await discoverProjectRoots([tmpDir], { maxProfiles: 0 });
+
+    assert.deepEqual(profiles, []);
+  });
 });
 
 describe('sanitized copies', () => {
@@ -104,6 +113,17 @@ describe('path guards', () => {
       () => safeRemoveWithin(runDir, path.join(tmpDir, 'outside')),
       /outside/i
     );
+  });
+
+  it('removes stale tool-owned directories inside the selected run directory', async () => {
+    const toolsDir = path.join(tmpDir, 'run', 'tools');
+    const cloneDir = path.join(toolsDir, 'codex-agent-mem-repo');
+    await mkdir(cloneDir, { recursive: true });
+    await writeFile(path.join(cloneDir, 'stale.txt'), 'old clone', 'utf8');
+
+    await safeRemoveWithin(toolsDir, cloneDir);
+
+    assert.equal(await exists(cloneDir), false);
   });
 });
 
