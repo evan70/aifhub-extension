@@ -155,7 +155,9 @@ export async function discoverProjectRoots(rootInputs, options = {}) {
     for (const entry of entries) {
       if (!entry.isDirectory() || shouldIgnoreDirectory(entry.name)) continue;
       const candidate = path.join(root, entry.name);
-      addRoot(roots, seen, candidate);
+      if (await isProjectRoot(candidate)) {
+        addRoot(roots, seen, candidate);
+      }
       for (const nested of await findNestedProjectRoots(candidate, { maxDepth: 3 })) {
         addRoot(roots, seen, nested);
       }
@@ -199,6 +201,14 @@ export function getToolPlan(scope = 'safe') {
     { id: 'context-mode', fullInstall: true, role: 'temporary_output_index' },
     { id: 'codex-agent-mem', fullInstall: false, role: 'continuity_memory_probe' }
   ].filter((tool) => !REJECTED_FULL_INSTALL_IDS.has(tool.id));
+}
+
+export function getProfileLifecycleRunStatus(profiles = [], passKey = 'lifecycle_passed') {
+  return profiles.some((profile) => Boolean(profile?.[passKey])) ? 'pass' : 'degraded';
+}
+
+export function getContext7RunStatus({ helpExitCode, docsLookup } = {}) {
+  return helpExitCode === 0 || docsLookup?.passed === true ? 'pass' : 'degraded';
 }
 
 export function buildPublicRunSummary({
@@ -378,7 +388,7 @@ async function runCodeGraph(tool, runtime) {
 
   return {
     tool_id: tool.id,
-    status: 'pass',
+    status: getProfileLifecycleRunStatus(profiles),
     installed_version: firstLine(version.stdout),
     npm_version: firstLine(npmVersion.stdout),
     profiles
@@ -463,7 +473,7 @@ async function runContext7(tool, runtime) {
   const docsLookup = await runContext7Lookup(cli, runtime);
   return {
     tool_id: tool.id,
-    status: help.exitCode === 0 || docsLookup.attempted ? 'pass' : 'degraded',
+    status: getContext7RunStatus({ helpExitCode: help.exitCode, docsLookup }),
     npm_version: firstLine(registry.stdout),
     help_available: help.exitCode === 0,
     docs_lookup: docsLookup

@@ -9,6 +9,8 @@ import {
   assertWithinDirectory,
   buildPublicRunSummary,
   discoverProjectRoots,
+  getContext7RunStatus,
+  getProfileLifecycleRunStatus,
   getToolPlan,
   hasSensitivePathLeak,
   prepareSanitizedCopy,
@@ -47,6 +49,18 @@ describe('project discovery', () => {
     assert.equal(encoded.includes('secret-product'), false);
     assert.equal(encoded.includes('another-private-service'), false);
     assert.equal(hasSensitivePathLeak(summary, [tmpDir]), false);
+  });
+
+  it('skips first-level non-project folders but includes nested project roots', async () => {
+    await writeFixtureFile(path.join('docs', 'notes.md'), '# docs only');
+    await writeFixtureFile(path.join('archive', 'old.txt'), 'not a project');
+    await writeFixtureFile(path.join('workspace', 'nested-service', 'package.json'), '{"name":"nested-service"}');
+    await writeFixtureFile(path.join('direct-service', 'go.mod'), 'module private.local/direct');
+
+    const profiles = await discoverProjectRoots([tmpDir], { maxProfiles: 10 });
+    const basenames = profiles.map((profile) => path.basename(profile.sourceRoot)).sort();
+
+    assert.deepEqual(basenames, ['direct-service', 'nested-service']);
   });
 });
 
@@ -103,6 +117,34 @@ describe('tool plan', () => {
     assert.equal(installed.includes('codex-mem'), false);
     assert.equal(installed.includes('eagle-mem'), false);
     assert.equal(installed.includes('agent-memory'), false);
+  });
+});
+
+describe('tool status aggregation', () => {
+  it('downgrades lifecycle tools when every profile run fails', () => {
+    assert.equal(getProfileLifecycleRunStatus([
+      { lifecycle_passed: false },
+      { lifecycle_passed: false }
+    ]), 'degraded');
+    assert.equal(getProfileLifecycleRunStatus([
+      { lifecycle_passed: false },
+      { lifecycle_passed: true }
+    ]), 'pass');
+  });
+
+  it('requires successful Context7 help or lookup, not just an attempted lookup', () => {
+    assert.equal(getContext7RunStatus({
+      helpExitCode: 1,
+      docsLookup: { attempted: true, passed: false }
+    }), 'degraded');
+    assert.equal(getContext7RunStatus({
+      helpExitCode: 1,
+      docsLookup: { attempted: true, passed: true }
+    }), 'pass');
+    assert.equal(getContext7RunStatus({
+      helpExitCode: 0,
+      docsLookup: { attempted: true, passed: false }
+    }), 'pass');
   });
 });
 
