@@ -1,5 +1,5 @@
 schema: aifhub.memory_tools.recommendation.v1
-updated: "2026-05-24"
+updated: "2026-05-25"
 purpose: "Метаданные для этапа анализа проекта: какие memory/retrieval инструменты можно предлагать пользователю, когда и с какими ограничениями."
 default_policy:
   install_policy: explicit_user_opt_in_only
@@ -390,13 +390,13 @@ tools:
     display_name: codex-agent-mem
     doc: codex-agent-mem.md
     repository: "https://github.com/MarceloCaporale/codex-agent-mem"
-    tested_version: "npm package unavailable by old name on 2026-05-24; previous 1.0.2 evidence retained"
+    tested_version: "Python source package 1.0.2 from GitHub"
     decision: optional
     recommendation_action: suggest_when_continuity_needed
     integration_role: read_only_continuity_memory
     install_policy: explicit_user_opt_in_only
-    stable_cli: degraded_registry_unavailable
-    mcp_status: read_only_mcp_verified_in_previous_run
+    stable_cli: source_installable_from_github_and_cli_help_verified
+    mcp_status: source_install_and_read_only_minimal_mcp_verified
     read_scope: explicit_sqlite_db_path
     purge_path: "delete configured SQLite DB and sidecar files"
     allowed_in:
@@ -411,7 +411,7 @@ tools:
       - aif-verify
       - aif-done
       - aif-commit
-    privacy_caveat: "Reads only the configured SQLite memory DB in read-only/minimal mode; it is not a source code index and cannot satisfy OpenSpec gates."
+    privacy_caveat: "Reads only the configured SQLite memory DB in read-only/minimal mode; it is not a source code index and cannot satisfy OpenSpec gates. Use minimal profile by default; full read-only lists mutating tool names even though mutating calls return isError and do not write."
     recommended_for:
       tasks:
         - resume_previous_work
@@ -428,12 +428,12 @@ tools:
         - initial_code_discovery
         - exact_file_or_symbol_lookup
         - architecture_graphing
-    suggestion_text: "Если нужен resume/open-work context между сессиями, можно предложить codex-agent-mem только при user-owned/reviewed install или existing explicit DB path; не устанавливать по старому npm имени без нового evidence."
+    suggestion_text: "Если нужен resume/open-work context между сессиями, можно предложить codex-agent-mem в read-only minimal MCP mode с explicit DB path. Install/setup остается user-owned; package source is GitHub/Python, not npm."
     execution:
       default:
         mode: read_existing_reviewed_output
         requires_explicit_path: true
-        notes: "Read only the configured SQLite DB or reviewed continuity notes."
+        notes: "Read only the configured SQLite DB or reviewed continuity notes. Prefer codex-agent-mem-mcp --read-only --profile minimal --response-mode compact; do not use full profile as the default low-impact mode."
   context-mode:
     display_name: context-mode
     doc: context-mode.md
@@ -935,8 +935,54 @@ evidence_runs:
         source_indexing_run: false
         recommendation_update: "manual helper only; temp MCP index/search/purge verified for generated output."
       codex-agent-mem:
-        npm_package_available: false
+        python_source_package: true
+        version: "1.0.2"
         temp_repo_probe_passed: true
         source_indexing_run: false
         sqlite_smoke_run: false
-        recommendation_update: "Availability degraded by old npm name; do not suggest package install by old name without new install-path evidence."
+        recommendation_update: "Correct npm-probe interpretation: GitHub/Python source package is available; recommendation remains optional continuity-only with user-owned install/setup and explicit DB path."
+  - id: codex-agent-mem-isolated-source-install-2026-05-25
+    date: "2026-05-25"
+    scope: "GitHub repo cloned into an isolated temp directory; Python venv, editable install, temp SQLite DB, CLI smoke, upstream tests, and MCP stdio probes were run without touching real project roots."
+    privacy: "Docs contain only package version, commit id, aggregate counts, tool names, and pass/fail status; real project names, local paths, smoke payload output, snippets, credentials, and temp paths are excluded."
+    source:
+      repository: "https://github.com/MarceloCaporale/codex-agent-mem"
+      commit: "d594c8a86207fb9a8a5b48a6aab323349680707a"
+      package: "codex-agent-mem"
+      version: "1.0.2"
+      requires_python: ">=3.12"
+    not_run:
+      - "source indexing"
+      - "global Codex config mutation"
+      - "MCP registration"
+      - "hooks"
+      - "background daemon lifecycle"
+    outcomes:
+      codex-agent-mem:
+        editable_install_passed: true
+        cli_help_passed:
+          - codex-agent-mem-smoke
+          - codex-agent-mem-mcp
+          - codex-agent-mem-policy
+        sqlite_smoke_passed: true
+        smoke_counts:
+          sessions: 1
+          turns: 1
+          observations: 3
+          active_decisions: 1
+          health_score: 100
+        upstream_pytest: "121 passed"
+        ruff_check: "All checks passed"
+        mcp_minimal_read_only:
+          initialized: true
+          version: "1.0.2"
+          exposed_tool_count: 7
+          mutating_tools_exposed: 0
+          calls_passed:
+            - mem_session_list
+            - mem_completion_check
+            - mem_context_pack
+            - mem_health_runtime
+        mcp_full_read_only_caveat: "tools/list exposes mutating tool names, but mutating tools/call returns isError and did not increase recent item count."
+        cleanup_passed: true
+        recommendation_update: "Keep optional continuity-only recommendation, but make minimal/read-only the default safe MCP mode and avoid full profile for low-impact roadmap/explore support."

@@ -58,7 +58,7 @@ Protected validation artifacts:
 
 - `rg`: baseline search.
 - Graphify: optional repo graph для large framework, legacy и multirepo impact discovery после baseline `rg`.
-- `codex-agent-mem`: optional read-only continuity memory с explicit SQLite DB path, но текущий npm package под старым именем недоступен; не предлагать install по этому имени без нового evidence.
+- `codex-agent-mem`: optional read-only continuity memory с explicit SQLite DB path; это Python source package из GitHub repo, не npm package.
 - `context-mode`: manual temporary index для explicit generated output или large command output.
 - Context7: optional docs provider для version-sensitive library/API questions.
 - `agent-memory`: manual notes только когда пользователь явно просит durable notes.
@@ -114,7 +114,9 @@ Follow-up smoke от 2026-05-23 использовал пять real local proje
 
 Позже CodeGraph был установлен по явному запросу пользователя и проверен на 29 real local project roots через `init`, `index --quiet`, `status`, JSON `query` и `uninit --force`. Lifecycle прошел на всех 29 roots без protected agent/config mutations и без оставшихся `.codegraph/` directories. Принятая рекомендация - manual CLI-only; `install`/MCP/agent-config behavior все еще не принят для AIFHub automation.
 
-Повторный safe field run от 2026-05-24 использовал 55 anonymous profiles из local projects root, но запускал инструменты только на sanitized temp copies или temp isolated dirs. Итог: `rg`, read-only `git/gh`, CodeGraph, Context7 и `context-mode` прошли; Graphify AST-only прошел на 54/55 профилей с одним timeout; `codex-agent-mem` degraded, потому что npm package под старым именем недоступен, хотя temp repo probe прошел. Context7 теперь имеет отдельный research note: [memory-tools-research/context7.md](memory-tools-research/context7.md).
+Повторный safe field run от 2026-05-24 использовал 55 anonymous profiles из local projects root, но запускал инструменты только на sanitized temp copies или temp isolated dirs. Итог: `rg`, read-only `git/gh`, CodeGraph, Context7 и `context-mode` прошли; Graphify AST-only прошел на 54/55 профилей с одним timeout; `codex-agent-mem` подтвержден как GitHub/Python source package без source indexing. Context7 теперь имеет отдельный research note: [memory-tools-research/context7.md](memory-tools-research/context7.md).
+
+Изолированный source-install test от 2026-05-25 подтвердил, что `MarceloCaporale/codex-agent-mem` работает как Python/MCP package: editable install прошел, upstream `pytest` дал 121 passed, `ruff` прошел, CLI smoke с explicit SQLite DB прошел, а `--read-only --profile minimal` MCP exposed только 7 non-mutating tools. Caveat: `--profile full --read-only` still lists mutating tool names, though mutating calls return `isError` and do not write; поэтому default recommendation остается `minimal + read-only`.
 
 ## Вывод Анализа
 

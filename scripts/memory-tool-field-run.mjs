@@ -515,19 +515,11 @@ async function runContextMode(tool, runtime) {
 }
 
 async function runCodexAgentMem(tool, runtime) {
-  const registry = await execNpm(runtime, ['view', 'codex-agent-mem', 'version'], {
+  const python = runtime.python ?? process.env.AIFHUB_FIELD_PYTHON ?? 'python';
+  const pypi = await execSafe(python, ['-m', 'pip', 'index', 'versions', 'codex-agent-mem'], {
     timeoutMs: runtime.timeoutMs,
     allowFailure: true
   });
-  if (registry.exitCode === 0) {
-    return {
-      tool_id: tool.id,
-      status: 'pass',
-      npm_available: true,
-      npm_version: firstLine(registry.stdout),
-      notes: 'registry package exists; smoke intentionally not run against source files'
-    };
-  }
 
   const cloneDir = path.join(runtime.toolsDir, 'codex-agent-mem-repo');
   assertWithinDirectory(runtime.toolsDir, cloneDir, 'codex-agent-mem clone');
@@ -541,16 +533,17 @@ async function runCodexAgentMem(tool, runtime) {
     timeoutMs: 120000,
     allowFailure: true
   });
-  const packageJson = clone.exitCode === 0
-    ? await readPackageJsonSummary(path.join(cloneDir, 'package.json'))
+  const pyproject = clone.exitCode === 0
+    ? await readPyprojectSummary(path.join(cloneDir, 'pyproject.toml'))
     : null;
   return {
     tool_id: tool.id,
-    status: clone.exitCode === 0 ? 'degraded' : 'unavailable',
-    npm_available: false,
+    status: clone.exitCode === 0 && pyproject ? 'pass' : 'unavailable',
+    pypi_available: pypi.exitCode === 0,
+    pypi_version: firstLine(pypi.stdout),
     repo_clone_available: clone.exitCode === 0,
-    package: packageJson,
-    notes: 'npm package name unavailable; temp clone inspected only, no source indexing'
+    package: pyproject,
+    notes: 'Python package source inspected from GitHub; PyPI registry package may be unavailable. No source indexing was run.'
   };
 }
 
@@ -657,6 +650,32 @@ async function readPackageJsonSummary(packagePath) {
   } catch {
     return null;
   }
+}
+
+async function readPyprojectSummary(pyprojectPath) {
+  try {
+    const content = await readFile(pyprojectPath, 'utf8');
+    const scripts = [];
+    const scriptPattern = /^\s*([A-Za-z0-9_.-]+)\s*=/gm;
+    const scriptsBlock = content.match(/\[project\.scripts\]([\s\S]*?)(?:\n\[|$)/);
+    if (scriptsBlock) {
+      let match;
+      while ((match = scriptPattern.exec(scriptsBlock[1])) !== null) {
+        scripts.push(match[1]);
+      }
+    }
+    return {
+      name: firstRegexCapture(content, /^\s*name\s*=\s*"([^"]+)"/m),
+      version: firstRegexCapture(content, /^\s*version\s*=\s*"([^"]+)"/m),
+      scripts
+    };
+  } catch {
+    return null;
+  }
+}
+
+function firstRegexCapture(value, pattern) {
+  return value.match(pattern)?.[1] ?? null;
 }
 
 function dryRunToolResult(tool) {
