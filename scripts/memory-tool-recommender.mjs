@@ -35,7 +35,13 @@ const IGNORE_DIRS = new Set([
   '.git',
   '.hg',
   '.svn',
+  '.agents',
+  '.codex',
   '.ai-factory/extensions',
+  '.ai-factory/state',
+  '.ai-factory/cache',
+  '.ai-factory/tmp',
+  '.github/skills',
   'node_modules',
   'vendor',
   'dist',
@@ -78,14 +84,16 @@ export async function runMemoryToolRecommender(args = [], options = {}) {
     if (parsed.command === 'recommend') {
       const loaded = await tryLoadMetadata(parsed, cwd, options);
       const taskSignals = parsed.flags.task.length > 0 ? parsed.flags.task : [DEFAULT_TASK_SIGNAL];
-      const projectShape = parsed.flags.fromProject
-        ? await classifyProjectShape(cwd)
-        : normalizeProjectShape(parsed.flags.shape);
+      const projectProfile = parsed.flags.fromProject
+        ? await classifyProjectProfile(cwd, parsed.flags)
+        : buildProjectProfileFromFlags(parsed.flags);
+      const projectShape = projectProfile.project_shape;
 
       if (!loaded.ok) {
         const body = degradedRecommendationResult({
           metadataError: loaded,
           projectShape,
+          projectProfile,
           taskSignals
         });
         return emitResult(body, 0, { ...options, json });
@@ -94,6 +102,7 @@ export async function runMemoryToolRecommender(args = [], options = {}) {
       const body = await buildRecommendationResult({
         metadata: loaded.metadata,
         projectShape,
+        projectProfile,
         taskSignals,
         command: parsed.flags.command,
         checkDocsProvider: Boolean(parsed.flags.checkDocsProvider),
@@ -105,9 +114,10 @@ export async function runMemoryToolRecommender(args = [], options = {}) {
     if (parsed.command === 'select') {
       const loaded = await tryLoadMetadata(parsed, cwd, options);
       const taskSignals = parsed.flags.task.length > 0 ? parsed.flags.task : [DEFAULT_TASK_SIGNAL];
-      const projectShape = parsed.flags.fromProject
-        ? await classifyProjectShape(cwd)
-        : normalizeProjectShape(parsed.flags.shape);
+      const projectProfile = parsed.flags.fromProject
+        ? await classifyProjectProfile(cwd, parsed.flags)
+        : buildProjectProfileFromFlags(parsed.flags);
+      const projectShape = projectProfile.project_shape;
       const config = await loadProjectToolConfig({
         cwd,
         metadata: loaded.ok ? loaded.metadata : null
@@ -118,6 +128,7 @@ export async function runMemoryToolRecommender(args = [], options = {}) {
           metadataError: loaded,
           config,
           projectShape,
+          projectProfile,
           taskSignals,
           command: parsed.flags.command
         });
@@ -128,6 +139,7 @@ export async function runMemoryToolRecommender(args = [], options = {}) {
         metadata: loaded.metadata,
         config,
         projectShape,
+        projectProfile,
         taskSignals,
         command: parsed.flags.command,
         checkDocsProvider: Boolean(parsed.flags.checkDocsProvider),
@@ -268,18 +280,20 @@ export async function loadProjectToolConfig(options = {}) {
 
 export async function buildRecommendationResult(options = {}) {
   const metadata = options.metadata;
-  const projectShape = normalizeProjectShape(options.projectShape);
+  const projectProfile = normalizeProjectProfile(options.projectProfile, options.projectShape);
+  const projectShape = projectProfile.project_shape;
   const taskSignals = normalizeTaskSignals(options.taskSignals);
   const command = normalizeCommand(options.command);
   const baseline = [metadata?.default_policy?.baseline_tool ?? 'rg'];
   const warnings = [];
-  const candidates = collectCandidateTools(metadata, projectShape, taskSignals);
+  const dimensionMatches = collectDimensionMatches(metadata, projectProfile);
+  const candidates = collectCandidateTools(metadata, projectShape, taskSignals, projectProfile, dimensionMatches);
   const recommendations = [];
 
   for (const toolId of candidates) {
     const tool = metadata.tools?.[toolId];
     if (!tool || isRejectedTool(toolId, tool)) continue;
-    if (!isAllowedForRequest(toolId, tool, projectShape, taskSignals, metadata)) continue;
+    if (!isAllowedForRequest(toolId, tool, projectShape, taskSignals, metadata, projectProfile, dimensionMatches)) continue;
     const permission = permissionForTool(metadata, toolId, command);
     if (commandBoundaryReason(tool, command, permission)) continue;
 
@@ -302,10 +316,12 @@ export async function buildRecommendationResult(options = {}) {
     metadata_available: true,
     metadata_source: metadata.source_path ?? null,
     project_shape: projectShape,
+    project_profile: projectProfile,
+    dimension_matches: dimensionMatches.map((match) => match.id),
     task_signals: taskSignals,
     baseline,
     recommendations: dedupeRecommendations(recommendations),
-    do_not_recommend: buildDoNotRecommend(metadata, projectShape, taskSignals),
+    do_not_recommend: buildDoNotRecommend(metadata, projectShape, taskSignals, projectProfile, dimensionMatches),
     protected_artifacts: asArray(metadata.protected_artifacts),
     forbidden_operations: asArray(metadata.forbidden_operations),
     warnings
@@ -314,7 +330,8 @@ export async function buildRecommendationResult(options = {}) {
 
 export async function buildSelectionResult(options = {}) {
   const metadata = options.metadata;
-  const projectShape = normalizeProjectShape(options.projectShape);
+  const projectProfile = normalizeProjectProfile(options.projectProfile, options.projectShape);
+  const projectShape = projectProfile.project_shape;
   const taskSignals = normalizeTaskSignals(options.taskSignals);
   const command = normalizeCommand(options.command);
   const config = options.config ?? {
@@ -324,6 +341,7 @@ export async function buildSelectionResult(options = {}) {
     warnings: []
   };
   const baseline = [metadata?.default_policy?.baseline_tool ?? 'rg'];
+  const dimensionMatches = collectDimensionMatches(metadata, projectProfile);
   const selectedTools = [];
   const notSelectedTools = [];
 
@@ -357,7 +375,7 @@ export async function buildSelectionResult(options = {}) {
       continue;
     }
 
-    if (!isAllowedForRequest(toolId, tool, projectShape, taskSignals, metadata)) {
+    if (!isAllowedForRequest(toolId, tool, projectShape, taskSignals, metadata, projectProfile, dimensionMatches)) {
       notSelectedTools.push({
         tool_id: toolId,
         reason: `${tool.display_name ?? toolId} is not applicable for ${projectShape} + ${taskSignals.join(', ')}.`,
@@ -395,6 +413,8 @@ export async function buildSelectionResult(options = {}) {
     },
     command,
     project_shape: projectShape,
+    project_profile: projectProfile,
+    dimension_matches: dimensionMatches.map((match) => match.id),
     task_signals: taskSignals,
     baseline,
     selected_tools: dedupeRecommendations(selectedTools),
@@ -452,6 +472,9 @@ function metadataSummary(metadata) {
     metadata_available: true,
     metadata_source: metadata.source_path ?? null,
     default_policy: metadata.default_policy ?? {},
+    project_dimensions: metadata.project_dimensions ?? {},
+    benchmark_matrix: metadata.benchmark_matrix ?? {},
+    dimension_signals: Object.keys(metadata.dimension_signals ?? {}),
     skill_usage_matrix: metadata.skill_usage_matrix ?? {},
     tool_permissions: metadata.tool_permissions ?? {},
     availability_probes: metadata.availability_probes ?? {},
@@ -464,11 +487,14 @@ function metadataSummary(metadata) {
 }
 
 function degradedRecommendationResult(options = {}) {
+  const projectProfile = normalizeProjectProfile(options.projectProfile, options.projectShape);
   return {
     schema: RECOMMENDATION_RESULT_SCHEMA,
     metadata_available: false,
     metadata_source: options.metadataError?.path ?? null,
-    project_shape: normalizeProjectShape(options.projectShape),
+    project_shape: projectProfile.project_shape,
+    project_profile: projectProfile,
+    dimension_matches: [],
     task_signals: normalizeTaskSignals(options.taskSignals),
     baseline: ['rg'],
     recommendations: [],
@@ -478,6 +504,7 @@ function degradedRecommendationResult(options = {}) {
 }
 
 function degradedSelectionResult(options = {}) {
+  const projectProfile = normalizeProjectProfile(options.projectProfile, options.projectShape);
   return {
     schema: SELECTION_RESULT_SCHEMA,
     metadata_available: false,
@@ -488,7 +515,9 @@ function degradedSelectionResult(options = {}) {
       enabled_tools: asArray(options.config?.enabled_tools)
     },
     command: normalizeCommand(options.command),
-    project_shape: normalizeProjectShape(options.projectShape),
+    project_shape: projectProfile.project_shape,
+    project_profile: projectProfile,
+    dimension_matches: [],
     task_signals: normalizeTaskSignals(options.taskSignals),
     baseline: ['rg'],
     selected_tools: [],
@@ -522,14 +551,24 @@ function metadataWarning(error) {
   };
 }
 
-function collectCandidateTools(metadata, projectShape, taskSignals) {
+function collectCandidateTools(metadata, projectShape, taskSignals, projectProfile = null, dimensionMatches = null) {
   const candidates = new Set();
   const shape = metadata.project_shape_signals?.[projectShape] ?? {};
+  const matches = dimensionMatches ?? collectDimensionMatches(metadata, projectProfile);
 
   for (const toolId of asArray(shape.suggest_tools)) candidates.add(toolId);
   for (const toolId of asArray(shape.conditional_tools)) {
     if (toolMatchesTask(metadata.tools?.[toolId], taskSignals)) {
       candidates.add(toolId);
+    }
+  }
+
+  for (const match of matches) {
+    for (const toolId of asArray(match.suggest_tools)) candidates.add(toolId);
+    for (const toolId of asArray(match.conditional_tools)) {
+      if (toolMatchesTask(metadata.tools?.[toolId], taskSignals)) {
+        candidates.add(toolId);
+      }
     }
   }
 
@@ -552,7 +591,7 @@ function toolMatchesTask(tool, taskSignals) {
   return taskSignals.some((signal) => recommendedTasks.includes(signal));
 }
 
-function isAllowedForRequest(toolId, tool, projectShape, taskSignals, metadata) {
+function isAllowedForRequest(toolId, tool, projectShape, taskSignals, metadata, projectProfile = null, dimensionMatches = null) {
   if (ALWAYS_REJECTED_TOOLS.has(toolId)) return false;
 
   const manualTaskSet = MANUAL_ONLY_TASKS.get(toolId);
@@ -562,6 +601,9 @@ function isAllowedForRequest(toolId, tool, projectShape, taskSignals, metadata) 
 
   const shape = metadata.project_shape_signals?.[projectShape] ?? {};
   if (asArray(shape.avoid_tools).includes(toolId)) return false;
+
+  const matches = dimensionMatches ?? collectDimensionMatches(metadata, projectProfile);
+  if (matches.some((match) => asArray(match.avoid_tools).includes(toolId))) return false;
 
   for (const signal of taskSignals) {
     const task = metadata.task_signals?.[signal] ?? {};
@@ -635,7 +677,7 @@ function nextStepForTool(toolId, tool) {
     return 'Use only as optional user-owned docs lookup for version-sensitive library/API questions.';
   }
   if (toolId === 'codegraph') {
-    return 'Use rg first; for broad repo graph questions only, run codegraph init <project>, codegraph index --quiet <project>, codegraph query --path <project> ... --json, then codegraph uninit --force <project>. Do not run codegraph install, sync, serve, serve --mcp, or mutate agent config.';
+    return 'Use rg first; for broad repo graph questions only, run codegraph init <project>, codegraph index --quiet <project>, codegraph query --path <project> ... --json, verify the output is non-empty and useful, then codegraph uninit --force <project>. Do not run codegraph install, sync, serve, serve --mcp, or mutate agent config.';
   }
   if (toolId === 'agent-memory') {
     return 'Use only as a manual markdown notebook when the user explicitly asks for durable notes.';
@@ -643,7 +685,7 @@ function nextStepForTool(toolId, tool) {
   return tool.suggestion_text ?? 'Use only as explicit opt-in supporting context.';
 }
 
-function buildDoNotRecommend(metadata, projectShape, taskSignals) {
+function buildDoNotRecommend(metadata, projectShape, taskSignals, projectProfile = null, dimensionMatches = null) {
   const entries = new Map();
 
   for (const [toolId, tool] of Object.entries(metadata.tools ?? {})) {
@@ -662,6 +704,18 @@ function buildDoNotRecommend(metadata, projectShape, taskSignals) {
       tool_id: toolId,
       reason: tool.avoid_reason ?? `${tool.display_name ?? toolId} is avoided for ${projectShape}.`
     });
+  }
+
+  const matches = dimensionMatches ?? collectDimensionMatches(metadata, projectProfile);
+  for (const match of matches) {
+    for (const toolId of asArray(match.avoid_tools)) {
+      const tool = metadata.tools?.[toolId] ?? {};
+      entries.set(toolId, {
+        tool_id: toolId,
+        reason: tool.avoid_reason ?? `${tool.display_name ?? toolId} is avoided for ${match.id}.`,
+        dimension_signal: match.id
+      });
+    }
   }
 
   for (const signal of taskSignals) {
@@ -802,14 +856,22 @@ function normalizeProbeResult(probe) {
   };
 }
 
-async function classifyProjectShape(cwd) {
+export async function classifyProjectShape(cwd) {
   const stats = await scanProject(cwd);
-  if (stats.manifestCount >= 3 || stats.workspaceMarkers > 0) return 'multirepo';
-  if (stats.hasGoMod) return stats.fileCount <= 100 ? 'small_microservice' : 'go_service';
-  if (stats.fileCount <= 100) return 'small_microservice';
-  if (stats.fileCount >= 1500) return 'large_legacy';
-  if (stats.hasFrameworkMarker || stats.fileCount >= 250) return 'large_framework_app';
-  return 'large_framework_app';
+  return classifyProjectShapeFromStats(stats);
+}
+
+export async function classifyProjectProfile(cwd, overrides = {}) {
+  const stats = await scanProject(cwd);
+  const profile = {
+    project_shape: classifyProjectShapeFromStats(stats),
+    languages: normalizeLanguages([...stats.languages]),
+    volume: classifyVolume(stats),
+    complexity: classifyComplexity(stats),
+    repo_shape: classifyRepoShape(stats),
+    artifact_mode: classifyArtifactMode(stats)
+  };
+  return applyProjectProfileOverrides(profile, overrides);
 }
 
 async function scanProject(rootDir) {
@@ -818,7 +880,10 @@ async function scanProject(rootDir) {
     manifestCount: 0,
     workspaceMarkers: 0,
     hasGoMod: false,
-    hasFrameworkMarker: false
+    hasFrameworkMarker: false,
+    hasOpenSpec: false,
+    hasAiFactory: false,
+    languages: new Set()
   };
 
   async function walk(currentDir, relativeDir = '') {
@@ -834,6 +899,7 @@ async function scanProject(rootDir) {
       const normalized = toPosix(rel);
       if (entry.isDirectory()) {
         if (shouldIgnoreDir(normalized)) continue;
+        if (isFrameworkMarker(`${normalized}/`)) result.hasFrameworkMarker = true;
         await walk(path.join(currentDir, entry.name), rel);
         continue;
       }
@@ -841,9 +907,16 @@ async function scanProject(rootDir) {
 
       result.fileCount += 1;
       if (isManifestName(entry.name)) result.manifestCount += 1;
+      collectLanguageSignal(result, entry.name, normalized);
       if (entry.name === 'go.mod') result.hasGoMod = true;
       if (isWorkspaceMarker(entry.name)) result.workspaceMarkers += 1;
       if (isFrameworkMarker(normalized)) result.hasFrameworkMarker = true;
+      if (normalized === 'openspec/config.yaml' || normalized.startsWith('openspec/specs/')) {
+        result.hasOpenSpec = true;
+      }
+      if (normalized.startsWith('.ai-factory/')) {
+        result.hasAiFactory = true;
+      }
     }
   }
 
@@ -851,10 +924,47 @@ async function scanProject(rootDir) {
   return result;
 }
 
+function classifyProjectShapeFromStats(stats) {
+  if (stats.manifestCount >= 3 || stats.workspaceMarkers > 0) return 'multirepo';
+  if (stats.hasGoMod) return stats.fileCount <= 100 ? 'small_microservice' : 'go_service';
+  if (stats.fileCount <= 100) return 'small_microservice';
+  if (stats.fileCount >= 1500) return 'large_legacy';
+  if (stats.hasFrameworkMarker || stats.fileCount >= 250) return 'large_framework_app';
+  return 'large_framework_app';
+}
+
+function classifyVolume(stats) {
+  if (stats.fileCount <= 100) return 'mini';
+  if (stats.fileCount <= 1500) return 'standard';
+  return 'large';
+}
+
+function classifyComplexity(stats) {
+  if (stats.hasFrameworkMarker) return 'framework';
+  if (stats.fileCount >= 1500) return 'legacy';
+  if (stats.manifestCount >= 4 || stats.workspaceMarkers > 0) return 'integration_heavy';
+  return stats.fileCount <= 100 ? 'mini' : 'framework';
+}
+
+function classifyRepoShape(stats) {
+  if (stats.workspaceMarkers > 0) return 'monorepo';
+  if (stats.manifestCount >= 3) return 'multirepo';
+  return 'single_repo';
+}
+
+function classifyArtifactMode(stats) {
+  if (stats.hasOpenSpec) return 'openspec_native';
+  if (stats.hasAiFactory) return 'legacy_ai_factory_only';
+  return 'none';
+}
+
 function shouldIgnoreDir(relativeDir) {
   if (IGNORE_DIRS.has(relativeDir)) return true;
+  for (const ignored of IGNORE_DIRS) {
+    if (ignored.includes('/') && relativeDir.startsWith(`${ignored}/`)) return true;
+  }
   const parts = relativeDir.split('/');
-  return parts.some((part) => IGNORE_DIRS.has(part));
+  return parts.some((part) => IGNORE_DIRS.has(part) && !part.includes('/'));
 }
 
 function isManifestName(name) {
@@ -881,8 +991,173 @@ function isWorkspaceMarker(name) {
 }
 
 function isFrameworkMarker(relativePath) {
-  return /(^|\/)(src|app|pages|routes|controllers|components)\//.test(relativePath)
-    || /(^|\/)(next|vite|nuxt|angular|svelte|astro)\.config\./.test(relativePath);
+  const normalized = String(relativePath).toLowerCase();
+  return /(^|\/)(src|app|pages|routes|controllers|components)\//.test(normalized)
+    || /(^|\/)(next|vite|nuxt|angular|svelte|astro)\.config\./.test(normalized);
+}
+
+function collectLanguageSignal(result, name, relativePath) {
+  const lowerName = String(name).toLowerCase();
+  const lowerPath = String(relativePath).toLowerCase();
+  if (lowerName === 'go.mod' || lowerPath.endsWith('.go')) result.languages.add('go');
+  if (lowerName === 'package.json' || /\.(?:mjs|cjs|js|jsx|ts|tsx)$/.test(lowerPath)) result.languages.add('js');
+  if (lowerName === 'composer.json' || lowerPath.endsWith('.php')) result.languages.add('php');
+  if (lowerName === 'cargo.toml' || lowerPath.endsWith('.rs')) result.languages.add('rust');
+}
+
+function buildProjectProfileFromFlags(flags = {}) {
+  const base = profileFromProjectShape(flags.shape);
+  return applyProjectProfileOverrides(base, flags);
+}
+
+function profileFromProjectShape(shape) {
+  const projectShape = normalizeProjectShape(shape);
+  const defaults = {
+    large_legacy: {
+      languages: [],
+      volume: 'large',
+      complexity: 'legacy',
+      repo_shape: 'single_repo',
+      artifact_mode: 'none'
+    },
+    multirepo: {
+      languages: ['multi'],
+      volume: 'large',
+      complexity: 'integration_heavy',
+      repo_shape: 'multirepo',
+      artifact_mode: 'none'
+    },
+    large_framework_app: {
+      languages: [],
+      volume: 'large',
+      complexity: 'framework',
+      repo_shape: 'single_repo',
+      artifact_mode: 'none'
+    },
+    go_service: {
+      languages: ['go'],
+      volume: 'standard',
+      complexity: 'framework',
+      repo_shape: 'single_repo',
+      artifact_mode: 'none'
+    },
+    small_microservice: {
+      languages: [],
+      volume: 'mini',
+      complexity: 'mini',
+      repo_shape: 'single_repo',
+      artifact_mode: 'none'
+    }
+  };
+  return {
+    project_shape: projectShape,
+    ...(defaults[projectShape] ?? defaults.large_framework_app)
+  };
+}
+
+function normalizeProjectProfile(profile = null, fallbackShape = null) {
+  const base = profile && typeof profile === 'object'
+    ? { ...profile }
+    : profileFromProjectShape(fallbackShape);
+  const projectShape = normalizeProjectShape(base.project_shape ?? fallbackShape);
+  const shapeDefaults = profileFromProjectShape(projectShape);
+  return {
+    project_shape: projectShape,
+    languages: normalizeLanguages(base.languages ?? shapeDefaults.languages),
+    volume: normalizeDimensionValue(base.volume, ['mini', 'standard', 'large'], shapeDefaults.volume),
+    complexity: normalizeDimensionValue(
+      base.complexity,
+      ['mini', 'framework', 'legacy', 'integration_heavy'],
+      shapeDefaults.complexity
+    ),
+    repo_shape: normalizeDimensionValue(
+      base.repo_shape,
+      ['single_repo', 'monorepo', 'multirepo'],
+      shapeDefaults.repo_shape
+    ),
+    artifact_mode: normalizeDimensionValue(
+      base.artifact_mode,
+      ['openspec_native', 'legacy_ai_factory_only', 'none'],
+      shapeDefaults.artifact_mode
+    )
+  };
+}
+
+function applyProjectProfileOverrides(profile, overrides = {}) {
+  const patched = {
+    ...profile,
+    languages: normalizeLanguages(profile.languages)
+  };
+  const languages = [
+    ...normalizeLanguages(overrides.language),
+    ...normalizeLanguages(overrides.languages)
+  ];
+  if (languages.length > 0) patched.languages = languages;
+  if (hasOverrideValue(overrides.shape) || hasOverrideValue(overrides.projectShape) || hasOverrideValue(overrides.project_shape)) {
+    patched.project_shape = normalizeProjectShape(overrides.shape ?? overrides.projectShape ?? overrides.project_shape);
+  }
+  if (hasOverrideValue(overrides.volume)) patched.volume = overrides.volume;
+  if (hasOverrideValue(overrides.complexity)) patched.complexity = overrides.complexity;
+  if (hasOverrideValue(overrides.repoShape) || hasOverrideValue(overrides.repo_shape)) {
+    patched.repo_shape = overrides.repoShape ?? overrides.repo_shape;
+  }
+  if (hasOverrideValue(overrides.artifactMode) || hasOverrideValue(overrides.artifact_mode)) {
+    patched.artifact_mode = overrides.artifactMode ?? overrides.artifact_mode;
+  }
+  return normalizeProjectProfile(patched, patched.project_shape);
+}
+
+function hasOverrideValue(value) {
+  return value !== undefined && value !== null && String(value).trim() !== '';
+}
+
+function normalizeLanguages(value) {
+  const normalized = asArray(value)
+    .flatMap((item) => splitCsv(item))
+    .map((language) => String(language).trim().toLowerCase())
+    .filter(Boolean);
+  return [...new Set(normalized)];
+}
+
+function normalizeDimensionValue(value, allowed, fallback) {
+  const normalized = String(value ?? '').trim();
+  return allowed.includes(normalized) ? normalized : fallback;
+}
+
+function splitCsv(value) {
+  return String(value ?? '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function collectDimensionMatches(metadata, projectProfile = null) {
+  const profile = normalizeProjectProfile(projectProfile);
+  const matches = [];
+  for (const [id, signal] of Object.entries(metadata?.dimension_signals ?? {})) {
+    if (dimensionSignalMatches(signal.match ?? {}, profile)) {
+      matches.push({ id, ...signal });
+    }
+  }
+  return matches;
+}
+
+function dimensionSignalMatches(match, profile) {
+  for (const [key, expected] of Object.entries(match ?? {})) {
+    if (!profileFieldMatches(profile, key, expected)) return false;
+  }
+  return true;
+}
+
+function profileFieldMatches(profile, key, expected) {
+  const normalizedKey = key === 'language' ? 'languages' : key;
+  const expectedValues = asArray(expected).flatMap((item) => splitCsv(item)).map(String);
+  if (expectedValues.length === 0) return true;
+  const actual = profile?.[normalizedKey];
+  if (Array.isArray(actual)) {
+    return actual.some((value) => expectedValues.includes(String(value)));
+  }
+  return expectedValues.includes(String(actual));
 }
 
 async function tryLoadMetadata(parsed, cwd, options = {}) {
@@ -921,6 +1196,11 @@ function parseArgs(args) {
     fromProject: false,
     checkDocsProvider: false,
     shape: null,
+    language: [],
+    volume: null,
+    complexity: null,
+    repoShape: null,
+    artifactMode: null,
     task: [],
     command: null,
     metadata: null
@@ -936,6 +1216,16 @@ function parseArgs(args) {
       flags.checkDocsProvider = true;
     } else if (token === '--shape') {
       flags.shape = rest[++index];
+    } else if (token === '--language' || token === '--lang') {
+      flags.language.push(...splitCsv(rest[++index]));
+    } else if (token === '--volume') {
+      flags.volume = rest[++index];
+    } else if (token === '--complexity') {
+      flags.complexity = rest[++index];
+    } else if (token === '--repo-shape') {
+      flags.repoShape = rest[++index];
+    } else if (token === '--artifact-mode') {
+      flags.artifactMode = rest[++index];
     } else if (token === '--task') {
       flags.task.push(rest[++index]);
     } else if (token === '--command') {

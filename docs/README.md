@@ -56,6 +56,9 @@ OpenSpec CLI features вызываются через AIFHub wrappers и `script
 | [Codex Agents](codex-agents.md) | Namespaced Codex subagents и invocation contract |
 | [Claude Agents](claude-agents.md) | Namespaced Claude subagents и install target |
 | [Research по Memory Tools](memory-tools-research/README.md) | Результаты проверки local memory/retrieval кандидатов для optional context providers |
+| [AI Tester Matrix Для Memory Tools](memory-tools-research/ai-tester-matrix.md) | Paired `rg` baseline и optional-tool matrix для dimension-aware recommendation metadata |
+| [CodeGraph Benchmark Results](memory-tools-research/codegraph-benchmark-results.md) | Видимые paired `rg`/CodeGraph test rows, token traces и 47-profile matrix summary |
+| [AI Tester Token Matrices](memory-tools-research/ai-tester-token-matrices.md) | Таблицы по skill с реальными `ai-tester` input/output/cache token traces и `NOT_RUN` строками |
 | [Codex Plan Mode](codex-plan-mode.md) | Codex mode и question-format guidance |
 | [Handoff Naming](handoff.md) | Stage vocabulary versus public CLI commands |
 
@@ -110,3 +113,6 @@ npm test
 - [ADR 0001](adr/0001-openspec-native-artifact-protocol.md)
 - [AIFHub MCP](aifhub-mcp.md)
 - [Research по Memory Tools](memory-tools-research/README.md)
+- [AI Tester Matrix Для Memory Tools](memory-tools-research/ai-tester-matrix.md)
+- [CodeGraph Benchmark Results](memory-tools-research/codegraph-benchmark-results.md)
+- [AI Tester Token Matrices](memory-tools-research/ai-tester-token-matrices.md)

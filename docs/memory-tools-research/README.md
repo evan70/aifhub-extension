@@ -16,6 +16,8 @@
 
 Эта meta не разрешает auto-install. Любой инструмент из списка должен предлагаться пользователю только как explicit opt-in с объяснением read scope, purge path и privacy tradeoff.
 
+Новая матрица описана в [AI Tester Matrix Для Memory Tools](ai-tester-matrix.md). Она делает paired прогон: `baseline_rg` на том же profile/task/skill, затем optional `tool_run`, затем decision `recommend`, `conditional`, `avoid` или `forbid`. Для индексируемых инструментов есть warm mode: `setup_commands` инициализируют индекс до model turn, а сам тест проверяет пользу уже готового индекса. Видимые строки CodeGraph-прогона находятся в [CodeGraph Benchmark Results](codegraph-benchmark-results.md), а фактические model-token строки по skill - в [AI Tester Token Matrices](ai-tester-token-matrices.md). В metadata теперь используются dimensions: language, volume, complexity, repo shape, artifact mode и старый `project_shape` как compatibility fallback.
+
 ## Алгоритм Тестирования
 
 Этот алгоритм нужен для добавления нового инструмента или повторного прогона существующего. README хранит методику и итоговую рекомендацию; все датированные результаты пишутся только в файл конкретного инструмента.
@@ -82,7 +84,54 @@ README содержит только общую сводку и итоговую
 | [codex-mem](codex-mem.md) | package не содержит repository metadata; ближайший проверенный публичный repo: [Just-Boring-Cat/codex-mem](https://github.com/Just-Boring-Cat/codex-mem) | `0.1.1` | Codex session/history memory. | Reject as default; privacy risk без строгой изоляции. |
 | [agent-memory](agent-memory.md) | [jayzeng/agentmemory](https://github.com/jayzeng/agentmemory) | `myagentmemory 0.4.12` | Manual markdown memory. | Docs-only/manual notes, без интеграции. |
 | [eagle-mem](eagle-mem.md) | [eagleisbatman/eagle-mem](https://github.com/eagleisbatman/eagle-mem) | `4.9.10` | Shared memory + hooks + guardrails + lanes. | Reject/defer; слишком широкий surface для issue #85. |
-| [CodeGraph](codegraph.md) | [colbymchenry/codegraph](https://github.com/colbymchenry/codegraph) | installed `0.9.3`, npm `0.9.4` | Manual CLI-only repo graph для broad analyze/explore questions. | `manual_cli_only`; scoped CLI read/purge verified, но `install`/MCP/agent-config surface не принят. |
+| [CodeGraph](codegraph.md) | [colbymchenry/codegraph](https://github.com/colbymchenry/codegraph) | installed `0.9.3`, npm `0.9.4` | Manual CLI-only repo graph для explicit symbol/surface mapping. | `manual_cli_only`; scoped CLI read/purge verified, но generic architecture context часто пустой, поэтому нужен quality gate. |
+
+## Итоговые Таблицы По Форматам Проектов
+
+### Мини Проект
+
+| Tool | aif-analyze | aif-explore | aif-plan | Вывод |
+|---|---|---|---|---|
+| `rg` | useful baseline | useful baseline | useful baseline | Точный поиск быстрее любых индексов. |
+| CodeGraph | avoided | avoided | forbidden | Перерасход setup/index для mini/exact lookup; уже готовый индекс можно переиспользовать только case-by-case, если есть полезный `files/query/context` output. |
+| Graphify | avoided | avoided | conditional read-only old output | Перерасход token/time без broad architecture задачи. |
+| context-mode | avoided | avoided | forbidden | Нет пользы без large generated output. |
+
+### Laravel/Framework
+
+| Tool | aif-analyze | aif-explore | aif-plan | Вывод |
+|---|---|---|---|---|
+| `rg` | required baseline | required baseline | required baseline | Всегда первый проход и fallback. |
+| CodeGraph | conditional | conditional when selected | forbidden | Использовать только если после `rg` нужен graph/symbol context и CodeGraph вернул непустую полезную выборку. |
+| Graphify | conditional | read existing reviewed output | read existing reviewed output | Полезен для architecture overview после `rg`, но не canonical evidence. |
+| Context7 | conditional docs | conditional docs | conditional docs | Только version-sensitive library/API docs. |
+
+### Multirepo
+
+| Tool | aif-analyze | aif-explore | aif-plan | Вывод |
+|---|---|---|---|---|
+| `rg` | required baseline | required baseline | required baseline | Нужен для точной проверки найденных областей. |
+| CodeGraph | conditional | conditional when selected | forbidden | Candidate для surface mapping при explicit opt-in, но generic architecture context часто header-only; проверять полезность output. |
+| Graphify | conditional | useful from reviewed output | useful from reviewed output | Помогает снизить шум broad repo search. |
+| codex-agent-mem | conditional continuity | conditional continuity | forbidden | Только resume/open-work, не repo indexing. |
+
+### Legacy Integration-Heavy
+
+| Tool | aif-analyze | aif-explore | aif-plan | Вывод |
+|---|---|---|---|---|
+| `rg` | required baseline | required baseline | required baseline | Нужен для source-grounded validation. |
+| CodeGraph | conditional | conditional when selected | forbidden | Рекомендовать только если `rg` шумит и CodeGraph query/context не пустой. |
+| Graphify | conditional | read existing reviewed output | read existing reviewed output | Может улучшить выборку слоев, но timeout risk остается. |
+| context-mode | conditional compression | conditional generated output | forbidden | Только для большого command output, не для source retrieval. |
+
+### Go Service
+
+| Tool | aif-analyze | aif-explore | aif-plan | Вывод |
+|---|---|---|---|---|
+| `rg` | required baseline | required baseline | required baseline | Для mini/standard Go сервисов обычно достаточно. |
+| CodeGraph | avoided on mini, conditional on standard | conditional when selected | forbidden | Для generic architecture context на Go service evidence слабый; использовать только под explicit symbol/graph query. |
+| Graphify | avoided on mini, conditional on standard | read existing reviewed output | read existing reviewed output | Польза появляется только на большем сервисе с интеграциями. |
+| codex-agent-mem | conditional continuity | conditional continuity | forbidden | Project shape не важен; важен task signal resume/open-work. |
 
 ## Итоговая Рекомендация
 
@@ -96,7 +145,7 @@ README содержит только общую сводку и итоговую
 - `Context7` можно документировать как optional docs provider для актуальных library/API вопросов.
 - `context-mode` может остаться manual helper для temporary indexing больших command outputs.
 - `codex-mem`, `agent-memory` и `eagle-mem` не должны становиться default AIFHub integrations.
-- `CodeGraph` можно рекомендовать из `/aif-analyze` как manual CLI-only opt-in и использовать из `/aif-explore` только когда selection CLI возвращает его в `selected_tools`; `install`/MCP/agent-config surface не принят.
+- `CodeGraph` можно рекомендовать из `/aif-analyze` как manual CLI-only opt-in и использовать из `/aif-explore` только когда selection CLI возвращает его в `selected_tools`, после `rg`, с непустым useful output и обязательным purge; `install`/MCP/agent-config surface не принят.
 
 Любая будущая реализация должна требовать explicit opt-in, explicit local paths, отсутствие global hooks по умолчанию, отсутствие canonical OpenSpec writes, отсутствие зависимости от install path и документированный purge/delete-index path.
 

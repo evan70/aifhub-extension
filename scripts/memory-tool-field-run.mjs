@@ -48,11 +48,14 @@ const IGNORE_DIR_NAMES = new Set([
   '.git',
   '.hg',
   '.svn',
+  '.agents',
+  '.codex',
   'node_modules',
   'vendor',
   'dist',
   'build',
   'coverage',
+  '.ai-factory',
   '.cache',
   '.next',
   '.turbo',
@@ -61,6 +64,9 @@ const IGNORE_DIR_NAMES = new Set([
   'temp',
   'graphify-out',
   '.codegraph'
+]);
+const IGNORE_DIR_PATHS = new Set([
+  '.github/skills'
 ]);
 const LOCK_FILE_NAMES = new Set([
   'package-lock.json',
@@ -86,7 +92,10 @@ export async function runMemoryToolFieldRun(args = [], options = {}) {
 
   const rootInputs = parsed.roots.length > 0 ? parsed.roots : [process.cwd()];
   const tools = getToolPlan(parsed.tools);
-  const profiles = await discoverProjectRoots(rootInputs, { maxProfiles: parsed.maxProfiles });
+  const profiles = await discoverProjectRoots(rootInputs, {
+    maxProfiles: parsed.maxProfiles,
+    excludeRoots: parsed.excludeRoots
+  });
   const selectedProfiles = parsed.dryRun ? profiles : profiles;
   const toolResults = [];
   const copies = [];
@@ -144,24 +153,27 @@ export async function discoverProjectRoots(rootInputs, options = {}) {
   const maxProfiles = Number.isFinite(options.maxProfiles) && options.maxProfiles >= 0
     ? options.maxProfiles
     : null;
+  const excludeRoots = asArray(options.excludeRoots).map((item) => path.resolve(item));
 
   for (const input of rootInputs) {
     const root = path.resolve(input);
     if (!await pathExists(root)) continue;
+    if (isExcludedPath(root, excludeRoots)) continue;
     const entries = await readdir(root, { withFileTypes: true }).catch(() => []);
 
     if (await isProjectRoot(root)) {
-      addRoot(roots, seen, root);
+      addRoot(roots, seen, root, excludeRoots);
     }
 
     for (const entry of entries) {
-      if (!entry.isDirectory() || shouldIgnoreDirectory(entry.name)) continue;
+      if (!entry.isDirectory() || shouldIgnoreDirectoryPath(entry.name)) continue;
       const candidate = path.join(root, entry.name);
+      if (isExcludedPath(candidate, excludeRoots)) continue;
       if (await isProjectRoot(candidate)) {
-        addRoot(roots, seen, candidate);
+        addRoot(roots, seen, candidate, excludeRoots);
       }
       for (const nested of await findNestedProjectRoots(candidate, { maxDepth: 3 })) {
-        addRoot(roots, seen, nested);
+        addRoot(roots, seen, nested, excludeRoots);
       }
     }
   }
@@ -715,17 +727,18 @@ function sanitizeToolResult(result) {
   }));
 }
 
-async function copySanitizedDirectory(sourceDir, targetDir) {
+async function copySanitizedDirectory(sourceDir, targetDir, relativeDir = '') {
   const entries = await readdir(sourceDir, { withFileTypes: true }).catch(() => []);
   for (const entry of entries) {
-    if (shouldIgnoreEntry(entry.name, entry.isDirectory())) continue;
+    const relativePath = toPosix(relativeDir ? path.join(relativeDir, entry.name) : entry.name);
+    if (shouldIgnoreEntry(entry.name, entry.isDirectory(), relativePath)) continue;
     const source = path.join(sourceDir, entry.name);
     const target = path.join(targetDir, entry.name);
     const stats = await lstat(source).catch(() => null);
     if (!stats || stats.isSymbolicLink()) continue;
     if (stats.isDirectory()) {
       await mkdir(target, { recursive: true });
-      await copySanitizedDirectory(source, target);
+      await copySanitizedDirectory(source, target, relativePath);
     } else if (stats.isFile()) {
       await mkdir(path.dirname(target), { recursive: true });
       await cp(source, target, { force: false });
@@ -740,7 +753,8 @@ async function findNestedProjectRoots(root, options = {}) {
     if (depth > maxDepth) return;
     const entries = await readdir(current, { withFileTypes: true }).catch(() => []);
     for (const entry of entries) {
-      if (!entry.isDirectory() || shouldIgnoreDirectory(entry.name)) continue;
+      const relativePath = toPosix(path.relative(root, path.join(current, entry.name)));
+      if (!entry.isDirectory() || shouldIgnoreDirectoryPath(relativePath)) continue;
       const candidate = path.join(current, entry.name);
       if (await isProjectRoot(candidate)) {
         results.push(candidate);
@@ -761,12 +775,32 @@ async function isProjectRoot(candidate) {
   return false;
 }
 
-function addRoot(roots, seen, root) {
+function addRoot(roots, seen, root, excludeRoots = []) {
   const resolved = path.resolve(root);
+  if (isExcludedPath(resolved, excludeRoots)) return;
   const key = resolved.toLowerCase();
   if (seen.has(key)) return;
   seen.add(key);
   roots.push(resolved);
+}
+
+function isExcludedPath(candidate, excludeRoots = []) {
+  const resolved = path.resolve(candidate);
+  const normalized = normalizePathForCompare(resolved);
+  return excludeRoots.some((root) => {
+    const normalizedRoot = normalizePathForCompare(path.resolve(root));
+    return normalized === normalizedRoot || normalized.startsWith(`${normalizedRoot}${path.sep}`);
+  });
+}
+
+function normalizePathForCompare(value) {
+  return process.platform === 'win32' ? String(value).toLowerCase() : String(value);
+}
+
+function asArray(value) {
+  if (Array.isArray(value)) return value;
+  if (value === undefined || value === null || value === '') return [];
+  return [value];
 }
 
 function classifyShapeFromPath(sourceRoot) {
@@ -777,13 +811,26 @@ function classifyShapeFromPath(sourceRoot) {
   return 'large_framework_app';
 }
 
-function shouldIgnoreEntry(name, isDirectory) {
-  if (isDirectory) return shouldIgnoreDirectory(name);
+function shouldIgnoreEntry(name, isDirectory, relativePath = name) {
+  if (isDirectory) return shouldIgnoreDirectoryPath(relativePath);
   return name.startsWith('.env') || LOCK_FILE_NAMES.has(name);
 }
 
 function shouldIgnoreDirectory(name) {
   return IGNORE_DIR_NAMES.has(name) || name.startsWith('.env');
+}
+
+function shouldIgnoreDirectoryPath(relativePath) {
+  const normalized = toPosix(relativePath);
+  if (IGNORE_DIR_PATHS.has(normalized)) return true;
+  for (const ignored of IGNORE_DIR_PATHS) {
+    if (normalized.startsWith(`${ignored}/`)) return true;
+  }
+  return normalized.split('/').some((part) => shouldIgnoreDirectory(part));
+}
+
+function toPosix(value) {
+  return String(value).replace(/\\/g, '/');
 }
 
 async function execSafe(command, args = [], options = {}) {
@@ -851,6 +898,7 @@ function parseArgs(args) {
   const parsed = {
     help: false,
     roots: [],
+    excludeRoots: [],
     out: null,
     tools: 'safe',
     json: false,
@@ -868,6 +916,8 @@ function parseArgs(args) {
       parsed.help = true;
     } else if (token === '--roots') {
       parsed.roots.push(args[++index]);
+    } else if (token === '--exclude-root') {
+      parsed.excludeRoots.push(args[++index]);
     } else if (token === '--out') {
       parsed.out = args[++index];
     } else if (token === '--tools') {
@@ -897,6 +947,7 @@ export function getCliUsage() {
     '',
     'Options:',
     '  --roots <dir>         Root directory to discover project profiles from. Repeatable.',
+    '  --exclude-root <dir>  Exclude this root and all nested project profiles. Repeatable.',
     '  --out <dir>           Temp run directory for sanitized copies, tool installs, and JSON output.',
     '  --tools safe          Run the safe optional-context-tool set.',
     '  --json                Emit public JSON summary to stdout.',

@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   buildRecommendationResult,
+  classifyProjectProfile,
   isWindowsShellCommandNotFound,
   loadRecommendationMetadata,
   parseRecommendationMetadata,
@@ -62,6 +63,17 @@ describe('recommendation metadata parsing', () => {
     assert.equal(metadata.default_policy.require_explicit_paths, true);
     assert.equal(metadata.default_policy.require_purge_path, true);
     assert.ok(metadata.skill_usage_matrix['aif-analyze']);
+    assert.deepEqual(metadata.project_dimensions.languages, ['php', 'go', 'js', 'rust', 'multi']);
+    assert.deepEqual(metadata.project_dimensions.volume, ['mini', 'standard', 'large']);
+    assert.deepEqual(metadata.project_dimensions.complexity, ['mini', 'framework', 'legacy', 'integration_heavy']);
+    assert.deepEqual(metadata.project_dimensions.repo_shape, ['single_repo', 'monorepo', 'multirepo']);
+    assert.deepEqual(metadata.project_dimensions.artifact_mode, ['openspec_native', 'legacy_ai_factory_only', 'none']);
+    assert.equal(metadata.benchmark_matrix.ai_tester.result_schema, 'aifhub.memory_tools.ai_tester_matrix.v1');
+    assert.deepEqual(metadata.benchmark_matrix.ai_tester.decision_actions, ['recommend', 'conditional', 'avoid', 'forbid']);
+    assert.ok(metadata.benchmark_matrix.ai_tester.comparison_metrics.includes('usefulness_vs_rg'));
+    assert.ok(metadata.dimension_signals.mini_go_service.avoid_tools.includes('codegraph'));
+    assert.ok(metadata.dimension_signals.large_framework_broad_discovery.conditional_tools.includes('codegraph'));
+    assert.ok(metadata.evidence_runs.some((run) => run.id === 'codegraph-forced-benchmark-2026-05-26'));
     assert.equal(metadata.tool_permissions.graphify['aif-analyze'], 'recommend_only');
     assert.equal(metadata.availability_probes.graphify[0], 'graphify --version');
     assert.ok(metadata.forbidden_operations.includes('auto_install'));
@@ -183,6 +195,9 @@ describe('recommendation results', () => {
     assert.ok(result.body.forbidden_operations.includes('auto_register_mcp'));
     assert.ok(result.body.protected_artifacts.includes('done-readiness.json'));
     assert.ok(result.body.protected_artifacts.includes('openspec/specs/**'));
+    assert.deepEqual(result.body.project_dimensions.languages, ['php', 'go', 'js', 'rust', 'multi']);
+    assert.equal(result.body.benchmark_matrix.ai_tester.result_schema, 'aifhub.memory_tools.ai_tester_matrix.v1');
+    assert.ok(result.body.dimension_signals.includes('mini_go_service'));
     assert.equal(metadata.tools.codegraph.recommendation_action, 'suggest_manual_cli_for_repo_graph_when_enabled_or_explicit');
   });
 
@@ -325,6 +340,7 @@ describe('recommendation results', () => {
     assert.equal(analyzeCodegraph.install_policy, 'explicit_user_opt_in_only');
     assert.equal(analyzeCodegraph.availability, 'installed');
     assert.match(analyzeCodegraph.next_step, /codegraph init <project>/i);
+    assert.match(analyzeCodegraph.next_step, /non-empty and useful/i);
     assert.match(analyzeCodegraph.next_step, /codegraph uninit --force <project>/i);
     assert.ok(!analyzeResult.do_not_recommend.some((item) => item.tool_id === 'codegraph'));
     assert.ok(exploreCodegraph);
@@ -362,6 +378,72 @@ describe('recommendation results', () => {
     for (const result of [planResult, reviewResult, compressionForPlan]) {
       assert.equal(result.recommendations.some((item) => item.permission === 'forbidden'), false);
     }
+  });
+
+  it('uses dimension signals without bypassing command-specific permissions', async () => {
+    const metadata = await loadRecommendationMetadata({ metadataPath: REAL_METADATA });
+    const analyzeResult = await buildRecommendationResult({
+      metadata,
+      projectShape: 'large_framework_app',
+      projectProfile: {
+        project_shape: 'large_framework_app',
+        languages: ['js'],
+        volume: 'large',
+        complexity: 'framework',
+        repo_shape: 'single_repo',
+        artifact_mode: 'openspec_native'
+      },
+      taskSignals: ['architecture_or_impact_discovery'],
+      command: 'aif-analyze',
+      probeRunner: async () => ({ availability: 'installed', command: 'tool --version' })
+    });
+    const implementResult = await buildRecommendationResult({
+      metadata,
+      projectShape: 'large_framework_app',
+      projectProfile: {
+        project_shape: 'large_framework_app',
+        languages: ['js'],
+        volume: 'large',
+        complexity: 'framework',
+        repo_shape: 'single_repo',
+        artifact_mode: 'openspec_native'
+      },
+      taskSignals: ['architecture_or_impact_discovery'],
+      command: 'aif-implement',
+      probeRunner: async () => ({ availability: 'installed', command: 'tool --version' })
+    });
+
+    assert.equal(analyzeResult.project_profile.volume, 'large');
+    assert.ok(analyzeResult.dimension_matches.includes('large_framework_broad_discovery'));
+    assert.ok(analyzeResult.recommendations.some((item) => item.tool_id === 'codegraph'));
+    assert.equal(implementResult.recommendations.some((item) => item.tool_id === 'codegraph'), false);
+    assert.equal(implementResult.recommendations.some((item) => item.tool_id === 'graphify'), false);
+  });
+
+  it('keeps mini Go projects on rg and records dimension-specific avoid decisions', async () => {
+    const metadata = await loadRecommendationMetadata({ metadataPath: REAL_METADATA });
+    const result = await buildRecommendationResult({
+      metadata,
+      projectShape: 'go_service',
+      projectProfile: {
+        project_shape: 'go_service',
+        languages: ['go'],
+        volume: 'mini',
+        complexity: 'mini',
+        repo_shape: 'single_repo',
+        artifact_mode: 'none'
+      },
+      taskSignals: ['architecture_or_impact_discovery'],
+      command: 'aif-analyze',
+      probeRunner: async () => ({ availability: 'installed', command: 'tool --version' })
+    });
+
+    assert.deepEqual(result.baseline, ['rg']);
+    assert.ok(result.dimension_matches.includes('mini_go_service'));
+    assert.equal(result.recommendations.some((item) => item.tool_id === 'codegraph'), false);
+    assert.equal(result.recommendations.some((item) => item.tool_id === 'graphify'), false);
+    assert.ok(result.do_not_recommend.some((item) => item.tool_id === 'codegraph'));
+    assert.ok(result.do_not_recommend.some((item) => item.tool_id === 'graphify'));
   });
 
   it('selects enabled tools from project config per command without prompt-specific tool lists', async () => {
@@ -569,6 +651,79 @@ describe('CLI behavior', () => {
     const codegraph = result.recommendations.find((item) => item.tool_id === 'codegraph');
     assert.ok(codegraph);
     assert.equal(codegraph.permission, 'manual_purged_cli_execution');
+  });
+
+  it('accepts explicit project dimensions in addition to legacy shape', async () => {
+    const result = await runCli([
+      'recommend',
+      '--shape',
+      'go_service',
+      '--language',
+      'go',
+      '--volume',
+      'mini',
+      '--complexity',
+      'mini',
+      '--repo-shape',
+      'single_repo',
+      '--artifact-mode',
+      'none',
+      '--task',
+      'architecture_or_impact_discovery',
+      '--metadata',
+      REAL_METADATA,
+      '--json'
+    ]);
+
+    assert.equal(result.project_shape, 'go_service');
+    assert.equal(result.project_profile.volume, 'mini');
+    assert.deepEqual(result.project_profile.languages, ['go']);
+    assert.ok(result.dimension_matches.includes('mini_go_service'));
+    assert.equal(result.recommendations.some((item) => item.tool_id === 'codegraph'), false);
+  });
+
+  it('classifies rich project profile dimensions from project files', async () => {
+    await mkdir(path.join(tmpDir, 'apps', 'api'), { recursive: true });
+    await mkdir(path.join(tmpDir, 'src', 'Http', 'Controllers'), { recursive: true });
+    await mkdir(path.join(tmpDir, 'openspec'), { recursive: true });
+    await writeFile(path.join(tmpDir, 'go.mod'), 'module example.local/service', 'utf8');
+    await writeFile(path.join(tmpDir, 'package.json'), '{"workspaces":["apps/*"]}', 'utf8');
+    await writeFile(path.join(tmpDir, 'pnpm-workspace.yaml'), 'packages:\n  - apps/*\n', 'utf8');
+    await writeFile(path.join(tmpDir, 'composer.json'), '{"require":{"laravel/framework":"^10.0"}}', 'utf8');
+    await writeFile(path.join(tmpDir, 'openspec', 'config.yaml'), 'project: example\n', 'utf8');
+
+    const profile = await classifyProjectProfile(tmpDir);
+
+    assert.equal(profile.project_shape, 'multirepo');
+    assert.deepEqual(profile.languages.sort(), ['go', 'js', 'php']);
+    assert.equal(profile.volume, 'mini');
+    assert.equal(profile.complexity, 'framework');
+    assert.equal(profile.repo_shape, 'monorepo');
+    assert.equal(profile.artifact_mode, 'openspec_native');
+  });
+
+  it('ignores generated ai-factory runtime state when classifying project dimensions', async () => {
+    await mkdir(path.join(tmpDir, 'src'), { recursive: true });
+    await mkdir(path.join(tmpDir, '.ai-factory', 'state', 'fixture', 'nested-project'), { recursive: true });
+    await mkdir(path.join(tmpDir, '.agents', 'skills', 'aif-build-automation', 'templates'), { recursive: true });
+    await mkdir(path.join(tmpDir, '.codex', 'skills', 'aif-build-automation', 'templates'), { recursive: true });
+    await mkdir(path.join(tmpDir, '.github', 'skills', 'aif-build-automation', 'templates'), { recursive: true });
+    await mkdir(path.join(tmpDir, '.github', 'workflows'), { recursive: true });
+    await writeFile(path.join(tmpDir, 'package.json'), '{"name":"fixture"}', 'utf8');
+    await writeFile(path.join(tmpDir, 'src', 'index.js'), 'console.log("ok");', 'utf8');
+    await writeFile(path.join(tmpDir, '.ai-factory', 'config.yaml'), 'tools:\n  enabled: []\n', 'utf8');
+    await writeFile(path.join(tmpDir, '.ai-factory', 'state', 'fixture', 'nested-project', 'package.json'), '{"name":"noise"}', 'utf8');
+    await writeFile(path.join(tmpDir, '.ai-factory', 'state', 'fixture', 'nested-project', 'go.mod'), 'module noise.local', 'utf8');
+    await writeFile(path.join(tmpDir, '.agents', 'skills', 'aif-build-automation', 'templates', 'magefile.go'), 'package main', 'utf8');
+    await writeFile(path.join(tmpDir, '.codex', 'skills', 'aif-build-automation', 'templates', 'magefile.go'), 'package main', 'utf8');
+    await writeFile(path.join(tmpDir, '.github', 'skills', 'aif-build-automation', 'templates', 'magefile.go'), 'package main', 'utf8');
+    await writeFile(path.join(tmpDir, '.github', 'workflows', 'validate.yml'), 'name: validate\n', 'utf8');
+
+    const profile = await classifyProjectProfile(tmpDir);
+
+    assert.equal(profile.repo_shape, 'single_repo');
+    assert.equal(profile.artifact_mode, 'legacy_ai_factory_only');
+    assert.deepEqual(profile.languages, ['js']);
   });
 
   it('degrades recommend output when metadata is unavailable', async () => {

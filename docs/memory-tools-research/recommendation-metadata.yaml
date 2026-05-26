@@ -1,5 +1,5 @@
 schema: aifhub.memory_tools.recommendation.v1
-updated: "2026-05-25"
+updated: "2026-05-26"
 purpose: "Метаданные для этапа анализа проекта: какие memory/retrieval инструменты можно предлагать пользователю, когда и с какими ограничениями."
 default_policy:
   install_policy: explicit_user_opt_in_only
@@ -246,6 +246,77 @@ protected_artifacts:
   - openspec/changes/**/specs/**
   - .ai-factory/rules/generated/openspec-rules-trace-*.json
   - exact evidence snippets
+project_dimensions:
+  languages: [php, go, js, rust, multi]
+  volume: [mini, standard, large]
+  complexity: [mini, framework, legacy, integration_heavy]
+  repo_shape: [single_repo, monorepo, multirepo]
+  artifact_mode: [openspec_native, legacy_ai_factory_only, none]
+benchmark_matrix:
+  ai_tester:
+    result_schema: aifhub.memory_tools.ai_tester_matrix.v1
+    suites: [baseline, positive, negative, overhead, docs-version, continuity]
+    scenario_contract:
+      allowed_expectations: [baseline_rg, positive, negative, overhead, not_applicable]
+      installed_wrapper: "ai-factory aifhub-memory-tools"
+      source_repo_fallback: "node scripts/memory-tool-recommender.mjs"
+      required_assertions: [tool_called, tool_call_sequence, no_tool_called, output_contains, turn_count_at_most, no_path_escape]
+    decision_actions: [recommend, conditional, avoid, forbid]
+    comparison_metrics:
+      - wall_clock_ms_delta
+      - token_estimate_delta
+      - ai_tester_token_delta
+      - output_noise_delta
+      - accuracy_delta
+      - usefulness_vs_rg
+      - safety_status
+      - purge_status
+dimension_signals:
+  mini_go_service:
+    match:
+      languages: [go]
+      volume: mini
+      repo_shape: single_repo
+    baseline_first: [rg]
+    avoid_tools: [graphify, codegraph, context-mode]
+    decision_action: avoid
+    evidence: ai-tester-matrix-contract-2026-05-26
+  mini_exact_lookup:
+    match:
+      volume: mini
+    baseline_first: [rg]
+    avoid_tools: [graphify, codegraph, context-mode]
+    decision_action: avoid
+    evidence: ai-tester-matrix-contract-2026-05-26
+  large_framework_broad_discovery:
+    match:
+      volume: large
+      complexity: framework
+    baseline_first: [rg]
+    suggest_tools: [graphify]
+    conditional_tools: [codegraph, context7, codex-agent-mem]
+    tasks: [architecture_or_impact_discovery, multirepo_surface_mapping]
+    decision_action: conditional
+    quality_gate: "Use CodeGraph only when rg output is noisy and CodeGraph query/context returns non-empty useful symbol context; avoid when context output is header-only."
+    evidence: codegraph-forced-benchmark-2026-05-26
+  multirepo_surface_mapping:
+    match:
+      repo_shape: multirepo
+    baseline_first: [rg]
+    suggest_tools: [graphify]
+    conditional_tools: [codegraph, codex-agent-mem]
+    tasks: [multirepo_surface_mapping, architecture_or_impact_discovery]
+    decision_action: conditional
+    quality_gate: "Use CodeGraph for explicit symbol/surface mapping only after rg baseline; avoid generic architecture prompts when CodeGraph context is empty."
+    evidence: codegraph-forced-benchmark-2026-05-26
+  legacy_integration_heavy:
+    match:
+      complexity: integration_heavy
+    baseline_first: [rg]
+    conditional_tools: [graphify, codegraph, context-mode]
+    avoid_tools: [codex-mem, eagle-mem]
+    decision_action: conditional
+    evidence: ai-tester-matrix-contract-2026-05-26
 project_shape_signals:
   large_legacy:
     description: "Большой legacy проект с плотными интеграциями, большим числом файлов и шумным literal search."
@@ -260,8 +331,8 @@ project_shape_signals:
     description: "Работа идёт сразу по нескольким репозиториям или нужно понять surface между компонентами."
     suggest_tools:
       - graphify
-      - codegraph
     conditional_tools:
+      - codegraph
       - codex-agent-mem
     avoid_tools:
       - codex-mem
@@ -270,8 +341,8 @@ project_shape_signals:
     description: "Крупное web-приложение на framework stack, где нужны architecture/impact вопросы."
     suggest_tools:
       - graphify
-      - codegraph
     conditional_tools:
+      - codegraph
       - context-mode
   go_service:
     description: "Средний Go сервис с интеграциями."
@@ -304,10 +375,12 @@ task_signals:
   architecture_or_impact_discovery:
     recommend:
       - graphify
+    conditional:
       - codegraph
   multirepo_surface_mapping:
     recommend:
       - graphify
+    conditional:
       - codegraph
   resume_previous_work:
     recommend:
@@ -633,18 +706,17 @@ tools:
       - aif-done
       - aif-commit
     privacy_caveat: "Local CLI indexing creates .codegraph/ under the explicit project path until purged; install/MCP/agent configuration mutation surfaces are not accepted."
-    recommended_for:
+    conditional_for:
       project_shapes:
         - multirepo
         - large_framework_app
+        - large_legacy
+        - go_service
       tasks:
         - architecture_or_impact_discovery
         - multirepo_surface_mapping
-    conditional_for:
-      project_shapes:
-        - large_legacy
-        - go_service
-      condition: "Только после baseline rg, только для broad repo graph questions, and only with explicit project path plus purge."
+      quality_gate: "Do not treat low token output as success by itself. Require non-empty useful CodeGraph files/query/context results; header-only context is avoid_no_useful_context."
+      condition: "Только после baseline rg, только для broad repo graph questions, only when rg output is noisy, and only with explicit project path plus purge. Interim ai-tester evidence shows CodeGraph is not a default token/time saver."
     do_not_recommend_for:
       project_shapes:
         - small_microservice
@@ -653,7 +725,7 @@ tools:
         - validation_gate
         - implementation
         - automatic_mcp_registration
-    suggestion_text: "Для broad architecture/impact или multirepo mapping можно предложить CodeGraph как manual CLI-only repo graph: probe, run explicit path init/index/query, then purge with codegraph uninit --force <project>. Do not run codegraph install, sync, serve, serve --mcp, or mutate agent config."
+    suggestion_text: "Для broad architecture/impact или multirepo mapping можно предложить CodeGraph только как manual CLI-only repo graph after rg baseline: probe, run explicit path init/index/query, verify useful non-empty output, then purge with codegraph uninit --force <project>. Do not run codegraph install, sync, serve, serve --mcp, or mutate agent config."
     execution:
       aif-explore:
         mode: manual_purged_cli_execution
@@ -986,3 +1058,153 @@ evidence_runs:
         mcp_full_read_only_caveat: "tools/list exposes mutating tool names, but mutating tools/call returns isError and did not increase recent item count."
         cleanup_passed: true
         recommendation_update: "Keep optional continuity-only recommendation, but make minimal/read-only the default safe MCP mode and avoid full profile for low-impact roadmap/explore support."
+  - id: ai-tester-matrix-contract-2026-05-26
+    date: "2026-05-26"
+    scope: "Static ai-tester matrix contract for paired rg baseline plus optional-tool runs across anonymous project dimensions."
+    privacy: "No raw transcripts, source snippets, local project names, local paths, temp paths, or private profile names are stored; durable artifacts keep only anonymous profile counts and aggregate decisions."
+    harness:
+      script: "scripts/memory-tool-ai-tester-matrix.mjs"
+      runner: "ai-tester"
+      baseline_first: true
+      result_schema: "aifhub.memory_tools.ai_tester_matrix.v1"
+      installed_wrapper: "ai-factory aifhub-memory-tools"
+      source_repo_fallback: "node scripts/memory-tool-recommender.mjs"
+    dimensions:
+      languages: [php, go, js, rust, multi]
+      volume: [mini, standard, large]
+      complexity: [mini, framework, legacy, integration_heavy]
+      repo_shape: [single_repo, monorepo, multirepo]
+      artifact_mode: [openspec_native, legacy_ai_factory_only, none]
+    comparison:
+      baseline: rg
+      decisions: [recommend, conditional, avoid, forbid]
+      metrics:
+        - wall_clock_ms_delta
+        - token_estimate_delta
+        - ai_tester_token_delta
+        - output_noise_delta
+        - accuracy_delta
+        - usefulness_vs_rg
+        - safety_status
+        - purge_status
+    outcomes:
+      codegraph:
+        recommendation_update: "Superseded by codegraph-forced-benchmark-2026-05-26 for CodeGraph usefulness decisions. Keep safety/purge contract, but do not treat low-token CodeGraph output as useful without a non-empty context/query result."
+      graphify:
+        recommendation_update: "Conditional for broad architecture/impact discovery after rg baseline; avoid for mini projects and exact lookup."
+      context-mode:
+        recommendation_update: "Conditional only for large generated output compression; avoid for source lookup and mini projects."
+      context7:
+        recommendation_update: "Conditional docs provider for version-sensitive library/API tasks only."
+      codex-agent-mem:
+        recommendation_update: "Conditional continuity provider for resume/open-work tasks only, with explicit DB path and read-only/minimal mode."
+  - id: codegraph-forced-benchmark-2026-05-26
+    date: "2026-05-26"
+    scope: "Forced rg vs CodeGraph benchmark over 47 sanitized anonymous local project profiles."
+    privacy: "Benchmark docs and metadata use aggregate counts and anonymous profile ids. Runtime state may contain local paths for debugging, but durable recommendation docs do not persist source snippets or raw CodeGraph output."
+    harness:
+      script: "scripts/memory-tool-codegraph-benchmark.mjs"
+      matrix_summary: ".ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/all-projects-codegraph-explore-architecture-full47/matrix-summary.json"
+      all_skills_matrix_summary: ".ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/all-projects-codegraph-all-skills-architecture-full47/matrix-summary.json"
+      preinitialized_sample_results:
+        - ".ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/current-folder-ai-tester-preinit-result/usage-summary.json"
+        - ".ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/mini-js-md-ai-tester-preinit-result/usage-summary.json"
+      results: ".ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/all-projects-codegraph-benchmark-full47/public-summary.json"
+      visible_results_doc: "docs/memory-tools-research/codegraph-benchmark-results.md"
+      token_matrix_report: "docs/memory-tools-research/ai-tester-token-matrices.md"
+      baseline: "rg --files plus rg -l architecture-pattern search"
+      preinitialized_ai_tester_setup:
+        - "cd project && codegraph init ."
+        - "cd project && codegraph index --quiet ."
+        - "model turn must not run codegraph init/index"
+        - "model turn must use codegraph files/query/context data command"
+        - "model turn must purge temporary fixture index with codegraph uninit --force ."
+      codegraph_sequence:
+        - "codegraph init <sanitized-copy>"
+        - "codegraph index --quiet <sanitized-copy>"
+        - "codegraph context --path <sanitized-copy> --format markdown --max-nodes 50 --max-code 10 architecture_or_impact_discovery"
+        - "codegraph uninit --force <sanitized-copy>"
+    outcomes:
+      profiles: 47
+      test_rows: 94
+      all_skills_scenarios: 940
+      excluded_roots: 0
+      lifecycle_passed: 47
+      purge_passed: 47
+      decisions:
+        avoid_mini_overhead: 23
+        avoid_no_useful_context: 18
+        conditional_noisy_rg: 4
+        conditional_broad_graph: 2
+      by_shape:
+        small_microservice:
+          count: 23
+          decision: "avoid_mini_overhead"
+        multirepo:
+          count: 8
+          conditional_broad_graph: 2
+          avoid_no_useful_context: 6
+        large_framework_app:
+          count: 14
+          conditional_noisy_rg: 4
+          avoid_no_useful_context: 10
+        go_service:
+          count: 2
+          avoid_no_useful_context: 2
+      ai_tester_token_traces:
+        matrix_summary:
+          report: "docs/memory-tools-research/ai-tester-token-matrices.md"
+          matrix_rows: 940
+          latest_counts_source: "Read the report summary; it is regenerated after every ai-tester scenario."
+          note: "Missing rows are explicit NOT_RUN when no ai-tester model trace exists yet."
+        interim_all_skills_pairs:
+          executed_rows: 59
+          paired_rows: 29
+          codegraph_duration_ratio_vs_rg: 1.166
+          codegraph_duration_delta_percent_vs_rg: 16.6
+          codegraph_tool_call_ratio_vs_rg: 1.249
+          codegraph_tool_call_delta_percent_vs_rg: 24.9
+          codegraph_total_token_ratio_vs_rg: 1.524
+          codegraph_total_token_delta_percent_vs_rg: 52.4
+          codegraph_input_output_token_ratio_vs_rg: 1.501
+          codegraph_input_output_token_delta_percent_vs_rg: 50.1
+          codegraph_better_total_token_pairs: 12
+          codegraph_better_total_token_pairs_percent: 41.4
+          codegraph_faster_pairs: 11
+          codegraph_faster_pairs_percent: 37.9
+          codegraph_failed_tool_run_pairs: 2
+          decision: "Stop broad run for policy decision; CodeGraph is not a default token/time saver and remains conditional only."
+        aif_analyze_profile01:
+          rg_total_tokens: 570610
+          rg_input_tokens: 312672
+          rg_output_tokens: 3730
+          rg_input_output_tokens: 316402
+          codegraph_total_tokens: 2061428
+          codegraph_input_tokens: 1082552
+          codegraph_output_tokens: 9532
+          codegraph_input_output_tokens: 1092084
+          ratio: 3.613
+          decision: "avoid for mini/no-primary-language profile; CodeGraph consumed more time, tool calls, input, output, and total tokens than rg."
+        current_extension:
+          rg_total_tokens: 407581
+          codegraph_total_tokens: 1225402
+          ratio: 3.007
+          decision: "avoid default for standard js/md+mjs extension profile"
+        mini_js_md:
+          rg_total_tokens: 846092
+          codegraph_total_tokens: 1957735
+          ratio: 2.314
+          decision: "avoid mini overhead"
+        current_extension_preinitialized:
+          rg_total_tokens: 439844
+          codegraph_total_tokens: 892047
+          ratio: 2.028
+          setup_mode: "preinitialized_codegraph_index"
+          decision: "avoid default; warm index still costs about 2x total tokens"
+        mini_js_md_preinitialized:
+          rg_total_tokens: 905731
+          codegraph_total_tokens: 863813
+          ratio: 0.954
+          setup_mode: "preinitialized_codegraph_index"
+          decision: "conditional existing-index reuse only; token win was small and extra signal weak"
+      recommendation_update: "CodeGraph is safe enough for scoped manual CLI use with purge, but generic architecture context is often empty. Recommend only conditionally after rg when the task needs graph/symbol context and CodeGraph returns non-empty useful output. Avoid on-demand setup for mini projects; reuse an already-initialized index only as a conditional broad-discovery helper."

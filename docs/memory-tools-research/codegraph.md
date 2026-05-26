@@ -26,7 +26,7 @@ do_not_recommend_when:
     - implementation
     - validation_gate
     - exact_file_or_symbol_lookup
-analysis_hint: "Scoped CLI init/index/status/query/uninit worked on real local roots. /aif-analyze may recommend it as manual CLI-only; follow-on skills may use it only when the selection CLI returns it for that command and then purge it."
+analysis_hint: "Scoped CLI init/index/status/query/uninit worked on temp copies and selected ai-tester fixtures. Do not initialize on demand for mini projects. Reuse an existing index only after rg when the selection CLI returns CodeGraph for that command, a files/query/context data command gives non-empty useful output, and purge is guaranteed for temporary indexes."
 ```
 
 ## Что Это
@@ -154,6 +154,42 @@ Anonymous per-root results:
 
 Вывод не меняет permission model: CodeGraph остается `manual_cli_only`. Новое evidence добавляет version drift (`0.9.3` installed vs `0.9.4` npm latest) и подтверждает, что scoped lifecycle работает на temp copies across broad local profile set. AIFHub все еще не должен запускать `codegraph install`, MCP serving, agent config mutation или использовать output как canonical evidence.
 
+## Forced Rg Baseline Matrix (2026-05-26)
+
+Прогон выполнен через `scripts/memory-tool-codegraph-benchmark.mjs` на 47 sanitized anonymous profiles. Для каждого profile сравнивались:
+
+- `rg --files` плюс `rg -l` по architecture/framework terms;
+- `codegraph init`, `index --quiet`, `context --format markdown`, `uninit --force`.
+
+Сводка:
+
+| Проверка | Результат |
+|---|---:|
+| Profiles | 47 |
+| Test rows | 94 |
+| CodeGraph lifecycle PASS | 47 |
+| Purge PASS | 47 |
+| Mini projects avoided | 23 |
+| Header-only / no useful context | 18 |
+| Conditional useful noisy-rg cases | 4 |
+| Conditional useful broad-graph cases | 2 |
+
+Главный вывод: safe lifecycle не равен useful retrieval. На generic `architecture_or_impact_discovery` CodeGraph часто возвращал только короткий `## Code Context` header без полезной выборки. Поэтому low token count сам по себе не считается победой над `rg`.
+
+Видимые строки тестов с `ai-tester` token traces, full 94-row CLI matrix и per-skill scenario matrix лежат в [CodeGraph Benchmark Results](codegraph-benchmark-results.md). Таблицы по skill с реальными input/output/cache token traces лежат в [AI Tester Token Matrices](ai-tester-token-matrices.md).
+
+Preinitialized `ai-tester` runs отдельно проверяют warm-index режим: `setup_commands` заранее выполняют `codegraph init .` и `codegraph index --quiet .`, а model turn не имеет права повторять `init/index`. На текущем standard extension profile warm CodeGraph все равно потратил ~2.0x total tokens против `rg`; на одном mini js/md profile warm CodeGraph сэкономил 4.6% total tokens, но дал слабый дополнительный сигнал. Поэтому warm-index режим не меняет default policy: это conditional reuse, не рекомендация делать setup.
+
+Interim all-skills `ai-tester` token matrix была остановлена после 59/940 строк, потому что результат уже достаточен для policy decision и дальнейший полный прогон тратил бы токены без смены вывода. На 29 paired rows CodeGraph против `rg`: +16.6% duration, +24.9% tool calls, +52.4% total tokens, +50.1% input+output tokens и 2 failed tool-run строки. CodeGraph был лучше по total tokens в 12/29 pairs (41.4%), по input+output tokens в 11/29 pairs (37.9%), быстрее в 11/29 pairs (37.9%) и с меньшим числом tool calls в 10/29 pairs (34.5%). Поэтому инструмент не считается default token/time saver.
+
+Updated recommendation:
+
+- avoid для mini проектов: setup/index дороже `rg`;
+- existing-index reuse для mini проектов не запрещен технически, но не рекомендован как default из-за слабого дополнительного сигнала;
+- avoid для generic architecture prompts, если CodeGraph context/query output пустой или header-only;
+- conditional для large framework или multirepo только после `rg`, когда `rg` шумит и нужен explicit symbol/surface mapping; не предлагать как обычную рекомендацию для экономии токенов;
+- always purge через `codegraph uninit --force <project>`.
+
 ## Очистка
 
 Accepted purge для explicit user-owned CLI experiments:
@@ -166,4 +202,4 @@ Real-root run подтвердил, что команда удаляет `.codeg
 
 ## Вывод
 
-CodeGraph CLI scoped read и purge verified для explicit local experiments. Принятая AIFHub integration - manual CLI-only: `/aif-analyze` может рекомендовать его для broad graph questions, а `/aif-explore` может использовать его только когда selection CLI возвращает его в `selected_tools`, с `codegraph uninit --force <project>` before completion. `codegraph install`, MCP и agent-config mutation остаются rejected.
+CodeGraph CLI scoped read и purge verified для explicit local experiments. Принятая AIFHub integration - manual CLI-only and conditional: `/aif-analyze` может упомянуть его только как optional broad graph helper after `rg`, а `/aif-explore` может использовать его только когда selection CLI возвращает его в `selected_tools`, когда `rg` шумит, когда CodeGraph возвращает non-empty useful `files/query/context`, и с `codegraph uninit --force <project>` before completion. `codegraph install`, MCP и agent-config mutation остаются rejected.
