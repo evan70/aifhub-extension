@@ -32,17 +32,52 @@ const ALWAYS_REJECTED_TOOLS = new Set(['codex-mem', 'eagle-mem']);
 const MANUAL_ONLY_TASKS = new Map([
   ['agent-memory', new Set(['manual_durable_notes'])]
 ]);
+const PROJECT_IGNORE_FILES = new Set([
+  '.gitignore',
+  '.dockerignore',
+  '.ignore',
+  '.rgignore',
+  '.fdignore'
+]);
+const AI_AND_IDE_FILE_NAMES = new Set([
+  '.aider.conf.yml',
+  '.aider.model.settings.yml',
+  '.aiderignore',
+  '.cursorrules',
+  '.mcp.json',
+  '.opencode.json',
+  '.roomodes',
+  '.windsurfrules',
+  'agents.md',
+  'claude.md',
+  'copilot-instructions.md',
+  'gemini.md',
+  'opencode.json'
+]);
 const IGNORE_DIRS = new Set([
   '.git',
   '.hg',
   '.svn',
   '.agents',
   '.codex',
+  '.claude',
+  '.opencode',
+  '.cursor',
+  '.continue',
+  '.github/copilot',
   '.ai-factory/extensions',
   '.ai-factory/state',
   '.ai-factory/cache',
   '.ai-factory/tmp',
   '.github/skills',
+  '.idea',
+  '.vscode',
+  '.windsurf',
+  '.roo',
+  '.kiro',
+  '.qodo',
+  '.aider',
+  '.openhands',
   'node_modules',
   'vendor',
   'dist',
@@ -1052,15 +1087,20 @@ async function scanProject(rootDir) {
     frameworkMarkerFiles: [],
     openSpecMarkers: [],
     aiFactoryMarkers: [],
+    ignoreRuleFiles: [],
+    ignoredPathSamples: [],
     languageEvidence: {
       go: [],
       js: [],
       php: [],
+      python: [],
       rust: []
     }
   };
 
-  async function walk(currentDir, relativeDir = '') {
+  async function walk(currentDir, relativeDir = '', inheritedIgnoreRules = []) {
+    const localIgnoreRules = await loadProjectIgnoreRules(currentDir, relativeDir, result);
+    const activeIgnoreRules = [...inheritedIgnoreRules, ...localIgnoreRules];
     let entries;
     try {
       entries = await readdir(currentDir, { withFileTypes: true });
@@ -1072,15 +1112,24 @@ async function scanProject(rootDir) {
       const rel = relativeDir ? path.join(relativeDir, entry.name) : entry.name;
       const normalized = toPosix(rel);
       if (entry.isDirectory()) {
-        if (shouldIgnoreDir(normalized)) continue;
+        const ignoredByProjectRules = shouldIgnoreByProjectRules(normalized, true, activeIgnoreRules);
+        if (shouldIgnoreDir(normalized) || (ignoredByProjectRules && !shouldTraverseForArtifactMode(normalized))) {
+          pushSample(result.ignoredPathSamples, `${normalized}/`);
+          continue;
+        }
         if (isFrameworkMarker(`${normalized}/`)) {
           result.hasFrameworkMarker = true;
           pushSample(result.frameworkMarkerFiles, `${normalized}/`);
         }
-        await walk(path.join(currentDir, entry.name), rel);
+        await walk(path.join(currentDir, entry.name), rel, activeIgnoreRules);
         continue;
       }
       if (!entry.isFile()) continue;
+      if (shouldIgnoreFile(normalized, entry.name) || shouldIgnoreByProjectRules(normalized, false, activeIgnoreRules)) {
+        collectArtifactSignal(result, normalized);
+        pushSample(result.ignoredPathSamples, normalized);
+        continue;
+      }
 
       result.fileCount += 1;
       if (isManifestName(entry.name)) {
@@ -1097,14 +1146,7 @@ async function scanProject(rootDir) {
         result.hasFrameworkMarker = true;
         pushSample(result.frameworkMarkerFiles, normalized);
       }
-      if (normalized === 'openspec/config.yaml' || normalized.startsWith('openspec/specs/')) {
-        result.hasOpenSpec = true;
-        pushSample(result.openSpecMarkers, normalized);
-      }
-      if (normalized.startsWith('.ai-factory/')) {
-        result.hasAiFactory = true;
-        pushSample(result.aiFactoryMarkers, normalized);
-      }
+      collectArtifactSignal(result, normalized);
     }
   }
 
@@ -1147,12 +1189,160 @@ function classifyArtifactMode(stats) {
 }
 
 function shouldIgnoreDir(relativeDir) {
-  if (IGNORE_DIRS.has(relativeDir)) return true;
+  const normalized = toPosix(relativeDir).toLowerCase();
+  if (IGNORE_DIRS.has(normalized)) return true;
   for (const ignored of IGNORE_DIRS) {
-    if (ignored.includes('/') && relativeDir.startsWith(`${ignored}/`)) return true;
+    if (ignored.includes('/') && normalized.startsWith(`${ignored}/`)) return true;
   }
-  const parts = relativeDir.split('/');
+  const parts = normalized.split('/');
   return parts.some((part) => IGNORE_DIRS.has(part) && !part.includes('/'));
+}
+
+function shouldIgnoreFile(relativePath, name) {
+  const lowerName = String(name).toLowerCase();
+  const lowerPath = toPosix(relativePath).toLowerCase();
+  return AI_AND_IDE_FILE_NAMES.has(lowerName)
+    || lowerPath.endsWith('.code-workspace');
+}
+
+function shouldTraverseForArtifactMode(relativeDir) {
+  const normalized = toPosix(relativeDir).toLowerCase();
+  return normalized === '.ai-factory'
+    || normalized === 'openspec'
+    || normalized.startsWith('openspec/specs');
+}
+
+function collectArtifactSignal(result, normalizedPath) {
+  const normalized = toPosix(normalizedPath);
+  if (normalized === 'openspec/config.yaml' || normalized.startsWith('openspec/specs/')) {
+    result.hasOpenSpec = true;
+    pushSample(result.openSpecMarkers, normalized);
+  }
+  if (normalized.startsWith('.ai-factory/')) {
+    result.hasAiFactory = true;
+    pushSample(result.aiFactoryMarkers, normalized);
+  }
+}
+
+async function loadProjectIgnoreRules(currentDir, relativeDir, result) {
+  const rules = [];
+  for (const ignoreFileName of PROJECT_IGNORE_FILES) {
+    let raw;
+    try {
+      raw = await readFile(path.join(currentDir, ignoreFileName), 'utf8');
+    } catch {
+      continue;
+    }
+    const source = toPosix(relativeDir ? path.join(relativeDir, ignoreFileName) : ignoreFileName);
+    pushSample(result.ignoreRuleFiles, source);
+    rules.push(...parseProjectIgnoreRules(raw, {
+      baseDir: toPosix(relativeDir),
+      source
+    }));
+  }
+  return rules;
+}
+
+function parseProjectIgnoreRules(raw, options = {}) {
+  const baseDir = toPosix(options.baseDir ?? '');
+  const source = options.source ?? null;
+  const rules = [];
+  for (const rawLine of String(raw ?? '').split(/\r?\n/)) {
+    const trimmed = rawLine.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    let pattern = trimmed;
+    let negated = false;
+    if (pattern.startsWith('!')) {
+      negated = true;
+      pattern = pattern.slice(1).trim();
+    }
+    if (!pattern) continue;
+    if (pattern.startsWith('\\#') || pattern.startsWith('\\!')) pattern = pattern.slice(1);
+    const directoryOnly = pattern.endsWith('/');
+    pattern = toPosix(pattern)
+      .replace(/^\/+/, '')
+      .replace(/^\.\//, '')
+      .replace(/\/+$/, '');
+    if (!pattern) continue;
+    rules.push({
+      baseDir,
+      source,
+      pattern: pattern.toLowerCase(),
+      negated,
+      directoryOnly,
+      hasSlash: pattern.includes('/'),
+      hasGlob: /[*?\[]/.test(pattern)
+    });
+  }
+  return rules;
+}
+
+function shouldIgnoreByProjectRules(relativePath, isDirectory, rules) {
+  let ignored = false;
+  for (const rule of rules) {
+    if (projectIgnoreRuleMatches(rule, relativePath, isDirectory)) {
+      ignored = !rule.negated;
+    }
+  }
+  return ignored;
+}
+
+function projectIgnoreRuleMatches(rule, relativePath, isDirectory) {
+  const pathInProject = toPosix(relativePath).toLowerCase();
+  const pathInBase = pathRelativeToIgnoreBase(pathInProject, rule.baseDir);
+  if (pathInBase === null || pathInBase === '') return false;
+
+  if (!rule.hasSlash) {
+    return pathInBase.split('/').some((part) => ignorePatternMatches(rule, part, isDirectory));
+  }
+
+  if (rule.directoryOnly && !rule.hasGlob) {
+    return pathInBase === rule.pattern || pathInBase.startsWith(`${rule.pattern}/`);
+  }
+
+  if (!rule.hasGlob) return pathInBase === rule.pattern;
+
+  return globToRegExp(rule.pattern).test(pathInBase);
+}
+
+function pathRelativeToIgnoreBase(relativePath, baseDir) {
+  if (!baseDir) return relativePath;
+  if (relativePath === baseDir) return '';
+  return relativePath.startsWith(`${baseDir}/`)
+    ? relativePath.slice(baseDir.length + 1)
+    : null;
+}
+
+function ignorePatternMatches(rule, value, isDirectory) {
+  if (rule.directoryOnly && !isDirectory) return value === rule.pattern;
+  if (rule.hasGlob) return globToRegExp(rule.pattern).test(value);
+  return value === rule.pattern;
+}
+
+function globToRegExp(pattern) {
+  let source = '';
+  for (let index = 0; index < pattern.length; index += 1) {
+    const char = pattern[index];
+    if (char === '*') {
+      if (pattern[index + 1] === '*') {
+        source += '.*';
+        index += 1;
+      } else {
+        source += '[^/]*';
+      }
+      continue;
+    }
+    if (char === '?') {
+      source += '[^/]';
+      continue;
+    }
+    source += escapeRegExp(char);
+  }
+  return new RegExp(`^${source}$`, 'i');
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
 }
 
 function isManifestName(name) {
@@ -1164,7 +1354,8 @@ function isManifestName(name) {
     'Cargo.toml',
     'pom.xml',
     'build.gradle',
-    'composer.json'
+    'composer.json',
+    'Pipfile'
   ].includes(name);
 }
 
@@ -1192,6 +1383,12 @@ function collectLanguageSignal(result, name, relativePath) {
     addLanguageSignal(result, 'js', relativePath);
   }
   if (lowerName === 'composer.json' || lowerPath.endsWith('.php')) addLanguageSignal(result, 'php', relativePath);
+  if (
+    ['pyproject.toml', 'requirements.txt', 'pipfile', 'setup.py'].includes(lowerName)
+    || lowerPath.endsWith('.py')
+  ) {
+    addLanguageSignal(result, 'python', relativePath);
+  }
   if (lowerName === 'cargo.toml' || lowerPath.endsWith('.rs')) addLanguageSignal(result, 'rust', relativePath);
 }
 

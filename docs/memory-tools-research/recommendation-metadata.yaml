@@ -247,7 +247,7 @@ protected_artifacts:
   - .ai-factory/rules/generated/openspec-rules-trace-*.json
   - exact evidence snippets
 project_dimensions:
-  languages: [php, go, js, rust, multi]
+  languages: [php, go, js, python, rust, multi]
   volume: [mini, standard, large]
   complexity: [mini, framework, legacy, integration_heavy]
   repo_shape: [single_repo, monorepo, multirepo]
@@ -1273,7 +1273,7 @@ evidence_runs:
       installed_wrapper: "ai-factory aifhub-memory-tools"
       source_repo_fallback: "node scripts/memory-tool-recommender.mjs"
     dimensions:
-      languages: [php, go, js, rust, multi]
+      languages: [php, go, js, python, rust, multi]
       volume: [mini, standard, large]
       complexity: [mini, framework, legacy, integration_heavy]
       repo_shape: [single_repo, monorepo, multirepo]

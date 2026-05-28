@@ -63,7 +63,7 @@ describe('recommendation metadata parsing', () => {
     assert.equal(metadata.default_policy.require_explicit_paths, true);
     assert.equal(metadata.default_policy.require_purge_path, true);
     assert.ok(metadata.skill_usage_matrix['aif-analyze']);
-    assert.deepEqual(metadata.project_dimensions.languages, ['php', 'go', 'js', 'rust', 'multi']);
+    assert.deepEqual(metadata.project_dimensions.languages, ['php', 'go', 'js', 'python', 'rust', 'multi']);
     assert.deepEqual(metadata.project_dimensions.volume, ['mini', 'standard', 'large']);
     assert.deepEqual(metadata.project_dimensions.complexity, ['mini', 'framework', 'legacy', 'integration_heavy']);
     assert.deepEqual(metadata.project_dimensions.repo_shape, ['single_repo', 'monorepo', 'multirepo']);
@@ -211,7 +211,7 @@ describe('recommendation results', () => {
     assert.ok(result.body.forbidden_operations.includes('auto_register_mcp'));
     assert.ok(result.body.protected_artifacts.includes('done-readiness.json'));
     assert.ok(result.body.protected_artifacts.includes('openspec/specs/**'));
-    assert.deepEqual(result.body.project_dimensions.languages, ['php', 'go', 'js', 'rust', 'multi']);
+    assert.deepEqual(result.body.project_dimensions.languages, ['php', 'go', 'js', 'python', 'rust', 'multi']);
     assert.equal(result.body.benchmark_matrix.ai_tester.result_schema, 'aifhub.memory_tools.ai_tester_matrix.v1');
     assert.ok(result.body.dimension_signals.includes('mini_go_service'));
     assert.equal(metadata.tools.codegraph.recommendation_action, 'suggest_manual_cli_for_repo_graph_when_enabled_or_explicit');
@@ -950,8 +950,12 @@ describe('CLI behavior', () => {
     await mkdir(path.join(tmpDir, '.ai-factory', 'state', 'fixture', 'nested-project'), { recursive: true });
     await mkdir(path.join(tmpDir, '.agents', 'skills', 'aif-build-automation', 'templates'), { recursive: true });
     await mkdir(path.join(tmpDir, '.codex', 'skills', 'aif-build-automation', 'templates'), { recursive: true });
+    await mkdir(path.join(tmpDir, '.claude', 'skills', 'aif-build-automation', 'templates'), { recursive: true });
+    await mkdir(path.join(tmpDir, '.opencode', 'skills', 'aif-build-automation', 'templates'), { recursive: true });
     await mkdir(path.join(tmpDir, '.github', 'skills', 'aif-build-automation', 'templates'), { recursive: true });
     await mkdir(path.join(tmpDir, '.github', 'workflows'), { recursive: true });
+    await mkdir(path.join(tmpDir, '.vscode'), { recursive: true });
+    await mkdir(path.join(tmpDir, '.idea'), { recursive: true });
     await writeFile(path.join(tmpDir, 'package.json'), '{"name":"fixture"}', 'utf8');
     await writeFile(path.join(tmpDir, 'src', 'index.js'), 'console.log("ok");', 'utf8');
     await writeFile(path.join(tmpDir, '.ai-factory', 'config.yaml'), 'tools:\n  enabled: []\n', 'utf8');
@@ -959,14 +963,59 @@ describe('CLI behavior', () => {
     await writeFile(path.join(tmpDir, '.ai-factory', 'state', 'fixture', 'nested-project', 'go.mod'), 'module noise.local', 'utf8');
     await writeFile(path.join(tmpDir, '.agents', 'skills', 'aif-build-automation', 'templates', 'magefile.go'), 'package main', 'utf8');
     await writeFile(path.join(tmpDir, '.codex', 'skills', 'aif-build-automation', 'templates', 'magefile.go'), 'package main', 'utf8');
+    await writeFile(path.join(tmpDir, '.claude', 'skills', 'aif-build-automation', 'templates', 'magefile.go'), 'package main', 'utf8');
+    await writeFile(path.join(tmpDir, '.opencode', 'skills', 'aif-build-automation', 'templates', 'magefile.go'), 'package main', 'utf8');
     await writeFile(path.join(tmpDir, '.github', 'skills', 'aif-build-automation', 'templates', 'magefile.go'), 'package main', 'utf8');
     await writeFile(path.join(tmpDir, '.github', 'workflows', 'validate.yml'), 'name: validate\n', 'utf8');
+    await writeFile(path.join(tmpDir, '.vscode', 'settings.json'), '{"deno.enable":true}', 'utf8');
+    await writeFile(path.join(tmpDir, '.idea', 'workspace.xml'), '<project />', 'utf8');
+    await writeFile(path.join(tmpDir, 'AGENTS.md'), 'agent instructions\n', 'utf8');
+    await writeFile(path.join(tmpDir, 'CLAUDE.md'), 'claude instructions\n', 'utf8');
 
     const profile = await classifyProjectProfile(tmpDir);
 
     assert.equal(profile.repo_shape, 'single_repo');
     assert.equal(profile.artifact_mode, 'legacy_ai_factory_only');
     assert.deepEqual(profile.languages, ['js']);
+  });
+
+  it('honors project ignore files when classifying project dimensions', async () => {
+    await mkdir(path.join(tmpDir, 'src'), { recursive: true });
+    await mkdir(path.join(tmpDir, 'generated', 'go-service'), { recursive: true });
+    await mkdir(path.join(tmpDir, 'docker-noise', 'backend'), { recursive: true });
+    await mkdir(path.join(tmpDir, 'tools', 'noise'), { recursive: true });
+    await writeFile(path.join(tmpDir, 'package.json'), '{"name":"fixture"}', 'utf8');
+    await writeFile(path.join(tmpDir, 'src', 'index.ts'), 'export const ok = true;\n', 'utf8');
+    await writeFile(path.join(tmpDir, '.gitignore'), 'generated/\n*.tmp.go\n', 'utf8');
+    await writeFile(path.join(tmpDir, '.dockerignore'), 'docker-noise/\n', 'utf8');
+    await writeFile(path.join(tmpDir, 'tools', '.gitignore'), 'noise/\n', 'utf8');
+    await writeFile(path.join(tmpDir, 'generated', 'go-service', 'go.mod'), 'module ignored.local', 'utf8');
+    await writeFile(path.join(tmpDir, 'generated', 'unused.tmp.go'), 'package main', 'utf8');
+    await writeFile(path.join(tmpDir, 'docker-noise', 'backend', 'requirements.txt'), 'fastapi\n', 'utf8');
+    await writeFile(path.join(tmpDir, 'tools', 'noise', 'Cargo.toml'), '[package]\nname="noise"\n', 'utf8');
+
+    const result = await runMemoryToolRecommender([
+      'labels',
+      '--from-project',
+      '--metadata',
+      REAL_METADATA,
+      '--json'
+    ], {
+      cwd: tmpDir,
+      stdout: [],
+      stderr: [],
+      exit: false
+    });
+
+    assert.equal(result.exitCode, 0);
+    assert.deepEqual(result.body.project_profile.languages, ['js']);
+    assert.equal(result.body.project_profile.repo_shape, 'single_repo');
+    assert.ok(!result.body.selected_labels.includes('go'));
+    assert.ok(!result.body.selected_labels.includes('python'));
+    assert.ok(!result.body.selected_labels.includes('rust'));
+    assert.ok(result.body.evidence.js.markers.includes('package.json'));
+    assert.ok(result.body.evidence.js.markers.includes('src/index.ts'));
+    assert.ok(!result.body.evidence.js.markers.some((marker) => marker.startsWith('generated/')));
   });
 
   it('degrades recommend output when metadata is unavailable', async () => {

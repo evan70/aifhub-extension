@@ -83,7 +83,7 @@ Metadata хранит project dimensions:
 
 ```yaml
 project_dimensions:
-  languages: [php, go, js, rust, multi]
+  languages: [php, go, js, python, rust, multi]
   volume: [mini, standard, large]
   complexity: [mini, framework, legacy, integration_heavy]
   repo_shape: [single_repo, monorepo, multirepo]
