@@ -403,8 +403,9 @@ project_shape_signals:
   large_framework_app:
     description: "Крупное web-приложение на framework stack, где нужны architecture/impact вопросы."
     suggest_tools: []
-    conditional_tools:
-      - context-mode
+    conditional_tools: []
+    condition: "Large/framework labels alone do not enable optional tools. Context7 needs an explicit library/API/version task; context-mode needs already-large generated output; CodeGraph needs exact screening_policy match."
+    evidence: python-openspec-all-tools-ai-tester-2026-05-28
   go_service:
     description: "Средний Go сервис с интеграциями."
     conditional_tools:
@@ -920,6 +921,16 @@ tools:
           best_rows:
             - "aif-verify / matrix-profile-13: -17.0% total, -17.9% input+output, -35.6% duration"
           recommendation_gate: "Weak verify-only case; review and commit were worse."
+      known_avoid_cases:
+        - id: python_standard_openspec_large_framework
+          required_labels: [python, standard, framework, single_repo, openspec_native, large_framework_app]
+          skills: [aif-analyze, aif-explore]
+          tasks: [architecture_or_impact_discovery]
+          evidence: python-openspec-all-tools-ai-tester-2026-05-28
+          observed_rows:
+            - "aif-analyze: CodeGraph +108.2% total tokens, +106.1% input+output, +137.4% duration"
+            - "aif-explore: CodeGraph +142.0% total tokens, +143.2% input+output, +76.1% duration"
+          recommendation_gate: "Do not select CodeGraph for this label set; use rg baseline."
     do_not_recommend_for:
       project_shapes:
         - small_microservice
@@ -1649,3 +1660,93 @@ evidence_runs:
         completed_fail_total_tokens_delta_percent: 651.8
         completed_fail_input_output_tokens_delta_percent: 666.7
         recommendation_update: "Cross evidence keeps context-mode out of project/source analysis; use only for explicit already-large generated output with purge."
+  - id: python-openspec-all-tools-ai-tester-2026-05-28
+    date: "2026-05-28"
+    scope: "Cross ai-tester run on one sanitized Python/OpenSpec standard framework single_repo large_framework_app profile across 10 representative skills and five optional tools."
+    privacy: "Durable docs store labels and aggregate token/time/tool-call counts. Source snippets and raw transcripts are not stored in docs."
+    project_profile:
+      labels: [python, standard, framework, single_repo, openspec_native, large_framework_app]
+      project_shape: large_framework_app
+      language: python
+      volume: standard
+      complexity: framework
+      repo_shape: single_repo
+      artifact_mode: openspec_native
+    sanitization:
+      fixture_files: 198
+      excluded:
+        - ".git"
+        - ".env*"
+        - ".agents"
+        - ".claude"
+        - ".codex"
+        - ".cursor"
+        - ".idea"
+        - ".vscode"
+        - ".venv"
+        - ".uv-cache"
+        - "logs"
+        - "cache/build artifacts"
+        - "project ignore files: .gitignore, .dockerignore, .ignore, .rgignore, .fdignore"
+    harness:
+      script: "scripts/memory-tool-ai-tester-matrix.mjs"
+      runner: "ai-tester"
+      baseline: rg
+      model: gpt-5.4-mini
+      matrix_size: screening
+      skill_set: grouped
+      run_dir: ".ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/model-gen-all-tools-grouped-clean-20260528-212755"
+      report: "docs/memory-tools-research/ai-tester-token-matrices-python-openspec-all-tools.md"
+    matrix:
+      rows_total: 100
+      rows_executed: 100
+      rows_pass: 100
+      rows_fail: 0
+      rows_not_run: 0
+      trace_files_read: 616
+      skills: [aif-analyze, aif-explore, aif-plan, aif-implement, aif-fix, aif-review, aif-rules-check, aif-verify, aif-docs, aif-commit]
+      expectation_counts_by_tool:
+        codegraph: { baseline_rg: 10, positive: 2, negative: 8, not_applicable: 0 }
+        graphify: { baseline_rg: 10, positive: 0, negative: 6, not_applicable: 4 }
+        context7: { baseline_rg: 10, positive: 0, negative: 5, not_applicable: 5 }
+        context-mode: { baseline_rg: 10, positive: 0, negative: 8, not_applicable: 2 }
+        codex-agent-mem: { baseline_rg: 10, positive: 0, negative: 7, not_applicable: 3 }
+    outcomes:
+      codegraph:
+        positive_usage_rows: 2
+        positive_usage_pass_rows: 2
+        cases:
+          - skill: aif-analyze
+            task: architecture_or_impact_discovery
+            rg_total_tokens: 2487995
+            tool_total_tokens: 5180258
+            tool_total_tokens_delta_percent: 108.2
+            tool_input_output_tokens_delta_percent: 106.1
+            tool_duration_delta_percent: 137.4
+            tool_calls_delta_percent: 34.0
+          - skill: aif-explore
+            task: architecture_or_impact_discovery
+            rg_total_tokens: 967038
+            tool_total_tokens: 2339882
+            tool_total_tokens_delta_percent: 142.0
+            tool_input_output_tokens_delta_percent: 143.2
+            tool_duration_delta_percent: 76.1
+            tool_calls_delta_percent: 200.0
+        recommendation_update: "Avoid CodeGraph for python+standard+framework+single_repo+openspec_native+large_framework_app architecture discovery; rg is faster and cheaper in both positive rows."
+      graphify:
+        positive_usage_rows: 0
+        policy_rows_passed: 10
+        recommendation_update: "Do not select automatically for this label set; keep only explicit_graph_quality_experiment."
+      context7:
+        positive_usage_rows: 0
+        policy_rows_passed: 10
+        recommendation_update: "Do not select by Python/framework/OpenSpec labels alone; require explicit library/API/version task."
+      context-mode:
+        positive_usage_rows: 0
+        policy_rows_passed: 10
+        recommendation_update: "Do not use for source/project discovery; use only for already-large generated output with purge."
+      codex-agent-mem:
+        positive_usage_rows: 0
+        policy_rows_passed: 10
+        recommendation_update: "Do not use for initial code discovery; keep continuity-only."
+    recommendation_update: "For this profile, recommendations are rg baseline only for architecture_or_impact_discovery. Optional tools remain task-specific and require explicit matching signals."

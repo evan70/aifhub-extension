@@ -89,6 +89,25 @@ Reduced cross run: 2 representative skills x 2 project labels x `rg/tool_run`. �
 
 Cross вывод: на проверенных комбинациях `aif-analyze/aif-explore` x `large_framework_app/multirepo` Graphify не дает token/time выгоды. Это сильнее предыдущего targeted run, потому что различие по skill тоже проверено.
 
+## AI Tester Python OpenSpec Cross 2026-05-28
+
+Raw artifact: `.ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/model-gen-all-tools-grouped-clean-20260528-212755/ai-tester-token-matrices.json`.
+
+Полный отчет: [AI Tester Token Matrices: Python OpenSpec All Tools](ai-tester-token-matrices-python-openspec-all-tools.md).
+
+Labels: `python`, `standard`, `framework`, `single_repo`, `openspec_native`, `large_framework_app`. Task: `architecture_or_impact_discovery`.
+
+| Metric | Value |
+|---|---:|
+| Rows | 20 |
+| `rg baseline` rows | 10 |
+| Graphify positive usage rows | 0 |
+| Graphify negative policy rows | 6 |
+| Graphify not-applicable rows | 4 |
+| PASS rows | 20 |
+
+Вывод: Graphify не был выбран ни для одного skill на этом профиле. Это policy evidence, а не token/time comparison использования инструмента. Для этого набора labels Graphify остается только `explicit_graph_quality_experiment`; автоматически по `large_framework_app` или `framework` его включать не надо.
+
 ## Safety Field Evidence: Project Profiles 2026-05-22
 
 Эти field rows сохраняются как safety/availability evidence. Их старые `Optional` решения не являются текущей policy: paired ai-tester sections выше supersede их для recommendation logic.

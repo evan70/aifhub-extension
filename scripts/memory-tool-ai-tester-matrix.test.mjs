@@ -269,6 +269,11 @@ describe('ai-tester matrix manifest', () => {
     await writeFixtureFile(path.join('secret-product', '.env'), 'TOKEN=private');
     await writeFixtureFile(path.join('secret-product', '.git', 'config'), 'private git config');
     await writeFixtureFile(path.join('secret-product', '.ai-factory', 'state', 'private.json'), '{"path":"private"}');
+    await writeFixtureFile(path.join('secret-product', '.claude', 'skills', 'template.go'), 'package main');
+    await writeFixtureFile(path.join('secret-product', '.venv', 'lib', 'site-packages', 'pkg.py'), 'dependency');
+    await writeFixtureFile(path.join('secret-product', '.gitignore'), 'generated/\n*.log\n');
+    await writeFixtureFile(path.join('secret-product', 'generated', 'go.mod'), 'module ignored.local');
+    await writeFixtureFile(path.join('secret-product', 'debug.log'), 'private log');
     await writeFixtureFile(path.join('secret-product', 'node_modules', 'pkg', 'index.js'), 'dependency');
 
     const result = await runMemoryToolAiTesterMatrix([
@@ -314,6 +319,10 @@ describe('ai-tester matrix manifest', () => {
     assert.equal(await exists(path.join(tmpDir, 'matrix-output-write', 'fixtures', 'matrix-profile-01', '.env')), false);
     assert.equal(await exists(path.join(tmpDir, 'matrix-output-write', 'fixtures', 'matrix-profile-01', '.git')), false);
     assert.equal(await exists(path.join(tmpDir, 'matrix-output-write', 'fixtures', 'matrix-profile-01', '.ai-factory')), false);
+    assert.equal(await exists(path.join(tmpDir, 'matrix-output-write', 'fixtures', 'matrix-profile-01', '.claude')), false);
+    assert.equal(await exists(path.join(tmpDir, 'matrix-output-write', 'fixtures', 'matrix-profile-01', '.venv')), false);
+    assert.equal(await exists(path.join(tmpDir, 'matrix-output-write', 'fixtures', 'matrix-profile-01', 'generated')), false);
+    assert.equal(await exists(path.join(tmpDir, 'matrix-output-write', 'fixtures', 'matrix-profile-01', 'debug.log')), false);
     assert.equal(await exists(path.join(tmpDir, 'matrix-output-write', 'fixtures', 'matrix-profile-01', 'node_modules')), false);
     const scenarioText = await readFile(scenarioPath, 'utf8');
     assert.match(scenarioText, /copy_trees:/);

@@ -44,12 +44,38 @@ const MANIFEST_NAMES = new Set([
   'build.gradle',
   'extension.json'
 ]);
+const PROJECT_IGNORE_FILES = new Set([
+  '.gitignore',
+  '.dockerignore',
+  '.ignore',
+  '.rgignore',
+  '.fdignore'
+]);
+const IGNORE_FILE_NAMES = new Set([
+  '.aider.conf.yml',
+  '.aider.model.settings.yml',
+  '.aiderignore',
+  '.cursorrules',
+  '.mcp.json',
+  '.opencode.json',
+  '.roomodes',
+  '.windsurfrules',
+  'agents.md',
+  'claude.md',
+  'copilot-instructions.md',
+  'gemini.md',
+  'opencode.json'
+]);
 const IGNORE_DIR_NAMES = new Set([
   '.git',
   '.hg',
   '.svn',
   '.agents',
   '.codex',
+  '.claude',
+  '.opencode',
+  '.cursor',
+  '.continue',
   'node_modules',
   'vendor',
   'dist',
@@ -57,16 +83,33 @@ const IGNORE_DIR_NAMES = new Set([
   'coverage',
   '.ai-factory',
   '.cache',
+  '.uv-cache',
+  '.pytest_cache',
+  '.mypy_cache',
+  '.ruff_cache',
+  '.venv',
+  'venv',
+  '__pycache__',
   '.next',
   '.turbo',
   'target',
   'tmp',
   'temp',
+  'logs',
   'graphify-out',
-  '.codegraph'
+  '.codegraph',
+  '.idea',
+  '.vscode',
+  '.windsurf',
+  '.roo',
+  '.kiro',
+  '.qodo',
+  '.aider',
+  '.openhands'
 ]);
 const IGNORE_DIR_PATHS = new Set([
-  '.github/skills'
+  '.github/skills',
+  '.github/copilot'
 ]);
 const LOCK_FILE_NAMES = new Set([
   'package-lock.json',
@@ -727,18 +770,25 @@ function sanitizeToolResult(result) {
   }));
 }
 
-async function copySanitizedDirectory(sourceDir, targetDir, relativeDir = '') {
+async function copySanitizedDirectory(sourceDir, targetDir, relativeDir = '', inheritedIgnoreRules = []) {
+  const localIgnoreRules = await loadProjectIgnoreRules(sourceDir, relativeDir);
+  const activeIgnoreRules = [...inheritedIgnoreRules, ...localIgnoreRules];
   const entries = await readdir(sourceDir, { withFileTypes: true }).catch(() => []);
   for (const entry of entries) {
     const relativePath = toPosix(relativeDir ? path.join(relativeDir, entry.name) : entry.name);
-    if (shouldIgnoreEntry(entry.name, entry.isDirectory(), relativePath)) continue;
+    if (
+      shouldIgnoreEntry(entry.name, entry.isDirectory(), relativePath)
+      || shouldIgnoreByProjectRules(relativePath, entry.isDirectory(), activeIgnoreRules)
+    ) {
+      continue;
+    }
     const source = path.join(sourceDir, entry.name);
     const target = path.join(targetDir, entry.name);
     const stats = await lstat(source).catch(() => null);
     if (!stats || stats.isSymbolicLink()) continue;
     if (stats.isDirectory()) {
       await mkdir(target, { recursive: true });
-      await copySanitizedDirectory(source, target, relativePath);
+      await copySanitizedDirectory(source, target, relativePath, activeIgnoreRules);
     } else if (stats.isFile()) {
       await mkdir(path.dirname(target), { recursive: true });
       await cp(source, target, { force: false });
@@ -813,7 +863,13 @@ function classifyShapeFromPath(sourceRoot) {
 
 function shouldIgnoreEntry(name, isDirectory, relativePath = name) {
   if (isDirectory) return shouldIgnoreDirectoryPath(relativePath);
-  return name.startsWith('.env') || LOCK_FILE_NAMES.has(name);
+  const lowerName = String(name).toLowerCase();
+  const lowerPath = toPosix(relativePath).toLowerCase();
+  return name.startsWith('.env')
+    || LOCK_FILE_NAMES.has(name)
+    || IGNORE_FILE_NAMES.has(lowerName)
+    || lowerPath.endsWith('.code-workspace')
+    || lowerPath.endsWith('.log');
 }
 
 function shouldIgnoreDirectory(name) {
@@ -821,12 +877,128 @@ function shouldIgnoreDirectory(name) {
 }
 
 function shouldIgnoreDirectoryPath(relativePath) {
-  const normalized = toPosix(relativePath);
+  const normalized = toPosix(relativePath).toLowerCase();
   if (IGNORE_DIR_PATHS.has(normalized)) return true;
   for (const ignored of IGNORE_DIR_PATHS) {
     if (normalized.startsWith(`${ignored}/`)) return true;
   }
   return normalized.split('/').some((part) => shouldIgnoreDirectory(part));
+}
+
+async function loadProjectIgnoreRules(currentDir, relativeDir) {
+  const rules = [];
+  for (const ignoreFileName of PROJECT_IGNORE_FILES) {
+    let raw;
+    try {
+      raw = await readFile(path.join(currentDir, ignoreFileName), 'utf8');
+    } catch {
+      continue;
+    }
+    rules.push(...parseProjectIgnoreRules(raw, {
+      baseDir: toPosix(relativeDir)
+    }));
+  }
+  return rules;
+}
+
+function parseProjectIgnoreRules(raw, options = {}) {
+  const baseDir = toPosix(options.baseDir ?? '');
+  const rules = [];
+  for (const rawLine of String(raw ?? '').split(/\r?\n/)) {
+    const trimmed = rawLine.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    let pattern = trimmed;
+    let negated = false;
+    if (pattern.startsWith('!')) {
+      negated = true;
+      pattern = pattern.slice(1).trim();
+    }
+    if (!pattern) continue;
+    if (pattern.startsWith('\\#') || pattern.startsWith('\\!')) pattern = pattern.slice(1);
+    const directoryOnly = pattern.endsWith('/');
+    pattern = toPosix(pattern)
+      .replace(/^\/+/, '')
+      .replace(/^\.\//, '')
+      .replace(/\/+$/, '');
+    if (!pattern) continue;
+    rules.push({
+      baseDir,
+      pattern: pattern.toLowerCase(),
+      negated,
+      directoryOnly,
+      hasSlash: pattern.includes('/'),
+      hasGlob: /[*?\[]/.test(pattern)
+    });
+  }
+  return rules;
+}
+
+function shouldIgnoreByProjectRules(relativePath, isDirectory, rules) {
+  let ignored = false;
+  for (const rule of rules) {
+    if (projectIgnoreRuleMatches(rule, relativePath, isDirectory)) {
+      ignored = !rule.negated;
+    }
+  }
+  return ignored;
+}
+
+function projectIgnoreRuleMatches(rule, relativePath, isDirectory) {
+  const pathInProject = toPosix(relativePath).toLowerCase();
+  const pathInBase = pathRelativeToIgnoreBase(pathInProject, rule.baseDir);
+  if (pathInBase === null || pathInBase === '') return false;
+
+  if (!rule.hasSlash) {
+    return pathInBase.split('/').some((part) => ignorePatternMatches(rule, part, isDirectory));
+  }
+
+  if (rule.directoryOnly && !rule.hasGlob) {
+    return pathInBase === rule.pattern || pathInBase.startsWith(`${rule.pattern}/`);
+  }
+
+  if (!rule.hasGlob) return pathInBase === rule.pattern;
+
+  return globToRegExp(rule.pattern).test(pathInBase);
+}
+
+function pathRelativeToIgnoreBase(relativePath, baseDir) {
+  if (!baseDir) return relativePath;
+  if (relativePath === baseDir) return '';
+  return relativePath.startsWith(`${baseDir}/`)
+    ? relativePath.slice(baseDir.length + 1)
+    : null;
+}
+
+function ignorePatternMatches(rule, value, isDirectory) {
+  if (rule.directoryOnly && !isDirectory) return value === rule.pattern;
+  if (rule.hasGlob) return globToRegExp(rule.pattern).test(value);
+  return value === rule.pattern;
+}
+
+function globToRegExp(pattern) {
+  let source = '';
+  for (let index = 0; index < pattern.length; index += 1) {
+    const char = pattern[index];
+    if (char === '*') {
+      if (pattern[index + 1] === '*') {
+        source += '.*';
+        index += 1;
+      } else {
+        source += '[^/]*';
+      }
+      continue;
+    }
+    if (char === '?') {
+      source += '[^/]';
+      continue;
+    }
+    source += escapeRegExp(char);
+  }
+  return new RegExp(`^${source}$`, 'i');
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
 }
 
 function toPosix(value) {

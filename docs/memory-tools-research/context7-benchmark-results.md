@@ -82,6 +82,25 @@ Reduced cross run: 2 representative skills x 2 project labels x `rg/tool_run`. �
 
 Cross вывод: даже для skills, где Context7 концептуально применим (`aif-plan`, `aif-rules-check`), project labels не дают token/time выгоду. Рекомендация остается task-quality only: использовать только когда вопрос явно зависит от внешних library/API/version docs.
 
+## AI Tester Python OpenSpec Cross 2026-05-28
+
+Raw artifact: `.ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/model-gen-all-tools-grouped-clean-20260528-212755/ai-tester-token-matrices.json`.
+
+Полный отчет: [AI Tester Token Matrices: Python OpenSpec All Tools](ai-tester-token-matrices-python-openspec-all-tools.md).
+
+Labels: `python`, `standard`, `framework`, `single_repo`, `openspec_native`, `large_framework_app`. Task: `architecture_or_impact_discovery`.
+
+| Metric | Value |
+|---|---:|
+| Rows | 20 |
+| `rg baseline` rows | 10 |
+| Context7 positive usage rows | 0 |
+| Context7 negative policy rows | 5 |
+| Context7 not-applicable rows | 5 |
+| PASS rows | 20 |
+
+Вывод: Context7 корректно не выбирается по Python/framework/OpenSpec labels без explicit library/API/version вопроса. Эти строки подтверждают selector policy; они не являются evidence, что Context7 ускоряет source discovery.
+
 ## Safety Field Run 2026-05-24
 
 Прогон выполнялся через `scripts/memory-tool-field-run.mjs` на 55 sanitized temp profiles. `ctx7` устанавливался только во временный npm prefix внутри temp run dir.

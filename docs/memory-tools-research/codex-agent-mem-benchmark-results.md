@@ -4,6 +4,8 @@
 
 Статус benchmark: paired `ai-tester` run для `rg baseline` vs `codex-agent-mem tool_run` еще не выполнен. Таблицы ниже являются safety/availability evidence; они не должны использоваться как финальное доказательство экономии tokens/time против `rg`.
 
+Обновление 2026-05-28: в cross matrix для Python/OpenSpec профиля `codex-agent-mem` получил 0 positive usage rows, потому что задача была `architecture_or_impact_discovery`, а не continuity. Эти строки подтверждают selector policy, но не являются paired source-retrieval benchmark.
+
 ## Методика
 
 `codex-agent-mem` проверялся как continuity memory, а не source-code index. Прогоны использовали explicit temp SQLite DB; source files не индексировались.
@@ -68,6 +70,25 @@
 | MCP read-only calls | PASS: `mem_session_list`, `mem_completion_check`, `mem_context_pack`, `mem_health_runtime` |
 | MCP full/read-only caveat | Mutating names visible, mutating call returned `isError: true` and did not write |
 | Cleanup | PASS |
+
+## AI Tester Python OpenSpec Cross 2026-05-28
+
+Raw artifact: `.ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/model-gen-all-tools-grouped-clean-20260528-212755/ai-tester-token-matrices.json`.
+
+Полный отчет: [AI Tester Token Matrices: Python OpenSpec All Tools](ai-tester-token-matrices-python-openspec-all-tools.md).
+
+Labels: `python`, `standard`, `framework`, `single_repo`, `openspec_native`, `large_framework_app`. Task: `architecture_or_impact_discovery`.
+
+| Metric | Value |
+|---|---:|
+| Rows | 20 |
+| `rg baseline` rows | 10 |
+| codex-agent-mem positive usage rows | 0 |
+| codex-agent-mem negative policy rows | 7 |
+| codex-agent-mem not-applicable rows | 3 |
+| PASS rows | 20 |
+
+Вывод: `codex-agent-mem` не должен включаться для первичного исследования кода даже на стандартном framework проекте. Он остается полезен только при task labels `resume_previous_work`, `open_work_or_completion_check` или наличии explicit prior memory DB.
 
 ## Когда Использовать
 

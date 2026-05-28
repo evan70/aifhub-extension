@@ -51,6 +51,25 @@ Reduced cross run был запущен для `aif-analyze` на `large_framewo
 
 Cross вывод: context-mode не показывать как project/source analysis helper даже на non-mini labels. Его допустимая область остается уже созданный большой generated output, где пользователь явно хочет temporary index и принимает purge/overhead.
 
+## AI Tester Python OpenSpec Cross 2026-05-28
+
+Raw artifact: `.ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/model-gen-all-tools-grouped-clean-20260528-212755/ai-tester-token-matrices.json`.
+
+Полный отчет: [AI Tester Token Matrices: Python OpenSpec All Tools](ai-tester-token-matrices-python-openspec-all-tools.md).
+
+Labels: `python`, `standard`, `framework`, `single_repo`, `openspec_native`, `large_framework_app`. Task: `architecture_or_impact_discovery`.
+
+| Metric | Value |
+|---|---:|
+| Rows | 20 |
+| `rg baseline` rows | 10 |
+| context-mode positive usage rows | 0 |
+| context-mode negative policy rows | 8 |
+| context-mode not-applicable rows | 2 |
+| PASS rows | 20 |
+
+Вывод: context-mode не был выбран для source/project discovery. Некоторые `tool_run` rows в raw matrix выглядят дешевле `rg`, но это negative/not-applicable сценарии, где ai-tester проверял запрет запуска `context-mode`; такие rows нельзя считать полезностью инструмента.
+
 ## Safety Probe: Controlled MCP Test
 
 | Проверка | Результат |

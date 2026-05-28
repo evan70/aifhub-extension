@@ -198,6 +198,28 @@ CodeGraph можно рекомендовать только если однов
 | Header-only или пустой CodeGraph output | Low token count не считается полезностью |
 | On-demand setup без user opt-in | `init/index` cost часто съедает всю потенциальную экономию |
 
+## AI Tester Python OpenSpec Cross 2026-05-28
+
+Raw artifact: `.ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/model-gen-all-tools-grouped-clean-20260528-212755/ai-tester-token-matrices.json`.
+
+Полный отчет: [AI Tester Token Matrices: Python OpenSpec All Tools](ai-tester-token-matrices-python-openspec-all-tools.md).
+
+Labels: `python`, `standard`, `framework`, `single_repo`, `openspec_native`, `large_framework_app`. Task: `architecture_or_impact_discovery`.
+
+| skill | run | status | duration | tool calls | total tokens | input tokens | output tokens | input+output tokens |
+|---|---|---|---:|---:|---:|---:|---:|---:|
+| `aif-analyze` | `rg baseline` | PASS | 152.0s | 50 | 2,487,995 | 1,275,389 | 10,174 | 1,285,563 |
+| `aif-analyze` | `codegraph tool_run` | PASS | 360.9s | 67 | 5,180,258 | 2,628,729 | 20,841 | 2,649,570 |
+| `aif-explore` | `rg baseline` | PASS | 101.8s | 14 | 967,038 | 484,303 | 5,679 | 489,982 |
+| `aif-explore` | `codegraph tool_run` | PASS | 179.3s | 42 | 2,339,882 | 1,180,137 | 11,585 | 1,191,722 |
+
+| skill | duration | tool calls | total tokens | input+output tokens | decision |
+|---|---:|---:|---:|---:|---|
+| `aif-analyze` | +137.4% | +34.0% | +108.2% | +106.1% | avoid |
+| `aif-explore` | +76.1% | +200.0% | +142.0% | +143.2% | avoid |
+
+Вывод: для `python + standard + framework + single_repo + openspec_native + large_framework_app` CodeGraph не попадает в useful cases. Даже когда positive rows разрешили CodeGraph для `aif-analyze` и `aif-explore`, `rg` был быстрее и дешевле.
+
 ## Итоговая Политика
 
 CodeGraph остается `manual_cli_only` и `avoid_by_default`.
