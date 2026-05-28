@@ -1,5 +1,5 @@
 schema: aifhub.memory_tools.recommendation.v1
-updated: "2026-05-27"
+updated: "2026-05-28"
 purpose: "Метаданные для этапа анализа проекта: какие memory/retrieval инструменты можно предлагать пользователю, когда и с какими ограничениями."
 default_policy:
   install_policy: explicit_user_opt_in_only
@@ -360,43 +360,41 @@ dimension_signals:
       volume: large
       complexity: framework
     baseline_first: [rg]
-    suggest_tools: [graphify]
+    suggest_tools: []
     conditional_tools: [context7, codex-agent-mem]
     tasks: [architecture_or_impact_discovery, multirepo_surface_mapping]
     decision_action: conditional
-    quality_gate: "CodeGraph is no longer selected by broad large/framework labels; use tools.codegraph.screening_policy exact skill+label cases instead."
-    evidence: codegraph-screening-preinit-nosipout-gpt54mini-2026-05-27
+    quality_gate: "Graphify and CodeGraph are no longer selected by broad large/framework labels; CodeGraph needs exact screening_policy match, Graphify needs explicit quality experiment opt-in."
+    evidence: targeted-graphify-context7-ai-tester-2026-05-28
   multirepo_surface_mapping:
     match:
       repo_shape: multirepo
     baseline_first: [rg]
-    suggest_tools: [graphify]
+    suggest_tools: []
     conditional_tools: [codex-agent-mem]
     tasks: [multirepo_surface_mapping, architecture_or_impact_discovery]
     decision_action: conditional
-    quality_gate: "CodeGraph needs an exact screening_policy match; multirepo alone is not enough because aggregate token/time deltas were worse than rg."
-    evidence: codegraph-screening-preinit-nosipout-gpt54mini-2026-05-27
+    quality_gate: "Multirepo alone is not enough for Graphify or CodeGraph. CodeGraph needs exact screening_policy match; Graphify needs explicit quality experiment opt-in."
+    evidence: targeted-graphify-context7-ai-tester-2026-05-28
   legacy_integration_heavy:
     match:
       complexity: integration_heavy
     baseline_first: [rg]
-    conditional_tools: [graphify, context-mode]
+    conditional_tools: [context-mode]
     avoid_tools: [codex-mem, eagle-mem]
     decision_action: conditional
     evidence: ai-tester-matrix-contract-2026-05-26
 project_shape_signals:
   large_legacy:
     description: "Большой legacy проект с плотными интеграциями, большим числом файлов и шумным literal search."
-    conditional_tools:
-      - graphify
-    condition: "Предлагать только после baseline rg, если literal search даёт слишком много шума или нужен architecture/impact overview."
+    conditional_tools: []
+    condition: "Repo graph tools do not become applicable from legacy/integration labels alone; use exact tool policies."
     avoid_tools:
       - codex-mem
       - eagle-mem
   multirepo:
     description: "Работа идёт сразу по нескольким репозиториям или нужно понять surface между компонентами."
-    suggest_tools:
-      - graphify
+    suggest_tools: []
     conditional_tools:
       - codex-agent-mem
     avoid_tools:
@@ -404,14 +402,12 @@ project_shape_signals:
       - eagle-mem
   large_framework_app:
     description: "Крупное web-приложение на framework stack, где нужны architecture/impact вопросы."
-    suggest_tools:
-      - graphify
+    suggest_tools: []
     conditional_tools:
       - context-mode
   go_service:
     description: "Средний Go сервис с интеграциями."
     conditional_tools:
-      - graphify
       - codex-agent-mem
     baseline_first:
       - rg
@@ -436,12 +432,10 @@ task_signals:
       - codegraph
       - context-mode
   architecture_or_impact_discovery:
-    recommend:
-      - graphify
+    recommend: []
     conditional: []
   multirepo_surface_mapping:
-    recommend:
-      - graphify
+    recommend: []
     conditional: []
   resume_previous_work:
     recommend:
@@ -455,6 +449,9 @@ task_signals:
   version_sensitive_library_docs:
     recommend:
       - context7
+  explicit_graph_quality_experiment:
+    conditional:
+      - graphify
   manual_durable_notes:
     conditional:
       - agent-memory
@@ -465,10 +462,11 @@ tools:
   graphify:
     display_name: Graphify
     doc: graphify.md
+    results_doc: graphify-benchmark-results.md
     repository: "https://github.com/safishamsi/graphify"
     tested_version: "graphifyy 0.8.17"
-    decision: optional
-    recommendation_action: suggest_optional_install
+    decision: manual_quality_experiment_only
+    recommendation_action: suggest_only_for_explicit_graph_quality_experiment
     integration_role: repo_graph_provider
     install_policy: explicit_user_opt_in_only
     stable_cli: true
@@ -489,25 +487,35 @@ tools:
       - aif-commit
     privacy_caveat: "Reads only an explicit project path, but generated graph output can contain source-derived structure and must be reviewed before storage."
     recommended_for:
+      tasks:
+        - explicit_graph_quality_experiment
+    conditional_for:
       project_shapes:
         - multirepo
         - large_framework_app
-      tasks:
-        - architecture_or_impact_discovery
-        - multirepo_surface_mapping
-        - token_reduction_for_broad_codebase_questions
-    conditional_for:
-      project_shapes:
         - large_legacy
         - go_service
-      condition: "Только после baseline rg и только для broad architecture/impact вопросов, не для exact lookup."
+      tasks:
+        - explicit_graph_quality_experiment
+      condition: "Только если пользователь явно хочет graph-shaped quality experiment после baseline rg и принимает overhead; не выбирать автоматически по project labels."
     do_not_recommend_for:
       project_shapes:
         - small_microservice
       tasks:
         - exact_file_or_symbol_lookup
         - durable_session_memory
-    suggestion_text: "Проект выглядит как large framework или multirepo; можно предложить Graphify как optional repo graph для architecture/impact анализа после baseline поиска через rg. Для legacy/go предлагать только если rg слишком шумный."
+    suggestion_text: "Graphify можно предложить только как явный graph-shaped quality experiment после baseline rg; текущий ai-tester не подтверждает экономию token/time на mini, large framework или multirepo labels."
+    screening_policy:
+      evidence: targeted-graphify-context7-ai-tester-2026-05-28
+      default_decision: avoid_by_default
+      baseline: rg
+      require_baseline_first: true
+      do_not_select_by: [language_only, broad_shape_only, architecture_task_only, multirepo_only]
+      conditional_cases:
+        - id: explicit_graph_quality_experiment
+          skills: [aif-analyze, aif-explore, aif-plan, aif-review]
+          tasks: [explicit_graph_quality_experiment]
+          recommendation_gate: "User explicitly requests a graph-shaped quality experiment after rg and accepts measured overhead."
     execution:
       default:
         mode: read_existing_reviewed_output
@@ -523,6 +531,7 @@ tools:
   codex-agent-mem:
     display_name: codex-agent-mem
     doc: codex-agent-mem.md
+    results_doc: codex-agent-mem-benchmark-results.md
     repository: "https://github.com/MarceloCaporale/codex-agent-mem"
     tested_version: "Python source package 1.0.2 from GitHub"
     decision: optional
@@ -571,6 +580,7 @@ tools:
   context-mode:
     display_name: context-mode
     doc: context-mode.md
+    results_doc: context-mode-benchmark-results.md
     repository: "https://github.com/mksglu/context-mode"
     tested_version: "1.0.151"
     decision: manual_helper_only
@@ -612,6 +622,7 @@ tools:
   context7:
     display_name: Context7
     doc: context7.md
+    results_doc: context7-benchmark-results.md
     repository: "https://github.com/upstash/context7"
     tested_version: "ctx7 0.4.4"
     decision: optional
@@ -655,6 +666,7 @@ tools:
   codex-mem:
     display_name: codex-mem
     doc: codex-mem.md
+    results_doc: codex-mem-benchmark-results.md
     repository: "https://github.com/Just-Boring-Cat/codex-mem"
     tested_version: "0.1.1"
     decision: reject_default
@@ -682,6 +694,7 @@ tools:
   agent-memory:
     display_name: agent-memory
     doc: agent-memory.md
+    results_doc: agent-memory-benchmark-results.md
     repository: "https://github.com/jayzeng/agentmemory"
     tested_version: "myagentmemory 0.4.12"
     decision: docs_only_manual_notes
@@ -717,6 +730,7 @@ tools:
   eagle-mem:
     display_name: eagle-mem
     doc: eagle-mem.md
+    results_doc: eagle-mem-benchmark-results.md
     repository: "https://github.com/eagleisbatman/eagle-mem"
     tested_version: "4.9.10"
     decision: reject_defer
@@ -744,6 +758,7 @@ tools:
   codegraph:
     display_name: CodeGraph
     doc: codegraph.md
+    results_doc: codegraph-benchmark-results.md
     repository: "https://github.com/colbymchenry/codegraph"
     tested_version: "installed @colbymchenry/codegraph 0.9.3; npm latest 0.9.4 on 2026-05-24"
     decision: manual_cli_only
@@ -1471,3 +1486,166 @@ evidence_runs:
           fewer_tool_calls: 49
           fewer_tool_calls_percent_of_pass_pass: 37.1
         recommendation_update: "CodeGraph is avoid_by_default. Recommend only when tools.codegraph.screening_policy has an exact conditional case for skill + project labels, after rg baseline, with non-empty useful output and purge."
+  - id: other-tools-ai-tester-pilots-2026-05-28
+    date: "2026-05-28"
+    scope: "Paired ai-tester pilot runs for non-CodeGraph tools on one stratified mini anonymous profile, with rg baseline and project-local setup_commands where needed."
+    privacy: "Durable docs store only anonymous labels and aggregate token/time/tool-call counts. No project names, snippets, local paths, temp paths, or raw transcripts are stored."
+    harness:
+      script: "scripts/memory-tool-ai-tester-matrix.mjs"
+      runner: "ai-tester"
+      baseline: rg
+      model: gpt-5.4-mini
+      run_dirs:
+        - ".ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/screening-graphify-ai-tester-pilot"
+        - ".ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/screening-context7-ai-tester-pilot-v2"
+        - ".ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/screening-context-mode-ai-tester-pilot-v2"
+    outcomes:
+      graphify:
+        labels: [no-primary-language, mini, mini, single_repo, none, small_microservice]
+        skill: aif-explore
+        task: architecture_or_impact_discovery
+        pass_pass: true
+        rg_total_tokens: 441415
+        tool_total_tokens: 2197674
+        tool_total_tokens_delta_percent: 397.9
+        tool_input_output_tokens_delta_percent: 363.8
+        tool_duration_delta_percent: 18.4
+        tool_calls_delta_percent: 700.0
+        recommendation_update: "Avoid Graphify for mini/small_microservice labels."
+      context7:
+        labels: [no-primary-language, mini, mini, single_repo, none, small_microservice]
+        skill: aif-rules-check
+        task: version_sensitive_library_docs
+        pass_pass: true
+        rg_total_tokens: 152380
+        tool_total_tokens: 3053547
+        tool_total_tokens_delta_percent: 1903.9
+        tool_input_output_tokens_delta_percent: 1459.0
+        tool_duration_delta_percent: 419.7
+        tool_calls_delta_percent: 2500.0
+        recommendation_update: "Avoid Context7 when there is no explicit dependency/library/version signal."
+      context-mode:
+        labels: [no-primary-language, mini, mini, single_repo, none, small_microservice]
+        skill: aif-explore
+        task: large_command_output_compression
+        pass_pass: false
+        rg_total_tokens: 197700
+        tool_total_tokens: 13649162
+        tool_total_tokens_delta_percent: 6804.0
+        tool_input_output_tokens_delta_percent: 6862.0
+        tool_duration_delta_percent: 666.0
+        tool_calls_delta_percent: 5400.0
+        recommendation_update: "Do not count failed row as useful; avoid context-mode on mini fixtures and retest only on scenarios with already-large generated output."
+  - id: targeted-graphify-context7-ai-tester-2026-05-28
+    date: "2026-05-28"
+    scope: "Targeted paired ai-tester runs for Graphify and Context7 on selected large_framework_app and multirepo anonymous profiles."
+    privacy: "Durable docs store only anonymous labels and aggregate token/time/tool-call counts. No project names, snippets, local paths, temp paths, or raw transcripts are stored."
+    harness:
+      script: "scripts/memory-tool-ai-tester-matrix.mjs"
+      runner: "ai-tester"
+      baseline: rg
+      model: gpt-5.4-mini
+      run_dirs:
+        - ".ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/targeted-graphify-ai-tester"
+        - ".ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/targeted-context7-ai-tester"
+    outcomes:
+      graphify:
+        rows_executed: 4
+        pass_rows: 4
+        paired_rows: 2
+        cases:
+          - labels: [js, go, standard, framework, single_repo, legacy_ai_factory_only, large_framework_app]
+            skill: aif-explore
+            task: architecture_or_impact_discovery
+            rg_total_tokens: 564018
+            tool_total_tokens: 1031559
+            tool_total_tokens_delta_percent: 82.9
+            tool_input_output_tokens_delta_percent: 69.4
+            tool_duration_delta_percent: 1.1
+            tool_calls_delta_percent: 0.0
+            output_tokens_delta_percent: -27.3
+          - labels: [js, php, standard, framework, multirepo, openspec_native]
+            skill: aif-explore
+            task: architecture_or_impact_discovery
+            rg_total_tokens: 713935
+            tool_total_tokens: 1626512
+            tool_total_tokens_delta_percent: 127.8
+            tool_input_output_tokens_delta_percent: 117.5
+            tool_duration_delta_percent: 74.6
+            tool_calls_delta_percent: 166.7
+        recommendation_update: "Graphify is not a token/time saver on current ai-tester evidence; do not recommend automatically by large_framework_app or multirepo labels. Keep only as explicit quality/graph experiment after rg."
+      context7:
+        rows_executed: 4
+        pass_rows: 4
+        paired_rows: 2
+        cases:
+          - labels: [js, go, standard, framework, single_repo, legacy_ai_factory_only, large_framework_app]
+            skill: aif-rules-check
+            task: version_sensitive_library_docs
+            rg_total_tokens: 459478
+            tool_total_tokens: 3960109
+            tool_total_tokens_delta_percent: 761.9
+            tool_input_output_tokens_delta_percent: 722.1
+            tool_duration_delta_percent: 184.5
+            tool_calls_delta_percent: 675.0
+          - labels: [js, php, standard, framework, multirepo, openspec_native]
+            skill: aif-rules-check
+            task: version_sensitive_library_docs
+            rg_total_tokens: 291893
+            tool_total_tokens: 3267616
+            tool_total_tokens_delta_percent: 1019.5
+            tool_input_output_tokens_delta_percent: 855.0
+            tool_duration_delta_percent: 222.9
+            tool_calls_delta_percent: 1050.0
+        recommendation_update: "Context7 is not selected by language/framework labels alone; require an explicit library/API/version question where external docs quality justifies overhead."
+  - id: cross-other-tools-ai-tester-2026-05-28
+    date: "2026-05-28"
+    scope: "Reduced cross ai-tester runs for Graphify, Context7, and context-mode across representative skills and project labels."
+    privacy: "Durable docs store only anonymous labels and aggregate token/time/tool-call counts. No project names, snippets, local paths, temp paths, or raw transcripts are stored."
+    harness:
+      script: "scripts/memory-tool-ai-tester-matrix.mjs"
+      runner: "ai-tester"
+      baseline: rg
+      model: gpt-5.4-mini
+      run_dirs:
+        - ".ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/cross-graphify-ai-tester"
+        - ".ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/cross-context7-ai-tester"
+        - ".ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/cross-context-mode-ai-tester"
+    outcomes:
+      graphify:
+        rows_executed: 8
+        pass_rows: 8
+        paired_rows: 4
+        skills: [aif-analyze, aif-explore]
+        project_labels:
+          - [js, go, standard, framework, single_repo, legacy_ai_factory_only, large_framework_app]
+          - [js, standard, framework, monorepo, legacy_ai_factory_only, multirepo]
+        total_tokens_delta_percent_range: [315.5, 1668.8]
+        input_output_tokens_delta_percent_range: [299.3, 1256.4]
+        duration_delta_percent_range: [125.8, 175.1]
+        recommendation_update: "Cross evidence confirms Graphify is not a token/time saver for aif-analyze or aif-explore on large_framework_app or multirepo labels; keep explicit quality experiment only."
+      context7:
+        rows_executed: 8
+        pass_rows: 8
+        paired_rows: 4
+        skills: [aif-plan, aif-rules-check]
+        project_labels:
+          - [js, go, standard, framework, single_repo, legacy_ai_factory_only, large_framework_app]
+          - [js, standard, framework, monorepo, legacy_ai_factory_only, multirepo]
+        total_tokens_delta_percent_range: [403.2, 1850.8]
+        input_output_tokens_delta_percent_range: [377.3, 1439.7]
+        duration_delta_percent_range: [237.2, 329.1]
+        recommendation_update: "Cross evidence confirms Context7 is not selected by project labels or skill alone; require explicit library/API/version quality need."
+      context-mode:
+        rows_executed: 3
+        pass_rows: 2
+        fail_rows: 1
+        not_run_rows: 13
+        partial_timeout_rows: 1
+        skills: [aif-analyze]
+        project_labels:
+          - [js, go, standard, framework, single_repo, legacy_ai_factory_only, large_framework_app]
+          - [js, standard, framework, monorepo, legacy_ai_factory_only, multirepo]
+        completed_fail_total_tokens_delta_percent: 651.8
+        completed_fail_input_output_tokens_delta_percent: 666.7
+        recommendation_update: "Cross evidence keeps context-mode out of project/source analysis; use only for explicit already-large generated output with purge."

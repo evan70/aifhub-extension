@@ -19,7 +19,9 @@ docs/memory-tools-research/recommendation-metadata.yaml
 Установленные проекты должны использовать wrapper command:
 
 ```bash
+ai-factory aifhub-memory-tools labels --from-project --json
 ai-factory aifhub-memory-tools recommend --from-project --json
+ai-factory aifhub-memory-tools recommend --command aif-analyze --shape large_framework_app --language js --volume standard --complexity framework --repo-shape single_repo --artifact-mode openspec_native --task architecture_or_impact_discovery --json
 ai-factory aifhub-memory-tools recommend --shape large_framework_app --task architecture_or_impact_discovery --json
 ai-factory aifhub-memory-tools select --from-project --command aif-explore --json
 ai-factory aifhub-memory-tools select --from-project --command aif-plan --json
@@ -122,7 +124,15 @@ Decision mapping из matrix:
 
 ## Выбор Через Config
 
-`/aif-analyze` должен классифицировать текущий проект, запустить `recommend`, спросить пользователя, какие рекомендации включить, и сохранить accepted tool ids в config:
+`/aif-analyze` должен сначала получить labels текущего проекта:
+
+```bash
+ai-factory aifhub-memory-tools labels --from-project --json
+```
+
+`labels` возвращает `available_labels`, `project_profile`, `selected_labels`, `matched_dimension_signals` и краткий `evidence` по выбранным labels. После этого `/aif-analyze` выбирает task signals из запроса и запускает `recommend` с явными labels из `project_profile`; `recommend --from-project` остается shortcut для диагностики и совместимости, но не основной flow анализа.
+
+Затем `/aif-analyze` спрашивает пользователя, какие рекомендации включить, и сохраняет accepted tool ids в config:
 
 ```yaml
 utilities:
@@ -161,6 +171,14 @@ Follow-up smoke от 2026-05-23 использовал пять real local proje
 
 ```text
 Optional local tools:
+
+Project labels:
+- languages: js
+- volume: standard
+- complexity: framework
+- repo shape: single_repo
+- artifact mode: openspec_native
+- task signals: architecture_or_impact_discovery
 
 Baseline:
 - rg: use for exact file/symbol lookup.

@@ -159,7 +159,7 @@ const OPTIONAL_TOOLS = getToolPlan('safe')
   .map((tool) => tool.id)
   .filter((toolId) => toolId !== 'rg' && toolId !== 'git-gh');
 const REPO_GRAPH_TOOLS = new Set(['codegraph', 'graphify']);
-const PREINITIALIZABLE_TOOLS = new Set(['codegraph']);
+const PREINITIALIZABLE_TOOLS = new Set(['codegraph', 'graphify', 'context7', 'context-mode']);
 const SELECTOR_COMMANDS = {
   installed: 'ai-factory aifhub-memory-tools select --from-project --command <skill> --json',
   'source-fallback': 'node scripts/memory-tool-recommender.mjs select --from-project --command <skill> --json'
@@ -398,6 +398,7 @@ export function renderAiTesterScenario(input = {}) {
   const promptFile = input.system_prompt_file ?? '../system-prompt.md';
   const preinitializedToolIds = asArray(input.preinitialized_tool_ids);
   const isCodeGraphPreinitialized = preinitializedToolIds.includes('codegraph');
+  const isToolPrepared = preinitializedToolIds.includes(input.tool_id);
   const lines = [
     `scenario: ${input.id}`,
     `description: "suite=${input.suite ?? suiteForExpectation(input.expectation, input.tool_id)} expectation=${input.expectation}"`,
@@ -426,7 +427,7 @@ export function renderAiTesterScenario(input = {}) {
         );
       } else {
         lines.push(
-          `  Then run ${input.tool_id} directly as the controlled optional tool_run for this benchmark pair.`,
+          `  Then run ${toolCommandLabel(input.tool_id)} directly as the controlled optional tool_run for this benchmark pair.`,
           '  Include the phrase "tool_run" in the final benchmark summary.'
         );
       }
@@ -441,7 +442,7 @@ export function renderAiTesterScenario(input = {}) {
         );
       } else {
         lines.push(
-          `  This is a forced usefulness measurement: run ${input.tool_id} directly after rg even if rg is expected to be better.`,
+          `  This is a forced usefulness measurement: run ${toolCommandLabel(input.tool_id)} directly after rg even if rg is expected to be better.`,
           '  Include the phrases "tool_run" and "overhead" in the final benchmark summary.'
         );
       }
@@ -456,6 +457,10 @@ export function renderAiTesterScenario(input = {}) {
         '  Include the phrase "rg baseline" in the final benchmark summary.'
       );
     }
+  }
+
+  if (isToolPrepared && input.tool_id !== 'codegraph') {
+    lines.push(...preparedToolPromptLines(input.tool_id));
   }
 
   if (selectorMode === 'source-fallback') {
@@ -554,6 +559,24 @@ export function renderAiTesterScenario(input = {}) {
         '    tool: Bash',
         '    args_match:',
         `      command: ${quoteYamlSingle(codegraphDataCommandInvocationRegexForYaml())}`
+      );
+    }
+    if (input.tool_id === 'graphify') {
+      lines.push(
+        '  - id: graphify-data-called',
+        '    type: tool_called',
+        '    tool: Bash',
+        '    args_match:',
+        `      command: ${quoteYamlSingle(toolSubcommandInvocationRegexForYaml('graphify', ['update', 'query', 'benchmark']))}`
+      );
+    }
+    if (input.tool_id === 'context-mode') {
+      lines.push(
+        '  - id: context-mode-data-called',
+        '    type: tool_called',
+        '    tool: Bash',
+        '    args_match:',
+        `      command: ${quoteYamlSingle(toolSubcommandInvocationRegexForYaml('context-mode', ['doctor', 'ctx_index', 'ctx_search']))}`
       );
     }
     if (isCodeGraphPreinitialized && input.tool_id === 'codegraph') {
@@ -915,7 +938,7 @@ function numeric(value) {
 }
 
 function quoteYaml(value) {
-  return `"${String(value ?? '').replaceAll('"', '\\"')}"`;
+  return `"${String(value ?? '').replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
 }
 
 function quoteYamlSingle(value) {
@@ -937,8 +960,19 @@ function escapeRegexForYaml(value) {
 }
 
 export function commandInvocationRegexForYaml(commandName) {
-  const escaped = escapeRegexForYaml(commandName);
-  return `(?:^\\s*["']?|[;&|]\\s*["']?|(?:cmd(?:\\.exe)?|powershell(?:\\.exe)?)\\s+(?:/d\\s+)?(?:/s\\s+)?/c\\s+["']?)(?:npx\\s+)?${escaped}(?:\\.cmd|\\.ps1|\\.exe)?(?=\\s|$|["'])`;
+  const escaped = escapeRegexForYaml(primaryCommandName(commandName));
+  const optionalPathPrefix = `(?:[A-Za-z0-9_.%:-]+[\\\\/])*`;
+  return `(?:^\\s*["']?|[;&]\\s*["']?|(?:cmd(?:\\.exe)?|powershell(?:\\.exe)?)\\s+(?:/d\\s+)?(?:/s\\s+)?/c\\s+["']?)(?:npx\\s+)?${optionalPathPrefix}${escaped}(?:\\.cmd|\\.ps1|\\.exe)?(?=\\s|$|["'])`;
+}
+
+function primaryCommandName(toolId) {
+  if (toolId === 'context7') return 'ctx7';
+  return toolId;
+}
+
+function toolCommandLabel(toolId) {
+  if (toolId === 'context7') return 'ctx7 (Context7)';
+  return toolId;
 }
 
 function codegraphSubcommandInvocationRegexForYaml(subcommand) {
@@ -951,13 +985,54 @@ function codegraphDataCommandInvocationRegexForYaml() {
   return `${command}(?!(?:[^;&|\\r\\n]*\\b--help\\b))(?:files|query|context)\\b(?![^;&|\\r\\n]*\\b--help\\b)`;
 }
 
+function toolSubcommandInvocationRegexForYaml(commandName, subcommands = []) {
+  const command = commandInvocationRegexForYaml(commandName).replace('(?=\\s|$|["\'])', '\\s+');
+  return `${command}(?:[^;&|\\r\\n]*\\b(?:${subcommands.map(escapeRegexForYaml).join('|')})\\b)`;
+}
+
 function setupCommandsForTools(toolIds = []) {
   const commands = [];
   if (toolIds.includes('codegraph')) {
     commands.push('cd project && codegraph init .');
     commands.push('cd project && codegraph index --quiet .');
   }
+  if (toolIds.includes('graphify')) {
+    commands.push('cd project && py -3 -m venv .ai-tester-tools\\graphify-venv');
+    commands.push('cd project && .ai-tester-tools\\graphify-venv\\Scripts\\python.exe -m pip install --disable-pip-version-check graphifyy');
+  }
+  if (toolIds.includes('context7')) {
+    commands.push('cd project && npm install --prefix .ai-tester-tools\\context7 ctx7');
+  }
+  if (toolIds.includes('context-mode')) {
+    commands.push('cd project && npm install --prefix .ai-tester-tools\\context-mode context-mode');
+  }
   return commands;
+}
+
+function preparedToolPromptLines(toolId) {
+  if (toolId === 'graphify') {
+    return [
+      '  setup_commands installed Graphify in project/.ai-tester-tools/graphify-venv before this model turn.',
+      '  Before calling Graphify, prepend .ai-tester-tools/graphify-venv/Scripts to PATH in the same shell command.',
+      '  Use Graphify for AST-only graph context, for example graphify update . --no-cluster and then inspect graphify-out/graph.json or run graphify benchmark graphify-out/graph.json.',
+      '  Remove graphify-out before completion and summarize whether the graph was useful versus rg.'
+    ];
+  }
+  if (toolId === 'context7') {
+    return [
+      '  setup_commands installed ctx7 under project/.ai-tester-tools/context7 before this model turn.',
+      '  Before calling Context7, prepend .ai-tester-tools/context7/node_modules/.bin to PATH in the same shell command.',
+      '  Use ctx7 only for an explicit library/docs lookup related to the fixture stack, then summarize whether the docs lookup was useful versus rg.'
+    ];
+  }
+  if (toolId === 'context-mode') {
+    return [
+      '  setup_commands installed context-mode under project/.ai-tester-tools/context-mode before this model turn.',
+      '  Before calling context-mode, prepend .ai-tester-tools/context-mode/node_modules/.bin to PATH in the same shell command.',
+      '  Use context-mode only for temporary generated-output inspection, then summarize whether it was useful versus rg.'
+    ];
+  }
+  return [];
 }
 
 function selectorInvocationRegexForYaml() {

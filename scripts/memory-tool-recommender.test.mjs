@@ -84,7 +84,9 @@ describe('recommendation metadata parsing', () => {
     assert.ok(metadata.forbidden_operations.includes('auto_install'));
     assert.ok(metadata.protected_artifacts.includes('aif-gate-result'));
     assert.ok(metadata.protected_artifacts.includes('coverage.json'));
-    assert.equal(metadata.tools.graphify.decision, 'optional');
+    assert.equal(metadata.tools.graphify.decision, 'manual_quality_experiment_only');
+    assert.equal(metadata.tools.graphify.screening_policy.default_decision, 'avoid_by_default');
+    assert.ok(metadata.evidence_runs.some((run) => run.id === 'targeted-graphify-context7-ai-tester-2026-05-28'));
     assert.equal(metadata.tools['codex-agent-mem'].read_scope, 'explicit_sqlite_db_path');
     assert.equal(metadata.tools['context-mode'].decision, 'manual_helper_only');
     assert.equal(metadata.tools['codex-mem'].decision, 'reject_default');
@@ -145,22 +147,29 @@ describe('metadata source resolution', () => {
 });
 
 describe('recommendation results', () => {
-  it('recommends Graphify for large framework architecture discovery', async () => {
+  it('keeps Graphify off broad large framework discovery unless an explicit quality experiment is requested', async () => {
     const metadata = await loadRecommendationMetadata({ metadataPath: REAL_METADATA });
-    const result = await buildRecommendationResult({
+    const broadResult = await buildRecommendationResult({
       metadata,
       projectShape: 'large_framework_app',
       taskSignals: ['architecture_or_impact_discovery'],
       probeRunner: async () => ({ availability: 'unknown' })
     });
+    const explicitResult = await buildRecommendationResult({
+      metadata,
+      projectShape: 'large_framework_app',
+      taskSignals: ['explicit_graph_quality_experiment'],
+      probeRunner: async () => ({ availability: 'unknown' })
+    });
 
-    const graphify = result.recommendations.find((item) => item.tool_id === 'graphify');
-    assert.equal(result.schema, 'aifhub.memory_tools.recommendation_result.v1');
-    assert.deepEqual(result.baseline, ['rg']);
+    const graphify = explicitResult.recommendations.find((item) => item.tool_id === 'graphify');
+    assert.equal(broadResult.schema, 'aifhub.memory_tools.recommendation_result.v1');
+    assert.deepEqual(broadResult.baseline, ['rg']);
+    assert.equal(broadResult.recommendations.some((item) => item.tool_id === 'graphify'), false);
     assert.ok(graphify);
-    assert.equal(result.recommendations.some((item) => item.tool_id === 'context-mode'), false);
+    assert.equal(explicitResult.recommendations.some((item) => item.tool_id === 'context-mode'), false);
     assert.equal(graphify.display_name, 'Graphify');
-    assert.equal(graphify.status, 'optional');
+    assert.equal(graphify.status, 'manual_quality_experiment_only');
     assert.equal(graphify.install_policy, 'explicit_user_opt_in_only');
     assert.equal(graphify.read_scope, 'explicit_project_path');
     assert.deepEqual(graphify.allowed_in, ['aif-analyze', 'aif-explore', 'aif-plan', 'aif-review']);
@@ -384,7 +393,7 @@ describe('recommendation results', () => {
       probeRunner: async () => ({ availability: 'installed', command: 'tool --version' })
     });
 
-    assert.ok(planResult.recommendations.some((item) => item.tool_id === 'graphify'));
+    assert.equal(planResult.recommendations.some((item) => item.tool_id === 'graphify'), false);
     assert.equal(planResult.recommendations.some((item) => item.tool_id === 'codegraph'), false);
     assert.equal(reviewResult.recommendations.some((item) => item.tool_id === 'codegraph'), false);
     assert.equal(compressionForPlan.recommendations.some((item) => item.tool_id === 'context-mode'), false);
@@ -530,6 +539,34 @@ describe('recommendation results', () => {
       exit: false,
       probeRunner: async () => ({ availability: 'installed', command: 'tool --version' })
     });
+    const implement = await runMemoryToolRecommender([
+      'select',
+      '--shape',
+      'multirepo',
+      '--language',
+      'js',
+      '--volume',
+      'standard',
+      '--complexity',
+      'framework',
+      '--repo-shape',
+      'monorepo',
+      '--artifact-mode',
+      'legacy_ai_factory_only',
+      '--task',
+      'architecture_or_impact_discovery',
+      '--command',
+      'aif-implement',
+      '--metadata',
+      REAL_METADATA,
+      '--json'
+    ], {
+      cwd: tmpDir,
+      stdout: [],
+      stderr: [],
+      exit: false,
+      probeRunner: async () => ({ availability: 'installed', command: 'tool --version' })
+    });
 
     assert.equal(explore.exitCode, 0);
     assert.equal(explore.body.schema, 'aifhub.memory_tools.selection_result.v1');
@@ -537,19 +574,30 @@ describe('recommendation results', () => {
     const exploreCodegraph = explore.body.selected_tools.find((item) => item.tool_id === 'codegraph');
     const exploreGraphify = explore.body.selected_tools.find((item) => item.tool_id === 'graphify');
     assert.ok(exploreCodegraph);
-    assert.ok(exploreGraphify);
+    assert.equal(exploreGraphify, undefined);
     assert.equal(exploreCodegraph.permission, 'manual_purged_cli_execution');
-    assert.equal(exploreGraphify.permission, 'read_existing_reviewed_output');
+    const skippedExploreGraphify = explore.body.not_selected_tools.find((item) => item.tool_id === 'graphify');
+    assert.ok(skippedExploreGraphify);
+    assert.match(skippedExploreGraphify.reason, /not applicable/i);
     assert.match(JSON.stringify(exploreCodegraph.execution), /codegraph init <project>/);
     assert.match(JSON.stringify(exploreCodegraph.execution), /codegraph uninit --force <project>/);
 
     assert.equal(plan.exitCode, 0);
     assert.equal(plan.body.schema, 'aifhub.memory_tools.selection_result.v1');
-    assert.ok(plan.body.selected_tools.some((item) => item.tool_id === 'graphify'));
+    assert.equal(plan.body.selected_tools.some((item) => item.tool_id === 'graphify'), false);
     assert.equal(plan.body.selected_tools.some((item) => item.tool_id === 'codegraph'), false);
     const skippedCodegraph = plan.body.not_selected_tools.find((item) => item.tool_id === 'codegraph');
+    const skippedPlanGraphify = plan.body.not_selected_tools.find((item) => item.tool_id === 'graphify');
     assert.ok(skippedCodegraph);
+    assert.ok(skippedPlanGraphify);
     assert.match(skippedCodegraph.reason, /forbidden/i);
+    assert.match(skippedPlanGraphify.reason, /not applicable/i);
+
+    assert.equal(implement.exitCode, 0);
+    assert.deepEqual(implement.body.selected_tools, []);
+    assert.ok(implement.body.not_selected_tools.some((item) => item.tool_id === 'codegraph'));
+    assert.ok(implement.body.not_selected_tools.some((item) => item.tool_id === 'graphify'));
+    assert.ok(implement.body.not_selected_tools.every((item) => /forbidden|not applicable/i.test(item.reason)));
   });
 
   it('selects enabled tools from inline YAML config lists', async () => {
@@ -597,7 +645,8 @@ describe('recommendation results', () => {
     assert.equal(result.exitCode, 0);
     assert.deepEqual(result.body.config.enabled_tools, ['codegraph', 'graphify']);
     assert.ok(result.body.selected_tools.some((item) => item.tool_id === 'codegraph'));
-    assert.ok(result.body.selected_tools.some((item) => item.tool_id === 'graphify'));
+    assert.equal(result.body.selected_tools.some((item) => item.tool_id === 'graphify'), false);
+    assert.ok(result.body.not_selected_tools.some((item) => item.tool_id === 'graphify'));
   });
 
   it('selects legacy utility-enabled tools as compatibility config', async () => {
@@ -669,7 +718,7 @@ describe('recommendation results', () => {
 });
 
 describe('CLI behavior', () => {
-  it('prints recommendation JSON for explicit shape and task signals', async () => {
+  it('keeps broad architecture recommendation JSON on rg unless an exact tool policy matches', async () => {
     const result = await runCli([
       'recommend',
       '--shape',
@@ -684,7 +733,7 @@ describe('CLI behavior', () => {
     assert.equal(result.schema, 'aifhub.memory_tools.recommendation_result.v1');
     assert.equal(result.project_shape, 'large_framework_app');
     assert.deepEqual(result.task_signals, ['architecture_or_impact_discovery']);
-    assert.ok(result.recommendations.some((item) => item.tool_id === 'graphify'));
+    assert.equal(result.recommendations.some((item) => item.tool_id === 'graphify'), false);
   });
 
   it('accepts command context so skills receive their own tool permissions', async () => {
@@ -765,6 +814,137 @@ describe('CLI behavior', () => {
     assert.equal(profile.artifact_mode, 'openspec_native');
   });
 
+  it('reports available and selected labels with project evidence', async () => {
+    await mkdir(path.join(tmpDir, 'apps', 'api'), { recursive: true });
+    await mkdir(path.join(tmpDir, 'src', 'Http', 'Controllers'), { recursive: true });
+    await mkdir(path.join(tmpDir, 'openspec'), { recursive: true });
+    await writeFile(path.join(tmpDir, 'go.mod'), 'module example.local/service', 'utf8');
+    await writeFile(path.join(tmpDir, 'package.json'), '{"workspaces":["apps/*"]}', 'utf8');
+    await writeFile(path.join(tmpDir, 'pnpm-workspace.yaml'), 'packages:\n  - apps/*\n', 'utf8');
+    await writeFile(path.join(tmpDir, 'composer.json'), '{"require":{"laravel/framework":"^10.0"}}', 'utf8');
+    await writeFile(path.join(tmpDir, 'openspec', 'config.yaml'), 'project: example\n', 'utf8');
+
+    const result = await runMemoryToolRecommender([
+      'labels',
+      '--from-project',
+      '--metadata',
+      REAL_METADATA,
+      '--json'
+    ], {
+      cwd: tmpDir,
+      stdout: [],
+      stderr: [],
+      exit: false
+    });
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.body.schema, 'aifhub.memory_tools.labels_result.v1');
+    assert.equal(result.body.metadata_available, true);
+    assert.ok(result.body.available_labels.languages.includes('js'));
+    assert.ok(result.body.available_labels.languages.includes('no-primary-language'));
+    assert.ok(result.body.available_labels.volume.includes('standard'));
+    assert.ok(result.body.available_labels.project_shape.includes('multirepo'));
+    assert.ok(result.body.available_labels.task_signals.includes('architecture_or_impact_discovery'));
+    assert.equal(result.body.project_profile.project_shape, 'multirepo');
+    assert.deepEqual(result.body.project_profile.languages.sort(), ['go', 'js', 'php']);
+    assert.ok(result.body.selected_labels.includes('go'));
+    assert.ok(result.body.selected_labels.includes('js'));
+    assert.ok(result.body.selected_labels.includes('php'));
+    assert.ok(result.body.selected_labels.includes('mini'));
+    assert.ok(result.body.selected_labels.includes('framework'));
+    assert.ok(result.body.selected_labels.includes('monorepo'));
+    assert.ok(result.body.selected_labels.includes('openspec_native'));
+    assert.ok(result.body.selected_labels.includes('multirepo'));
+    assert.equal(result.body.evidence.js.category, 'languages');
+    assert.ok(result.body.evidence.js.markers.includes('package.json'));
+    assert.equal(result.body.evidence.framework.category, 'complexity');
+    assert.ok(result.body.evidence.framework.markers.some((marker) => marker.startsWith('src/')));
+    assert.deepEqual(result.body.dimension_matches, ['mini_exact_lookup']);
+    assert.equal(result.body.matched_dimension_signals[0].id, 'mini_exact_lookup');
+    assert.ok(result.body.matched_dimension_signals[0].avoid_tools.includes('codegraph'));
+  });
+
+  it('lets analyze call recommend with explicit labels from labels output', async () => {
+    await mkdir(path.join(tmpDir, 'src'), { recursive: true });
+    await mkdir(path.join(tmpDir, '.ai-factory'), { recursive: true });
+    await writeFile(path.join(tmpDir, 'package.json'), '{"name":"fixture"}', 'utf8');
+    await writeFile(path.join(tmpDir, 'src', 'index.js'), 'console.log("ok");', 'utf8');
+    await writeFile(path.join(tmpDir, '.ai-factory', 'config.yaml'), 'language:\n  ui: ru\n', 'utf8');
+
+    const labels = await runMemoryToolRecommender([
+      'labels',
+      '--from-project',
+      '--metadata',
+      REAL_METADATA,
+      '--json'
+    ], {
+      cwd: tmpDir,
+      stdout: [],
+      stderr: [],
+      exit: false
+    });
+    const profile = labels.body.project_profile;
+    const languageArgs = profile.languages.flatMap((language) => ['--language', language]);
+    const explicitArgs = [
+      'recommend',
+      '--shape',
+      profile.project_shape,
+      ...languageArgs,
+      '--volume',
+      profile.volume,
+      '--complexity',
+      profile.complexity,
+      '--repo-shape',
+      profile.repo_shape,
+      '--artifact-mode',
+      profile.artifact_mode,
+      '--task',
+      'architecture_or_impact_discovery',
+      '--command',
+      'aif-analyze',
+      '--metadata',
+      REAL_METADATA,
+      '--json'
+    ];
+
+    const explicit = await runMemoryToolRecommender(explicitArgs, {
+      cwd: tmpDir,
+      stdout: [],
+      stderr: [],
+      exit: false,
+      probeRunner: async () => ({ availability: 'unknown', command: 'tool --version' })
+    });
+    const shortcut = await runMemoryToolRecommender([
+      'recommend',
+      '--from-project',
+      '--task',
+      'architecture_or_impact_discovery',
+      '--command',
+      'aif-analyze',
+      '--metadata',
+      REAL_METADATA,
+      '--json'
+    ], {
+      cwd: tmpDir,
+      stdout: [],
+      stderr: [],
+      exit: false,
+      probeRunner: async () => ({ availability: 'unknown', command: 'tool --version' })
+    });
+
+    assert.equal(explicit.body.schema, 'aifhub.memory_tools.recommendation_result.v1');
+    assert.deepEqual(explicit.body.project_profile, shortcut.body.project_profile);
+    assert.deepEqual(explicit.body.dimension_matches, shortcut.body.dimension_matches);
+    assert.deepEqual(
+      explicit.body.recommendations.map((item) => item.tool_id),
+      shortcut.body.recommendations.map((item) => item.tool_id)
+    );
+    assert.deepEqual(
+      explicit.body.do_not_recommend.map((item) => item.tool_id),
+      shortcut.body.do_not_recommend.map((item) => item.tool_id)
+    );
+  });
+
   it('ignores generated ai-factory runtime state when classifying project dimensions', async () => {
     await mkdir(path.join(tmpDir, 'src'), { recursive: true });
     await mkdir(path.join(tmpDir, '.ai-factory', 'state', 'fixture', 'nested-project'), { recursive: true });
@@ -817,11 +997,12 @@ describe('CLI behavior', () => {
     const result = await buildRecommendationResult({
       metadata,
       projectShape: 'large_framework_app',
-      taskSignals: ['architecture_or_impact_discovery'],
+      taskSignals: ['explicit_graph_quality_experiment'],
       probeRunner: async () => ({ availability: 'not_installed', command: 'graphify --version' })
     });
 
     const graphify = result.recommendations.find((item) => item.tool_id === 'graphify');
+    assert.ok(graphify);
     assert.equal(graphify.availability, 'not_installed');
   });
 

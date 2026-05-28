@@ -250,11 +250,16 @@ describe('ai-tester matrix manifest', () => {
 
   it('matches tool invocations without treating rg search terms as tool calls', () => {
     const codegraphCommand = new RegExp(commandInvocationRegexForYaml('codegraph'));
+    const context7Command = new RegExp(commandInvocationRegexForYaml('context7'));
+    const contextModeCommand = new RegExp(commandInvocationRegexForYaml('context-mode'));
 
     assert.equal(codegraphCommand.test('cmd.exe /c "codegraph context --path project architecture"'), true);
     assert.equal(codegraphCommand.test('cmd.exe /c \'codegraph query --path project symbol\''), true);
+    assert.equal(context7Command.test('cmd.exe /c "ctx7 library chalk api"'), true);
+    assert.equal(contextModeCommand.test('cmd.exe /c "project\\.ai-tester-tools\\context-mode\\node_modules\\.bin\\context-mode.cmd doctor"'), true);
     assert.equal(codegraphCommand.test('cmd.exe /c \'rg -n "codegraph|context-mode" project\''), false);
     assert.equal(codegraphCommand.test('rg -n "codegraph|context-mode" project'), false);
+    assert.equal(contextModeCommand.test('rg -n "codegraph|context-mode" project'), false);
   });
 
   it('copies fixtures through sanitized temp paths and keeps public output anonymous', async () => {

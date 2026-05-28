@@ -6,7 +6,8 @@
 
 Файл [recommendation-metadata.yaml](recommendation-metadata.yaml) содержит machine-readable правила для analysis-этапа. Его можно читать при анализе проекта и превращать project signals в предложение пользователю:
 
-- если проект выглядит как `multirepo` или large framework, предложить `Graphify` как optional repo graph; `CodeGraph` предлагать только при exact `screening_policy` match по skill + project labels;
+- `Graphify` не предлагать автоматически по `multirepo` или large framework labels; он остается только для явного graph-shaped quality experiment после `rg`, если пользователь принимает overhead;
+- `CodeGraph` предлагать только при exact `screening_policy` match по skill + project labels;
 - если задача про resume/open work между сессиями, предложить `codex-agent-mem` в read-only MCP mode с explicit DB path;
 - если задача про большой command output, предложить `context-mode` как temporary manual helper с обязательным purge;
 - если проект маленький или нужен точный file/symbol lookup, оставить baseline `rg`;
@@ -73,18 +74,38 @@
 
 ## Сводка
 
-README содержит только общую сводку и итоговую рекомендацию. Датированные результаты тестирования, anonymous profile таблицы, safety evidence и выводы по конкретному инструменту находятся в файле этого инструмента.
+README содержит только общую сводку и итоговую рекомендацию. У каждого инструмента есть два файла: описание инструмента и отдельный файл с результатами тестов, labels и выводами по применимости.
 
-| Tool | Repository | Проверенная версия | Где подходит | Решение |
+Правило benchmark: выводы о выгоде инструмента строятся только по paired `ai-tester` runs `rg baseline` vs `<tool> tool_run`. Field/smoke runs в result-файлах считаются только safety/availability evidence.
+
+## AI Tester Evidence
+
+Raw `ai-tester` artifacts лежат локально в `.ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/<run>/ai-tester-token-matrices.json`. В docs ниже перенесены только anonymous labels и агрегированные метрики.
+
+| Tool | ai-tester run | Rows | Где смотреть | Вывод |
 |---|---|---:|---|---|
-| [Graphify](graphify.md) | [safishamsi/graphify](https://github.com/safishamsi/graphify) | `graphifyy 0.8.17` | Repo graph / architecture / impact discovery. Не memory. | Оставить как optional guidance для больших/legacy/multirepo проектов; temp-copy run 2026-05-24 показал 54/55 AST PASS. |
-| [Context7](context7.md) | [upstash/context7](https://github.com/upstash/context7) | `ctx7 0.4.4` | Version-sensitive library/API docs. | Optional docs provider; setup/MCP registration не выполнять из AIFHub. |
-| [codex-agent-mem](codex-agent-mem.md) | [MarceloCaporale/codex-agent-mem](https://github.com/MarceloCaporale/codex-agent-mem) | Python source package `1.0.2` | Cross-session continuity, open work, closure checks, compact context packs. | Optional read-only continuity provider; source-installable from GitHub, isolated install/pytest/ruff/minimal MCP PASS on 2026-05-25. |
-| [context-mode](context-mode.md) | [mksglu/context-mode](https://github.com/mksglu/context-mode) | `1.0.151` | Temporary output/context indexing and compression. | Только docs-only optional helper, не persistent AIFHub memory; temp MCP index/search/purge PASS. |
-| [codex-mem](codex-mem.md) | package не содержит repository metadata; ближайший проверенный публичный repo: [Just-Boring-Cat/codex-mem](https://github.com/Just-Boring-Cat/codex-mem) | `0.1.1` | Codex session/history memory. | Reject as default; privacy risk без строгой изоляции. |
-| [agent-memory](agent-memory.md) | [jayzeng/agentmemory](https://github.com/jayzeng/agentmemory) | `myagentmemory 0.4.12` | Manual markdown memory. | Docs-only/manual notes, без интеграции. |
-| [eagle-mem](eagle-mem.md) | [eagleisbatman/eagle-mem](https://github.com/eagleisbatman/eagle-mem) | `4.9.10` | Shared memory + hooks + guardrails + lanes. | Reject/defer; слишком широкий surface для issue #85. |
-| [CodeGraph](codegraph.md) | [colbymchenry/codegraph](https://github.com/colbymchenry/codegraph) | installed `0.9.3`, npm `0.9.4` | Manual CLI-only repo graph для exact screening cases. | `manual_cli_only`, `avoid_by_default`; final screening: +55.7% total tokens vs `rg`, useful only for exact skill+label cases. |
+| CodeGraph | `screening-codegraph-preinit-nosipout-gpt54mini` | 300 executed, 150 pairs | [ai-tester-token-matrices-screening-codegraph.md](ai-tester-token-matrices-screening-codegraph.md), `.ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/screening-codegraph-preinit-nosipout-gpt54mini/ai-tester-token-matrices.json` | +55.7% total tokens, +21.0% time; useful only in exact skill+label cases. |
+| Graphify | `screening-graphify-ai-tester-pilot` | 2 executed, 1 pair | [graphify-benchmark-results.md](graphify-benchmark-results.md#ai-tester-pilot-2026-05-28), `.ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/screening-graphify-ai-tester-pilot/ai-tester-token-matrices.json` | mini/small profile: +397.9% total tokens. |
+| Graphify | `targeted-graphify-ai-tester` | 4 executed, 2 pairs | [graphify-benchmark-results.md](graphify-benchmark-results.md#ai-tester-targeted-run-2026-05-28), `.ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/targeted-graphify-ai-tester/ai-tester-token-matrices.json` | large framework +82.9%, multirepo +127.8% total tokens. |
+| Graphify | `cross-graphify-ai-tester` | 8 executed, 4 pairs | [graphify-benchmark-results.md](graphify-benchmark-results.md#ai-tester-cross-screening-2026-05-28), `.ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/cross-graphify-ai-tester/ai-tester-token-matrices.json` | `aif-analyze/aif-explore` x large framework/multirepo: +315.5% to +1668.8% total tokens. |
+| Context7 | `screening-context7-ai-tester-pilot-v2` | 2 executed, 1 pair | [context7-benchmark-results.md](context7-benchmark-results.md#ai-tester-pilot-2026-05-28), `.ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/screening-context7-ai-tester-pilot-v2/ai-tester-token-matrices.json` | mini/no dependency signal: +1903.9% total tokens. |
+| Context7 | `targeted-context7-ai-tester` | 4 executed, 2 pairs | [context7-benchmark-results.md](context7-benchmark-results.md#ai-tester-targeted-run-2026-05-28), `.ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/targeted-context7-ai-tester/ai-tester-token-matrices.json` | language/framework labels alone: +761.9% to +1019.5% total tokens. |
+| Context7 | `cross-context7-ai-tester` | 8 executed, 4 pairs | [context7-benchmark-results.md](context7-benchmark-results.md#ai-tester-cross-screening-2026-05-28), `.ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/cross-context7-ai-tester/ai-tester-token-matrices.json` | `aif-plan/aif-rules-check` x large framework/multirepo: +403.2% to +1850.8% total tokens. |
+| context-mode | `screening-context-mode-ai-tester-pilot-v2` | 2 executed, 1 pair | [context-mode-benchmark-results.md](context-mode-benchmark-results.md#ai-tester-pilot-2026-05-28), `.ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/screening-context-mode-ai-tester-pilot-v2/ai-tester-token-matrices.json` | tool_run failed useful assertion and spent +6804.0% total tokens. |
+| context-mode | `cross-context-mode-ai-tester` | 3 executed, 1 completed pair + 1 timeout | [context-mode-benchmark-results.md](context-mode-benchmark-results.md#ai-tester-cross-screening-2026-05-28), `.ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/cross-context-mode-ai-tester/ai-tester-token-matrices.json` | `aif-analyze` x multirepo failed with +651.8% total tokens; large framework tool_run timed out. |
+
+No paired positive `ai-tester` benchmark is recorded yet for `codex-agent-mem` and `agent-memory`, because they are not source retrieval tools: their current docs contain safety/availability evidence only. `codex-mem` and `eagle-mem` are rejected before positive benchmark because scoped read/purge/default privacy safety is not acceptable; they should only get negative/forbidden selector scenarios.
+
+| Tool | Tests | Repository | Проверенная версия | Где подходит | Решение |
+|---|---|---|---:|---|---|
+| [Graphify](graphify.md) | [results](graphify-benchmark-results.md) | [safishamsi/graphify](https://github.com/safishamsi/graphify) | `graphifyy 0.8.17` | Repo graph / architecture / impact discovery. Не memory. | ai-tester: проиграл `rg` на mini, large framework и multirepo; только explicit quality experiment, не token/time saver. |
+| [Context7](context7.md) | [results](context7-benchmark-results.md) | [upstash/context7](https://github.com/upstash/context7) | `ctx7 0.4.4` | Version-sensitive library/API docs. | ai-tester: overhead без explicit library/API/version; выбирать только по конкретному docs question. |
+| [codex-agent-mem](codex-agent-mem.md) | [results](codex-agent-mem-benchmark-results.md) | [MarceloCaporale/codex-agent-mem](https://github.com/MarceloCaporale/codex-agent-mem) | Python source package `1.0.2` | Cross-session continuity, open work, closure checks, compact context packs. | Optional read-only continuity provider; полезен по task label, не по языку/объему проекта. |
+| [context-mode](context-mode.md) | [results](context-mode-benchmark-results.md) | [mksglu/context-mode](https://github.com/mksglu/context-mode) | `1.0.151` | Temporary output/context indexing and compression. | ai-tester pilot на mini fixture failed useful assertion и дал экстремальный overhead; только для уже большого generated output. |
+| [codex-mem](codex-mem.md) | [results](codex-mem-benchmark-results.md) | package не содержит repository metadata; ближайший проверенный публичный repo: [Just-Boring-Cat/codex-mem](https://github.com/Just-Boring-Cat/codex-mem) | `0.1.1` | Codex session/history memory. | Reject as default; privacy risk без строгой изоляции. |
+| [agent-memory](agent-memory.md) | [results](agent-memory-benchmark-results.md) | [jayzeng/agentmemory](https://github.com/jayzeng/agentmemory) | `myagentmemory 0.4.12` | Manual markdown memory. | Docs-only/manual notes; не project retrieval provider. |
+| [eagle-mem](eagle-mem.md) | [results](eagle-mem-benchmark-results.md) | [eagleisbatman/eagle-mem](https://github.com/eagleisbatman/eagle-mem) | `4.9.10` | Shared memory + hooks + guardrails + lanes. | Reject/defer; scoped read/purge и MCP не доказаны. |
+| [CodeGraph](codegraph.md) | [results](codegraph-benchmark-results.md) | [colbymchenry/codegraph](https://github.com/colbymchenry/codegraph) | installed `0.9.3`, npm `0.9.4` | Manual CLI-only repo graph для exact screening cases. | `manual_cli_only`, `avoid_by_default`; final screening: +55.7% total tokens vs `rg`, useful only for exact skill+label cases. |
 
 ## Итоговые Таблицы По Форматам Проектов
 
@@ -94,7 +115,7 @@ README содержит только общую сводку и итоговую
 |---|---|---|---|---|
 | `rg` | useful baseline | useful baseline | useful baseline | Точный поиск быстрее любых индексов. |
 | CodeGraph | avoided by default | exact screening only | forbidden | Mini/exact lookup остается на `rg`; исключения возможны только для записанных skill+label cases. |
-| Graphify | avoided | avoided | conditional read-only old output | Перерасход token/time без broad architecture задачи. |
+| Graphify | avoided | avoided | avoided | Перерасход token/time на mini profile. |
 | context-mode | avoided | avoided | forbidden | Нет пользы без large generated output. |
 
 ### Laravel/Framework
@@ -103,7 +124,7 @@ README содержит только общую сводку и итоговую
 |---|---|---|---|---|
 | `rg` | required baseline | required baseline | required baseline | Всегда первый проход и fallback. |
 | CodeGraph | avoided by default | exact screening only | forbidden | Framework label сам по себе недостаточен; нужен совпавший skill+labels case и непустой useful output. |
-| Graphify | conditional | read existing reviewed output | read existing reviewed output | Полезен для architecture overview после `rg`, но не canonical evidence. |
+| Graphify | avoided by default | explicit quality experiment only | explicit reviewed output only | ai-tester не подтвердил token/time выгоду на framework labels. |
 | Context7 | conditional docs | conditional docs | conditional docs | Только version-sensitive library/API docs. |
 
 ### Multirepo
@@ -112,7 +133,7 @@ README содержит только общую сводку и итоговую
 |---|---|---|---|---|
 | `rg` | required baseline | required baseline | required baseline | Нужен для точной проверки найденных областей. |
 | CodeGraph | avoided by default | exact screening only | forbidden | Multirepo label сам по себе недостаточен; использовать только записанные conditional cases. |
-| Graphify | conditional | useful from reviewed output | useful from reviewed output | Помогает снизить шум broad repo search. |
+| Graphify | avoided by default | explicit quality experiment only | explicit reviewed output only | Multirepo label сам по себе не дает выгоды; использовать только если нужен graph-shaped quality check. |
 | codex-agent-mem | conditional continuity | conditional continuity | forbidden | Только resume/open-work, не repo indexing. |
 
 ### Legacy Integration-Heavy
@@ -121,7 +142,7 @@ README содержит только общую сводку и итоговую
 |---|---|---|---|---|
 | `rg` | required baseline | required baseline | required baseline | Нужен для source-grounded validation. |
 | CodeGraph | avoided by default | exact screening only | forbidden | Integration-heavy не является отдельным positive signal; нужен exact screening match. |
-| Graphify | conditional | read existing reviewed output | read existing reviewed output | Может улучшить выборку слоев, но timeout risk остается. |
+| Graphify | avoided by default | explicit quality experiment only | explicit reviewed output only | Field runs были quality-only, ai-tester не подтвердил экономию; timeout risk остается. |
 | context-mode | conditional compression | conditional generated output | forbidden | Только для большого command output, не для source retrieval. |
 
 ### Go Service
@@ -130,7 +151,7 @@ README содержит только общую сводку и итоговую
 |---|---|---|---|---|
 | `rg` | required baseline | required baseline | required baseline | Для mini/standard Go сервисов обычно достаточно. |
 | CodeGraph | avoided | exact screening only | forbidden | Go label не дает recommendation; weak/sample-more cases не перекрывают общий +19.3% total-token overhead по Go. |
-| Graphify | avoided on mini, conditional on standard | read existing reviewed output | read existing reviewed output | Польза появляется только на большем сервисе с интеграциями. |
+| Graphify | avoided on mini, explicit quality only on standard | explicit reviewed output only | explicit reviewed output only | Не выбирать по Go label; нужен явный graph-quality запрос. |
 | codex-agent-mem | conditional continuity | conditional continuity | forbidden | Project shape не важен; важен task signal resume/open-work. |
 
 ## Итоговая Рекомендация
@@ -141,7 +162,7 @@ README содержит только общую сводку и итоговую
 
 - `rg` остаётся baseline для literal search, точного поиска файлов и маленьких проектов.
 - `codex-agent-mem` можно документировать как optional read-only MCP continuity provider.
-- `Graphify` можно документировать как optional repo-graph provider для исследования больших кодовых баз.
+- `Graphify` можно документировать как optional repo-graph provider только для явного quality experiment; не выбирать автоматически по размеру, framework или multirepo labels.
 - `Context7` можно документировать как optional docs provider для актуальных library/API вопросов.
 - `context-mode` может остаться manual helper для temporary indexing больших command outputs.
 - `codex-mem`, `agent-memory` и `eagle-mem` не должны становиться default AIFHub integrations.

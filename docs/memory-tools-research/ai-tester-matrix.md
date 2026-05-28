@@ -2,6 +2,8 @@
 
 Эта страница описывает воспроизводимый прогон optional memory/context tools через `ai-tester`. Матрица всегда сравнивает инструмент с тем же сценарием через `rg`: сначала `baseline_rg`, затем `tool_run`, затем нормализованное сравнение.
 
+Ключевое правило: benchmark должен быть перекрестным. Решение по инструменту нельзя делать по одному skill или одному project label. Минимальная матрица для recommendation evidence: `tool x representative skills x representative project labels x rg/tool_run`. Только такая таблица отвечает, какой skill с каким инструментом лучше использовать на каком типе проекта.
+
 Связанные артефакты:
 
 - [recommendation-metadata.yaml](recommendation-metadata.yaml) - machine-readable dimensions, suites, decision actions и aggregate evidence id.
@@ -32,6 +34,17 @@ node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --tool cod
 node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --tool codegraph --skill aif-explore --task architecture_or_impact_discovery --json
 node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --tool codegraph --task architecture_or_impact_discovery --json
 node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --tool codegraph --skill aif-explore --task architecture_or_impact_discovery --preinitialize-tool codegraph --json
+node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --tool graphify --skill aif-explore --task explicit_graph_quality_experiment --preinitialize-tool graphify --json
+node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --tool context7 --skill aif-rules-check --task version_sensitive_library_docs --preinitialize-tool context7 --json
+node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --tool context-mode --skill aif-explore --task large_command_output_compression --preinitialize-tool context-mode --json
+```
+
+Reduced cross examples:
+
+```bash
+node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --exclude-root <excluded-root> --out <run-dir> --tool graphify --skill aif-analyze --skill aif-explore --skill aif-plan --skill aif-review --task explicit_graph_quality_experiment --max-profiles 4 --stratified --preinitialize-tool graphify --scenario-prefix cross-graphify --json
+node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --exclude-root <excluded-root> --out <run-dir> --tool context7 --skill aif-plan --skill aif-rules-check --task version_sensitive_library_docs --max-profiles 4 --stratified --preinitialize-tool context7 --scenario-prefix cross-context7 --json
+node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --exclude-root <excluded-root> --out <run-dir> --tool context-mode --skill aif-analyze --skill aif-explore --task large_command_output_compression --max-profiles 4 --stratified --preinitialize-tool context-mode --scenario-prefix cross-context-mode --json
 ```
 
 `--roots` может указывать на один проект или каталог с проектами. Durable docs не должны содержать этот путь; public output хранит только anonymous profile ids.
@@ -48,6 +61,8 @@ node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --tool cod
 | `full` | all discovered | metadata skills by default | `primary` | depends | Audit mode; для 29 skills x 47 profiles используйте `--matrix-size full --skill-set all`, это 2726 scenarios per tool/task. |
 
 Для полного локального набора старый exhaustive вариант был слишком дорогим: 29 skills * 47 profiles * 2 runs = 2726 scenarios для одного tool/task. После исключения ненужных roots число проектов может быть меньше, но правило сохраняется: сначала `screening`, затем targeted confirmation.
+
+Если screening запускается не на grouped representatives, а на ручном наборе, набор должен пересекать минимум два skill groups и минимум два project labels. Одноосевые проверки (`1 skill x many projects` или `many skills x 1 project`) допустимы только как диагностика, но не как recommendation evidence.
 
 Skill groups покрывают все AI Factory skills через representatives:
 
@@ -75,6 +90,16 @@ Windows note: runner должен уметь выполнять `fixtures.setup_
 | `comparison` | Принять recommendation decision. | Считаются speed, token, noise, accuracy, usefulness, safety и purge deltas. |
 
 Для инструментов с индексом генератор поддерживает warm/preinitialized режим. `--preinitialize-tool codegraph` добавляет в `fixtures.setup_commands` команды `codegraph init .` и `codegraph index --quiet .` до model turn. В самом model turn сценарий запрещает `codegraph init/index`, требует чтение данных из существующего индекса через `codegraph files`, `codegraph query` или `codegraph context`, и требует purge через `codegraph uninit --force .`.
+
+Для инструментов, которых обычно нет в `PATH`, `--preinitialize-tool` может подготовить project-local CLI до model turn:
+
+| Tool | Подготовка | Model turn command |
+|---|---|---|
+| `graphify` | Python venv под `project/.ai-tester-tools/graphify-venv`, install `graphifyy` | prepend venv `Scripts` to PATH, then call `graphify update/query/benchmark` |
+| `context7` | npm prefix под `project/.ai-tester-tools/context7`, install `ctx7` | prepend `.bin` to PATH, then call `ctx7` |
+| `context-mode` | npm prefix под `project/.ai-tester-tools/context-mode`, install `context-mode` | prepend `.bin` to PATH, then call `context-mode` or MCP-backed helper |
+
+Rejected tools (`codex-mem`, `eagle-mem`) не получают positive tool_run setup; для них допустимы только negative/forbidden ai-tester scenarios. Safety/smoke runs не считаются benchmark.
 
 Сценарии используют native `ai-tester` поля: `system_prompt_file`, `copy_trees`, `skill`, `user_prompt` или `user_prompts`, `runner.setting_sources` для CLI-parity suites, и assertions `tool_called`, `tool_call_sequence`, `no_tool_called`, `output_contains`, `turn_count_at_most`, `no_path_escape`.
 

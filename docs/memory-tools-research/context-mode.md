@@ -2,7 +2,65 @@
 
 Репозиторий: [mksglu/context-mode](https://github.com/mksglu/context-mode)
 
-Проверенный package: `context-mode 1.0.151` в safe field run 2026-05-24; более ранние results ниже использовали `1.0.146`.
+Проверенный package: `context-mode 1.0.151`.
+
+Результаты тестов и выводы по labels: [context-mode-benchmark-results.md](context-mode-benchmark-results.md).
+
+## Что Это
+
+`context-mode` - temporary context-window optimization и retrieval tool. Он может индексировать explicit content, искать по нему и purge knowledge base.
+
+Для AIFHub это не persistent memory provider. Его полезная роль - временно сжать и переиспользовать большой generated output, например summary нескольких команд.
+
+Полезен для:
+
+- `large_command_output_compression`;
+- temporary one-session retrieval;
+- поиска по explicit indexed generated output.
+
+Не подходит для:
+
+- source-code indexing;
+- persistent project memory;
+- small project lookup;
+- protected validation artifacts;
+- implementation/verify gates.
+
+## Политика AIFHub
+
+`context-mode` остается `manual_helper_only`.
+
+Рекомендовать только если анализ упирается в большой generated output. Project labels важны косвенно: на large/legacy/multirepo проектах output может быть больше, но сам tool полезен только при task signal.
+
+Не рекомендовать для `small_microservice`, exact lookup и любых задач, где `rg` напрямую дает нужные файлы.
+
+## CLI И MCP
+
+Проверенный безопасный flow:
+
+```text
+context-mode doctor
+ctx_index <explicit-generated-text>
+ctx_search <query>
+ctx_purge scope=project
+```
+
+MCP exposes широкий surface: `ctx_execute`, `ctx_index`, `ctx_search`, `ctx_fetch_and_index`, `ctx_batch_execute`, `ctx_stats`, `ctx_doctor`, `ctx_upgrade`, `ctx_purge`, `ctx_insight`.
+
+Из AIFHub не использовать command execution tools как default provider. Индексировать только explicit generated content, не source tree.
+
+## Границы И Privacy
+
+Все, что explicit indexed, становится retrievable. Поэтому нельзя индексировать raw secrets, private snippets, local paths или protected validation artifacts.
+
+Не устанавливать hooks и не register MCP automatically.
+
+## Очистка
+
+Использовать `ctx_purge`:
+
+- `scope: "session"` с session id;
+- `scope: "project"` для whole project knowledge base.
 
 ## Мета Для Анализа
 
@@ -24,143 +82,5 @@ do_not_recommend_when:
   tasks:
     - persistent_project_memory
     - source_code_indexing
-analysis_hint: "Предлагать только когда анализ упирается в большой generated output; не использовать как постоянную memory."
+analysis_hint: "Предлагать только для большого generated output; не использовать как source-code memory."
 ```
-
-## Что Это
-
-`context-mode` - context-window optimization и temporary retrieval tool. Он может выполнять команды, индексировать output, искать по indexed content и purge project/session knowledge base.
-
-Это не clean memory provider для AIFHub. Он шире, чем memory, потому что включает shell execution, hooks, browser/insight helpers и output virtualization.
-
-## CLI И MCP
-
-CLI:
-
-- `context-mode doctor` работал.
-- Server и SQLite/FTS5 checks прошли.
-- Hook checks warned, потому что hooks не были registered.
-- `--help` и `--version` не вернули полезного output в trial.
-
-MCP exposed 11 tools:
-
-- `ctx_execute`
-- `ctx_execute_file`
-- `ctx_index`
-- `ctx_search`
-- `ctx_fetch_and_index`
-- `ctx_batch_execute`
-- `ctx_stats`
-- `ctx_doctor`
-- `ctx_upgrade`
-- `ctx_purge`
-- `ctx_insight`
-
-## Результаты Тестов
-
-Live MCP test:
-
-- Indexed маленький explicit text source.
-- Search успешно нашёл его.
-- Проверено, что canary text retrievable before purge.
-- Вызван `ctx_purge({ confirm: true, scope: "project" })`.
-- Проверено, что knowledge base empty after purge.
-- Total live test time: 1,922 ms.
-- `ctx_stats` reported 582 B entered context.
-
-## Результаты По Project Profiles (2026-05-22)
-
-`context-mode` не запускался против source fixtures P1-P5 как project index. Controlled run использовал маленький explicit text source для проверки indexing, search, canary retrieval и purge behavior.
-
-| Profile | Project Fixture Run | Scenario Tested | Result | Решение для профиля |
-|---|---|---|---|---|
-| P1 - Большой legacy PHP проект с интеграциями | Not run on source fixture | Temporary output indexing applicability | Может помочь с compression большого command output, но command execution/indexing должны быть explicit. | Manual helper only. |
-| P2 - Go-сервис с интеграциями | Not run on source fixture | Temporary output indexing applicability | Project-specific benefit over `rg` не доказан. | Manual helper only. |
-| P3 - Laravel/Vue продукт | Not run on source fixture | Temporary output indexing applicability | Project-specific benefit over `rg` не доказан; полезен только для большого generated output. | Manual helper only. |
-| P4 - Multirepo продукт | Not run on source fixture | Temporary output indexing applicability | Может индексировать selected multi-command output, но не должен становиться persistent memory. | Manual helper only. |
-| P5 - Малый Go микросервис | Not run on source fixture | Temporary output indexing applicability | Overhead, скорее всего, не нужен. | Не использовать по умолчанию. |
-
-Shared controlled result: explicit indexed canary был retrievable before purge, а `ctx_purge({ confirm: true, scope: "project" })` очистил его.
-
-## Локальный Прогон На Anonymous Profiles (2026-05-22)
-
-Проверка выполнялась только на explicit generated text: anonymous profile summary + canary. Source files не индексировались. Для каждого профиля использовался отдельный `CONTEXT_MODE_DIR`, затем выполнялся `ctx_purge({ confirm: true, scope: "project" })`.
-
-| Profile | Shape | Indexed Tokens | Index | Search | Found | Очистка | Решение |
-|---|---|---:|---:|---:|---|---|---|
-| R2026-05-22-P01 | `go_service` | ~43 | 59 ms | 8 ms | yes | PASS | Manual helper для explicit generated output. |
-| R2026-05-22-P02 | `large_framework_app` | ~46 | 49 ms | 8 ms | yes | PASS | Manual helper для explicit generated output. |
-| R2026-05-22-P03 | `small_microservice` | ~54 | 35 ms | 6 ms | yes | PASS | Manual helper для explicit generated output. |
-| R2026-05-22-P04 | `large_framework_app` | ~47 | 43 ms | 6 ms | yes | PASS | Manual helper для explicit generated output. |
-| R2026-05-22-P05 | `large_legacy` | ~43 | 38 ms | 7 ms | yes | PASS | Manual helper для explicit generated output. |
-| R2026-05-22-P06 | `small_microservice` | ~42 | 37 ms | 6 ms | yes | PASS | Manual helper для explicit generated output. |
-| R2026-05-22-P07 | `small_microservice` | ~47 | 40 ms | 7 ms | yes | PASS | Manual helper для explicit generated output. |
-| R2026-05-22-P08 | `large_framework_app` | ~50 | 41 ms | 7 ms | yes | PASS | Manual helper для explicit generated output. |
-| R2026-05-22-P09 | `small_microservice` | ~47 | 38 ms | 7 ms | yes | PASS | Manual helper для explicit generated output. |
-| R2026-05-22-P10 | `large_framework_app` | ~46 | 41 ms | 7 ms | yes | PASS | Manual helper для explicit generated output. |
-| R2026-05-22-P11 | `multirepo` | ~41 | 46 ms | 7 ms | yes | PASS | Manual helper для explicit generated output. |
-| R2026-05-22-P12 | `multirepo` | ~50 | 38 ms | 6 ms | yes | PASS | Manual helper для explicit generated output. |
-| R2026-05-22-P13 | `multirepo` | ~37 | 42 ms | 8 ms | yes | PASS | Manual helper для explicit generated output. |
-
-Вывод по этому прогону: `context-mode` быстро работает как temporary index для явного generated output, но это не доказательство пользы как source-code retrieval tool. Рекомендация остаётся manual/helper-only.
-
-## Локальный Прогон На Real Project Roots (2026-05-23)
-
-Проверка выполнялась через MCP SDK на пяти real project roots, но индексировались только generated profile summaries из `rg` baseline. Source snippets, paths, secrets и validation artifacts не передавались в `ctx_index`. Для каждого профиля использовался отдельный `CONTEXT_MODE_DIR`, затем выполнялся `ctx_purge({ confirm: true, scope: "project" })`.
-
-| Profile | Shape | MCP Connect | `ctx_index` | `ctx_search` | `ctx_purge` | Результат | Решение |
-|---|---|---:|---:|---:|---:|---|---|
-| real-profile-01 | `large_legacy_web_app` | 3.36 s | 83 ms | 8 ms | 121 ms | PASS | Manual helper только для generated output. |
-| real-profile-02 | `go_service` | 1.55 s | 36 ms | 7 ms | 9 ms | PASS | Manual helper только для generated output. |
-| real-profile-03 | `large_framework_app` | 1.69 s | 39 ms | 7 ms | 8 ms | PASS | Manual helper только для generated output. |
-| real-profile-04 | `multi_app_workspace` | 2.29 s | 40 ms | 7 ms | 8 ms | PASS | Manual helper только для generated output. |
-| real-profile-05 | `small_microservice` | 1.73 s | 46 ms | 8 ms | 10 ms | PASS | Обычно не нужен для малых проектов. |
-
-`context-mode doctor` также прошел runtime/server/FTS5 checks, а Codex hook registration failed/warned, потому что hooks намеренно не устанавливались. Для AIFHub docs это ожидаемо: не устанавливать hooks и не register MCP automatically.
-
-## Повторный Safe Field Run На Temp Copies (2026-05-24)
-
-Прогон выполнен через `scripts/memory-tool-field-run.mjs` на sanitized temp copies 55 anonymous profiles. `context-mode` устанавливался только во временный npm prefix. Source files не индексировались: harness индексировал только generated `rg` summary text без локальных путей и snippets, затем выполнял `ctx_search` и `ctx_purge`.
-
-| Проверка | Результат |
-|---|---:|
-| Проверенная версия | `context-mode 1.0.151` |
-| `context-mode doctor` | PASS |
-| MCP initialize | PASS |
-| `ctx_index` generated rg summary | PASS |
-| Indexed input size | 11,417 chars |
-| `ctx_search` | PASS |
-| `ctx_purge scope=project` | PASS |
-| Source indexing | no |
-| Hooks/setup/MCP registration | no |
-
-Вывод не меняет роль: `context-mode` остается manual helper для explicit generated output. Новое evidence подтверждает актуальную CLI/MCP версию и temp-only index/search/purge flow, но не доказывает его как source-code retrieval provider.
-
-## Границы И Privacy
-
-Privacy content-driven:
-
-- Он не читал private files сам по себе в live test.
-- Всё, что explicit indexed, становится retrievable.
-- Command execution tools могут читать или emit private data при неосторожном использовании.
-
-Для AIFHub это значит, что `context-mode` не должен регистрироваться как default provider. Если используется, то только как manual, per-session helper для большого command output и docs, а не persistent project memory.
-
-## Защищенные Validation Artifacts
-
-`context-mode` не должен rewrite validation artifacts и не должен compress protected artifacts in place. Protected validation artifacts включают `aif-gate-result`, `coverage.json`, `done-readiness.json`, OpenSpec specs, generated-rules traces и exact evidence snippets.
-
-## Очистка
-
-`ctx_purge` поддерживает explicit scopes:
-
-- `scope: "session"` с session id.
-- `scope: "project"` для whole project knowledge base.
-
-Live canary test подтвердил, что project purge работает.
-
-## Вывод
-
-Полезен как optional temporary context compression tool. Не подходит как default AIFHub memory.
-
-Рекомендуемая роль в AIFHub: docs-only/manual helper для уменьшения большого command output и one-session retrieval noise.

@@ -13,6 +13,7 @@ export const RECOMMENDATION_RESULT_SCHEMA = 'aifhub.memory_tools.recommendation_
 export const METADATA_RESULT_SCHEMA = 'aifhub.memory_tools.metadata_result.v1';
 export const STATUS_RESULT_SCHEMA = 'aifhub.memory_tools.status_result.v1';
 export const SELECTION_RESULT_SCHEMA = 'aifhub.memory_tools.selection_result.v1';
+export const LABELS_RESULT_SCHEMA = 'aifhub.memory_tools.labels_result.v1';
 export const ERROR_SCHEMA = 'aifhub.memory_tools.error.v1';
 
 const METADATA_RELATIVE_PATH = path.join('docs', 'memory-tools-research', 'recommendation-metadata.yaml');
@@ -77,6 +78,22 @@ export async function runMemoryToolRecommender(args = [], options = {}) {
         metadataError: loaded.ok ? null : loaded,
         checkDocsProvider: Boolean(parsed.flags.checkDocsProvider),
         probeRunner: options.probeRunner
+      });
+      return emitResult(body, 0, { ...options, json });
+    }
+
+    if (parsed.command === 'labels') {
+      const loaded = await tryLoadMetadata(parsed, cwd, options);
+      const taskSignals = parsed.flags.task.length > 0 ? parsed.flags.task : [DEFAULT_TASK_SIGNAL];
+      const classified = parsed.flags.fromProject
+        ? await classifyProjectProfileDetails(cwd, parsed.flags)
+        : buildProjectProfileDetailsFromFlags(parsed.flags);
+      const body = buildLabelsResult({
+        metadata: loaded.ok ? loaded.metadata : null,
+        metadataError: loaded.ok ? null : loaded,
+        projectProfile: classified.projectProfile,
+        evidence: classified.evidence,
+        taskSignals
       });
       return emitResult(body, 0, { ...options, json });
     }
@@ -425,6 +442,37 @@ export async function buildSelectionResult(options = {}) {
   };
 }
 
+export function buildLabelsResult(options = {}) {
+  const metadata = options.metadata;
+  const projectProfile = normalizeProjectProfile(options.projectProfile);
+  const taskSignals = normalizeTaskSignals(options.taskSignals);
+  const dimensionMatches = collectDimensionMatches(metadata, projectProfile);
+
+  return {
+    schema: LABELS_RESULT_SCHEMA,
+    metadata_available: Boolean(metadata),
+    metadata_source: metadata?.source_path ?? options.metadataError?.path ?? null,
+    available_labels: buildAvailableLabels(metadata),
+    project_shape: projectProfile.project_shape,
+    project_profile: projectProfile,
+    selected_labels: selectedLabelsForProfile(projectProfile),
+    task_signals: taskSignals,
+    dimension_matches: dimensionMatches.map((match) => match.id),
+    matched_dimension_signals: dimensionMatches.map((match) => ({
+      id: match.id,
+      match: match.match ?? {},
+      decision_action: match.decision_action ?? null,
+      suggest_tools: asArray(match.suggest_tools),
+      conditional_tools: asArray(match.conditional_tools),
+      avoid_tools: asArray(match.avoid_tools),
+      evidence: match.evidence ?? null,
+      quality_gate: match.quality_gate ?? null
+    })),
+    evidence: options.evidence ?? {},
+    warnings: metadata ? [] : [metadataWarning(options.metadataError)]
+  };
+}
+
 async function buildStatusResult(options = {}) {
   const metadata = options.metadata;
   const tools = metadata?.tools ? Object.keys(metadata.tools) : [];
@@ -529,6 +577,51 @@ function degradedSelectionResult(options = {}) {
       ...asArray(options.config?.warnings)
     ]
   };
+}
+
+function buildAvailableLabels(metadata) {
+  const dimensions = metadata?.project_dimensions ?? {};
+  return {
+    languages: uniqueLabels([...asArray(dimensions.languages), 'no-primary-language']),
+    volume: uniqueLabels(asArray(dimensions.volume).length > 0 ? dimensions.volume : ['mini', 'standard', 'large']),
+    complexity: uniqueLabels(
+      asArray(dimensions.complexity).length > 0
+        ? dimensions.complexity
+        : ['mini', 'framework', 'legacy', 'integration_heavy']
+    ),
+    repo_shape: uniqueLabels(
+      asArray(dimensions.repo_shape).length > 0
+        ? dimensions.repo_shape
+        : ['single_repo', 'monorepo', 'multirepo']
+    ),
+    artifact_mode: uniqueLabels(
+      asArray(dimensions.artifact_mode).length > 0
+        ? dimensions.artifact_mode
+        : ['openspec_native', 'legacy_ai_factory_only', 'none']
+    ),
+    project_shape: uniqueLabels(
+      Object.keys(metadata?.project_shape_signals ?? {}).length > 0
+        ? Object.keys(metadata.project_shape_signals)
+        : [...VALID_PROJECT_SHAPES]
+    ),
+    task_signals: uniqueLabels(Object.keys(metadata?.task_signals ?? {}))
+  };
+}
+
+function selectedLabelsForProfile(profile) {
+  const projectProfile = normalizeProjectProfile(profile);
+  return uniqueLabels([
+    ...(projectProfile.languages.length > 0 ? projectProfile.languages : ['no-primary-language']),
+    projectProfile.volume,
+    projectProfile.complexity,
+    projectProfile.repo_shape,
+    projectProfile.artifact_mode,
+    projectProfile.project_shape
+  ]);
+}
+
+function uniqueLabels(values) {
+  return [...new Set(asArray(values).flatMap((value) => splitCsv(value)).map(String).filter(Boolean))];
 }
 
 function metadataErrorBody(error) {
@@ -648,8 +741,11 @@ function screeningPolicyAllowsRequest(tool, projectProfile, taskSignals, command
 }
 
 function profileLabels(profile) {
+  const languageLabels = asArray(profile?.languages).length > 0
+    ? asArray(profile.languages).map(String)
+    : ['no-primary-language'];
   return new Set([
-    ...asArray(profile?.languages).map(String),
+    ...languageLabels,
     profile?.volume,
     profile?.complexity,
     profile?.repo_shape,
@@ -905,8 +1001,13 @@ export async function classifyProjectShape(cwd) {
 }
 
 export async function classifyProjectProfile(cwd, overrides = {}) {
+  const details = await classifyProjectProfileDetails(cwd, overrides);
+  return details.projectProfile;
+}
+
+async function classifyProjectProfileDetails(cwd, overrides = {}) {
   const stats = await scanProject(cwd);
-  const profile = {
+  const scannedProfile = {
     project_shape: classifyProjectShapeFromStats(stats),
     languages: normalizeLanguages([...stats.languages]),
     volume: classifyVolume(stats),
@@ -914,7 +1015,26 @@ export async function classifyProjectProfile(cwd, overrides = {}) {
     repo_shape: classifyRepoShape(stats),
     artifact_mode: classifyArtifactMode(stats)
   };
-  return applyProjectProfileOverrides(profile, overrides);
+  const projectProfile = applyProjectProfileOverrides(scannedProfile, overrides);
+  return {
+    projectProfile,
+    evidence: buildProfileEvidence(projectProfile, {
+      stats,
+      sourceKind: 'project-scan',
+      overrides
+    })
+  };
+}
+
+function buildProjectProfileDetailsFromFlags(flags = {}) {
+  const projectProfile = buildProjectProfileFromFlags(flags);
+  return {
+    projectProfile,
+    evidence: buildProfileEvidence(projectProfile, {
+      sourceKind: 'explicit-flags',
+      overrides: flags
+    })
+  };
 }
 
 async function scanProject(rootDir) {
@@ -926,7 +1046,18 @@ async function scanProject(rootDir) {
     hasFrameworkMarker: false,
     hasOpenSpec: false,
     hasAiFactory: false,
-    languages: new Set()
+    languages: new Set(),
+    manifestFiles: [],
+    workspaceMarkerFiles: [],
+    frameworkMarkerFiles: [],
+    openSpecMarkers: [],
+    aiFactoryMarkers: [],
+    languageEvidence: {
+      go: [],
+      js: [],
+      php: [],
+      rust: []
+    }
   };
 
   async function walk(currentDir, relativeDir = '') {
@@ -942,23 +1073,37 @@ async function scanProject(rootDir) {
       const normalized = toPosix(rel);
       if (entry.isDirectory()) {
         if (shouldIgnoreDir(normalized)) continue;
-        if (isFrameworkMarker(`${normalized}/`)) result.hasFrameworkMarker = true;
+        if (isFrameworkMarker(`${normalized}/`)) {
+          result.hasFrameworkMarker = true;
+          pushSample(result.frameworkMarkerFiles, `${normalized}/`);
+        }
         await walk(path.join(currentDir, entry.name), rel);
         continue;
       }
       if (!entry.isFile()) continue;
 
       result.fileCount += 1;
-      if (isManifestName(entry.name)) result.manifestCount += 1;
+      if (isManifestName(entry.name)) {
+        result.manifestCount += 1;
+        pushSample(result.manifestFiles, normalized);
+      }
       collectLanguageSignal(result, entry.name, normalized);
       if (entry.name === 'go.mod') result.hasGoMod = true;
-      if (isWorkspaceMarker(entry.name)) result.workspaceMarkers += 1;
-      if (isFrameworkMarker(normalized)) result.hasFrameworkMarker = true;
+      if (isWorkspaceMarker(entry.name)) {
+        result.workspaceMarkers += 1;
+        pushSample(result.workspaceMarkerFiles, normalized);
+      }
+      if (isFrameworkMarker(normalized)) {
+        result.hasFrameworkMarker = true;
+        pushSample(result.frameworkMarkerFiles, normalized);
+      }
       if (normalized === 'openspec/config.yaml' || normalized.startsWith('openspec/specs/')) {
         result.hasOpenSpec = true;
+        pushSample(result.openSpecMarkers, normalized);
       }
       if (normalized.startsWith('.ai-factory/')) {
         result.hasAiFactory = true;
+        pushSample(result.aiFactoryMarkers, normalized);
       }
     }
   }
@@ -1042,10 +1187,175 @@ function isFrameworkMarker(relativePath) {
 function collectLanguageSignal(result, name, relativePath) {
   const lowerName = String(name).toLowerCase();
   const lowerPath = String(relativePath).toLowerCase();
-  if (lowerName === 'go.mod' || lowerPath.endsWith('.go')) result.languages.add('go');
-  if (lowerName === 'package.json' || /\.(?:mjs|cjs|js|jsx|ts|tsx)$/.test(lowerPath)) result.languages.add('js');
-  if (lowerName === 'composer.json' || lowerPath.endsWith('.php')) result.languages.add('php');
-  if (lowerName === 'cargo.toml' || lowerPath.endsWith('.rs')) result.languages.add('rust');
+  if (lowerName === 'go.mod' || lowerPath.endsWith('.go')) addLanguageSignal(result, 'go', relativePath);
+  if (lowerName === 'package.json' || /\.(?:mjs|cjs|js|jsx|ts|tsx)$/.test(lowerPath)) {
+    addLanguageSignal(result, 'js', relativePath);
+  }
+  if (lowerName === 'composer.json' || lowerPath.endsWith('.php')) addLanguageSignal(result, 'php', relativePath);
+  if (lowerName === 'cargo.toml' || lowerPath.endsWith('.rs')) addLanguageSignal(result, 'rust', relativePath);
+}
+
+function addLanguageSignal(result, language, marker) {
+  result.languages.add(language);
+  if (!result.languageEvidence[language]) result.languageEvidence[language] = [];
+  pushSample(result.languageEvidence[language], marker);
+}
+
+function pushSample(target, value, limit = 8) {
+  const normalized = toPosix(value);
+  if (target.length >= limit || target.includes(normalized)) return;
+  target.push(normalized);
+}
+
+function buildProfileEvidence(profile, options = {}) {
+  const stats = options.stats ?? null;
+  const sourceKind = options.sourceKind ?? 'unknown';
+  const evidence = {};
+  const languages = profile.languages.length > 0 ? profile.languages : ['no-primary-language'];
+
+  for (const language of languages) {
+    setLabelEvidence(evidence, language, buildLanguageEvidence(language, stats, sourceKind));
+  }
+
+  setLabelEvidence(evidence, profile.volume, {
+    category: 'volume',
+    source: sourceKind,
+    reason: stats
+      ? `${stats.fileCount} scanned files classify volume as ${profile.volume}.`
+      : `Explicit or default profile volume is ${profile.volume}.`,
+    markers: []
+  });
+
+  setLabelEvidence(evidence, profile.complexity, {
+    category: 'complexity',
+    source: sourceKind,
+    reason: complexityEvidenceReason(profile.complexity, stats),
+    markers: stats?.frameworkMarkerFiles ?? []
+  });
+
+  setLabelEvidence(evidence, profile.repo_shape, {
+    category: 'repo_shape',
+    source: sourceKind,
+    reason: repoShapeEvidenceReason(profile.repo_shape, stats),
+    markers: stats ? [...stats.workspaceMarkerFiles, ...stats.manifestFiles].slice(0, 8) : []
+  });
+
+  setLabelEvidence(evidence, profile.artifact_mode, {
+    category: 'artifact_mode',
+    source: sourceKind,
+    reason: artifactModeEvidenceReason(profile.artifact_mode, stats),
+    markers: stats ? [...stats.openSpecMarkers, ...stats.aiFactoryMarkers].slice(0, 8) : []
+  });
+
+  setLabelEvidence(evidence, profile.project_shape, {
+    category: 'project_shape',
+    source: sourceKind,
+    reason: projectShapeEvidenceReason(profile.project_shape, stats),
+    markers: stats ? [
+      ...stats.workspaceMarkerFiles,
+      ...stats.manifestFiles,
+      ...stats.frameworkMarkerFiles
+    ].slice(0, 8) : []
+  });
+
+  return markExplicitOverrides(evidence, profile, options.overrides ?? {});
+}
+
+function setLabelEvidence(evidence, label, item) {
+  if (!evidence[label]) {
+    evidence[label] = item;
+    return;
+  }
+
+  evidence[label] = {
+    ...evidence[label],
+    category: uniqueLabels([...asArray(evidence[label].category), item.category]),
+    source: uniqueLabels([...asArray(evidence[label].source), item.source]),
+    reason: [evidence[label].reason, item.reason].filter(Boolean).join(' '),
+    markers: uniqueLabels([...asArray(evidence[label].markers), ...asArray(item.markers)])
+  };
+}
+
+function buildLanguageEvidence(language, stats, sourceKind) {
+  if (language === 'no-primary-language') {
+    return {
+      category: 'languages',
+      source: sourceKind,
+      reason: stats
+        ? 'No supported primary language markers were detected.'
+        : 'No explicit supported primary language label was provided.',
+      markers: []
+    };
+  }
+
+  return {
+    category: 'languages',
+    source: sourceKind,
+    reason: stats
+      ? `Detected ${language} language markers.`
+      : `Explicit or default language label is ${language}.`,
+    markers: stats?.languageEvidence?.[language] ?? []
+  };
+}
+
+function complexityEvidenceReason(complexity, stats) {
+  if (!stats) return `Explicit or default complexity is ${complexity}.`;
+  if (stats.hasFrameworkMarker) return `Framework markers classify complexity as ${complexity}.`;
+  if (stats.fileCount >= 1500) return `Large file count (${stats.fileCount}) classifies complexity as ${complexity}.`;
+  if (stats.manifestCount >= 4 || stats.workspaceMarkers > 0) {
+    return `Multiple manifests/workspace markers classify complexity as ${complexity}.`;
+  }
+  return `${stats.fileCount} scanned files classify complexity as ${complexity}.`;
+}
+
+function repoShapeEvidenceReason(repoShape, stats) {
+  if (!stats) return `Explicit or default repo shape is ${repoShape}.`;
+  if (stats.workspaceMarkers > 0) return `Workspace markers classify repo shape as ${repoShape}.`;
+  if (stats.manifestCount >= 3) return `${stats.manifestCount} manifests classify repo shape as ${repoShape}.`;
+  return 'No workspace markers or multirepo manifest count were detected.';
+}
+
+function artifactModeEvidenceReason(artifactMode, stats) {
+  if (!stats) return `Explicit or default artifact mode is ${artifactMode}.`;
+  if (stats.hasOpenSpec) return `OpenSpec markers classify artifact mode as ${artifactMode}.`;
+  if (stats.hasAiFactory) return `Existing .ai-factory markers classify artifact mode as ${artifactMode}.`;
+  return 'No OpenSpec or .ai-factory artifact markers were detected.';
+}
+
+function projectShapeEvidenceReason(projectShape, stats) {
+  if (!stats) return `Explicit or default project shape is ${projectShape}.`;
+  return [
+    `${stats.fileCount} scanned files`,
+    `${stats.manifestCount} manifests`,
+    `${stats.workspaceMarkers} workspace markers`,
+    stats.hasGoMod ? 'go.mod present' : 'go.mod absent',
+    stats.hasFrameworkMarker ? 'framework markers present' : 'framework markers absent'
+  ].join('; ') + ` classify project shape as ${projectShape}.`;
+}
+
+function markExplicitOverrides(evidence, profile, overrides) {
+  const overrideLabels = [];
+  if (hasOverrideValue(overrides.language) || hasOverrideValue(overrides.languages)) {
+    overrideLabels.push(...(profile.languages.length > 0 ? profile.languages : ['no-primary-language']));
+  }
+  if (hasOverrideValue(overrides.shape) || hasOverrideValue(overrides.projectShape) || hasOverrideValue(overrides.project_shape)) {
+    overrideLabels.push(profile.project_shape);
+  }
+  if (hasOverrideValue(overrides.volume)) overrideLabels.push(profile.volume);
+  if (hasOverrideValue(overrides.complexity)) overrideLabels.push(profile.complexity);
+  if (hasOverrideValue(overrides.repoShape) || hasOverrideValue(overrides.repo_shape)) overrideLabels.push(profile.repo_shape);
+  if (hasOverrideValue(overrides.artifactMode) || hasOverrideValue(overrides.artifact_mode)) overrideLabels.push(profile.artifact_mode);
+
+  for (const label of overrideLabels) {
+    if (!evidence[label]) continue;
+    evidence[label] = {
+      ...evidence[label],
+      source: 'explicit-override',
+      reason: `Explicit CLI override selected ${label}.`
+    };
+  }
+
+  return evidence;
 }
 
 function buildProjectProfileFromFlags(flags = {}) {

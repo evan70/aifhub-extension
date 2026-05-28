@@ -94,7 +94,7 @@ Safety вывод: scoped lifecycle можно считать рабочим д�
 
 Финальный reduced screening run: `screening-codegraph-preinit-nosipout-gpt54mini`.
 
-Полная таблица по skill и rows находится в [ai-tester-token-matrices-screening-codegraph.md](ai-tester-token-matrices-screening-codegraph.md).
+Полная таблица по skill и rows находится в [ai-tester-token-matrices-screening-codegraph.md](ai-tester-token-matrices-screening-codegraph.md). Raw artifact: `.ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/screening-codegraph-preinit-nosipout-gpt54mini/ai-tester-token-matrices.json`.
 
 | Metric | rg | CodeGraph | CodeGraph delta |
 |---|---:|---:|---:|
