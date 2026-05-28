@@ -26,6 +26,9 @@ node scripts/memory-tool-recommender.mjs select --from-project --command aif-exp
 ```bash
 node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --out <temp-run-dir> --max-profiles 5 --json
 node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --out <temp-run-dir> --dry-run --json
+node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --tool codegraph --matrix-size screening --preinitialize-tool codegraph --scenario-prefix screening-codegraph --json
+node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --tool codegraph --matrix-size profile-sweep --json
+node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --tool codegraph --matrix-size skill-sweep --json
 node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --tool codegraph --skill aif-explore --task architecture_or_impact_discovery --json
 node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --tool codegraph --task architecture_or_impact_discovery --json
 node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --tool codegraph --skill aif-explore --task architecture_or_impact_discovery --preinitialize-tool codegraph --json
@@ -33,7 +36,31 @@ node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --tool cod
 
 `--roots` может указывать на один проект или каталог с проектами. Durable docs не должны содержать этот путь; public output хранит только anonymous profile ids.
 
-Для полного локального набора текущий discovery дает 47 anonymous project profiles. При одном skill итоговая матрица содержит 94 scenarios: 47 `rg baseline` и 47 `codegraph tool_run`. При default skill set итоговая матрица содержит 940 scenarios: для каждого из 10 skills по 47 `rg baseline` и 47 `codegraph tool_run`.
+Используйте `--scenario-prefix <id>` для каждого нового большого прогона. `ai-tester` хранит traces глобально по scenario id; prefix предотвращает случайное переиспользование старых traces с такими же `matrix-profile-01` ids.
+
+По умолчанию генератор использует `--matrix-size screening`, а не exhaustive matrix. Цель первого прогона - найти условия, где tool может быть выгоден по tokens/time/result, а не оплатить все комбинации заранее.
+
+| Preset | Profiles | Skills | Task set | Scenarios per tool | Когда запускать |
+|---|---:|---:|---|---:|---|
+| `screening` | 15 stratified | 10 grouped representatives | `primary` | 300 | Первый проход: найти signal по skill group и project labels. |
+| `profile-sweep` | all discovered | 4 high-signal representatives | `primary` | `profiles * 8` | Подтвердить project/profile условия после screening. |
+| `skill-sweep` | 8 stratified | 29 AI Factory skills | `primary` | 464 | Проверить все skills на малой выборке проектов. |
+| `full` | all discovered | metadata skills by default | `primary` | depends | Audit mode; для 29 skills x 47 profiles используйте `--matrix-size full --skill-set all`, это 2726 scenarios per tool/task. |
+
+Для полного локального набора старый exhaustive вариант был слишком дорогим: 29 skills * 47 profiles * 2 runs = 2726 scenarios для одного tool/task. После исключения ненужных roots число проектов может быть меньше, но правило сохраняется: сначала `screening`, затем targeted confirmation.
+
+Skill groups покрывают все AI Factory skills через representatives:
+
+| Group | Representatives | Members |
+|---|---|---|
+| `bootstrap_analysis` | `aif-analyze` | `aif`, `aif-init`, `aif-analyze`, `aif-mode` |
+| `research_architecture` | `aif-explore` | `aif-explore`, `aif-architecture`, `aif-grounded` |
+| `planning_refinement` | `aif-plan` | `aif-plan`, `aif-improve`, `aif-roadmap`, `aif-loop` |
+| `implementation_fix` | `aif-implement`, `aif-fix` | `aif-implement`, `aif-fix` |
+| `review_quality_gates` | `aif-review`, `aif-rules-check`, `aif-verify` | `aif-review`, `aif-qa`, `aif-rules-check`, `aif-security-checklist`, `aif-verify`, `aif-done` |
+| `generation_output` | `aif-docs` | `aif-build-automation`, `aif-ci`, `aif-dockerize`, `aif-docs`, `aif-reference`, `aif-rules`, `aif-skill-generator` |
+| `commit_finalization` | `aif-commit` | `aif-commit` |
+| `guidance_only` | none by default | `aif-best-practices`, `aif-evolve` |
 
 Windows note: runner должен уметь выполнять `fixtures.setup_commands` через Windows shell. В локальном прогоне `ai-tester 0.5.0` был patched to use `cmd.exe` for setup commands instead of hard-coded `/bin/sh`.
 

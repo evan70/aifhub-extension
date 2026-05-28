@@ -19,6 +19,7 @@ import {
 } from './memory-tool-recommender.mjs';
 
 export const AI_TESTER_MATRIX_SCHEMA = 'aifhub.memory_tools.ai_tester_matrix.v1';
+export const DEFAULT_MATRIX_SIZE = 'screening';
 
 const DEFAULT_SKILLS = [
   'aif-analyze',
@@ -32,6 +33,119 @@ const DEFAULT_SKILLS = [
   'aif-done',
   'aif-commit'
 ];
+const ALL_AIF_SKILLS = [
+  'aif',
+  'aif-analyze',
+  'aif-architecture',
+  'aif-best-practices',
+  'aif-build-automation',
+  'aif-ci',
+  'aif-commit',
+  'aif-dockerize',
+  'aif-docs',
+  'aif-done',
+  'aif-evolve',
+  'aif-explore',
+  'aif-fix',
+  'aif-grounded',
+  'aif-implement',
+  'aif-improve',
+  'aif-init',
+  'aif-loop',
+  'aif-mode',
+  'aif-plan',
+  'aif-qa',
+  'aif-reference',
+  'aif-review',
+  'aif-roadmap',
+  'aif-rules',
+  'aif-rules-check',
+  'aif-security-checklist',
+  'aif-skill-generator',
+  'aif-verify'
+];
+const DEFAULT_SKILL_GROUPS = [
+  {
+    id: 'bootstrap_analysis',
+    representatives: ['aif-analyze'],
+    members: ['aif', 'aif-init', 'aif-analyze', 'aif-mode'],
+    rationale: 'project classification, metadata, and setup-oriented repository reading'
+  },
+  {
+    id: 'research_architecture',
+    representatives: ['aif-explore'],
+    members: ['aif-explore', 'aif-architecture', 'aif-grounded'],
+    rationale: 'broad discovery and architecture/impact investigation'
+  },
+  {
+    id: 'planning_refinement',
+    representatives: ['aif-plan'],
+    members: ['aif-plan', 'aif-improve', 'aif-roadmap', 'aif-loop'],
+    rationale: 'planning and iterative refinement over gathered context'
+  },
+  {
+    id: 'implementation_fix',
+    representatives: ['aif-implement', 'aif-fix'],
+    members: ['aif-implement', 'aif-fix'],
+    rationale: 'source edits, bug fixes, and direct implementation workflows'
+  },
+  {
+    id: 'review_quality_gates',
+    representatives: ['aif-review', 'aif-rules-check', 'aif-verify'],
+    members: ['aif-review', 'aif-qa', 'aif-rules-check', 'aif-security-checklist', 'aif-verify', 'aif-done'],
+    rationale: 'review, rules, security, QA, and completion gates'
+  },
+  {
+    id: 'generation_output',
+    representatives: ['aif-docs'],
+    members: ['aif-build-automation', 'aif-ci', 'aif-dockerize', 'aif-docs', 'aif-reference', 'aif-rules', 'aif-skill-generator'],
+    rationale: 'generated files or documentation based on repository context'
+  },
+  {
+    id: 'commit_finalization',
+    representatives: ['aif-commit'],
+    members: ['aif-commit'],
+    rationale: 'diff summarization and commit message workflow'
+  },
+  {
+    id: 'guidance_only',
+    representatives: [],
+    members: ['aif-best-practices', 'aif-evolve'],
+    rationale: 'guidance/meta skills are excluded from screening; sample explicitly if needed'
+  }
+];
+const MATRIX_SIZE_PRESETS = {
+  screening: {
+    skillSet: 'grouped',
+    profileMode: 'stratified',
+    maxProfiles: 15,
+    taskSet: 'primary',
+    purpose: 'Fast signal discovery across representative skill groups and project dimensions.'
+  },
+  'profile-sweep': {
+    skillSet: 'high-signal',
+    profileMode: 'all',
+    maxProfiles: null,
+    taskSet: 'primary',
+    purpose: 'Check project/profile conditions after screening finds likely useful skill groups.'
+  },
+  'skill-sweep': {
+    skillSet: 'all',
+    profileMode: 'stratified',
+    maxProfiles: 8,
+    taskSet: 'primary',
+    purpose: 'Check all AI Factory skills on a small stratified profile sample.'
+  },
+  full: {
+    skillSet: 'metadata',
+    profileMode: 'all',
+    maxProfiles: null,
+    taskSet: 'primary',
+    purpose: 'Full current metadata skill matrix; use --skill-set all for exhaustive all-skill coverage.'
+  }
+};
+const HIGH_SIGNAL_SKILLS = ['aif-explore', 'aif-plan', 'aif-review', 'aif-rules-check'];
+const PRIMARY_TASK_SCENARIOS = ['architecture_or_impact_discovery'];
 const DEFAULT_TASK_SCENARIOS = [
   'architecture_or_impact_discovery',
   'exact_file_or_symbol_lookup',
@@ -50,7 +164,7 @@ const SELECTOR_COMMANDS = {
   installed: 'ai-factory aifhub-memory-tools select --from-project --command <skill> --json',
   'source-fallback': 'node scripts/memory-tool-recommender.mjs select --from-project --command <skill> --json'
 };
-const DEFAULT_CODEX_MODEL = 'gpt-5';
+const DEFAULT_CODEX_MODEL = 'gpt-5.4-mini';
 const MATRIX_SYSTEM_PROMPT = [
   '# AIFHub Memory Tool Matrix',
   '',
@@ -82,10 +196,11 @@ export async function runMemoryToolAiTesterMatrix(args = [], options = {}) {
     metadataPath: parsed.metadata,
     cwd
   });
+  const matrixStrategy = resolveMatrixStrategy({ parsed, metadata });
   const rootInputs = parsed.roots.length > 0 ? parsed.roots : [cwd];
   const profiles = await discoverMatrixProfiles(rootInputs, {
-    maxProfiles: parsed.maxProfiles,
-    stratified: parsed.stratified,
+    maxProfiles: matrixStrategy.max_profiles,
+    stratified: matrixStrategy.stratified,
     excludeRoots: parsed.excludeRoots
   });
   const copies = [];
@@ -99,12 +214,14 @@ export async function runMemoryToolAiTesterMatrix(args = [], options = {}) {
   const manifest = buildAiTesterMatrixManifest({
     metadata,
     profiles,
-    skills: parsed.skills.length > 0 ? parsed.skills : defaultSkills(metadata),
+    skills: matrixStrategy.skills,
     tools: parsed.tools.length > 0 ? parsed.tools : OPTIONAL_TOOLS,
-    taskScenarios: parsed.tasks.length > 0 ? parsed.tasks : defaultTaskScenarios(metadata),
+    taskScenarios: matrixStrategy.task_scenarios,
     preinitializeTools: parsed.preinitializeTools,
     selectorMode: parsed.selectorMode,
-    model: parsed.model ?? DEFAULT_CODEX_MODEL
+    model: parsed.model ?? DEFAULT_CODEX_MODEL,
+    matrixStrategy,
+    scenarioPrefix: parsed.scenarioPrefix
   });
 
   if (!parsed.dryRun) {
@@ -211,13 +328,15 @@ export function buildAiTesterMatrixManifest(options = {}) {
     ? asArray(options.taskScenarios)
     : DEFAULT_TASK_SCENARIOS;
   const selectorMode = normalizeSelectorMode(options.selectorMode);
+  const scenarioPrefix = safeScenarioPrefix(options.scenarioPrefix);
   const cases = [];
 
   for (const profile of profiles) {
     for (const skill of skills) {
       for (const taskScenario of taskScenarios) {
         for (const toolId of tools.filter((tool) => tool !== 'rg')) {
-          const pairId = `${profile.id}__${skill}__${toolId}__${taskScenario}`;
+          const pairIdBase = `${profile.id}__${skill}__${toolId}__${taskScenario}`;
+          const pairId = scenarioPrefix ? `${scenarioPrefix}__${pairIdBase}` : pairIdBase;
           cases.push({
             id: `${pairId}__baseline_rg`,
             pair_id: pairId,
@@ -263,6 +382,9 @@ export function buildAiTesterMatrixManifest(options = {}) {
       model: options.model ?? DEFAULT_CODEX_MODEL,
       permission_mode: 'bypassPermissions'
     },
+    matrix_strategy: options.matrixStrategy ?? null,
+    scenario_prefix: scenarioPrefix,
+    skill_groups: sanitizeSkillGroups(defaultSkillGroups(metadata)),
     preinitialized_tools: preinitializeTools,
     suites: buildSuiteDefinitions(),
     profiles,
@@ -531,6 +653,9 @@ export function buildPublicMatrixSummary({
     output_scope: outDir ? 'selected-run-dir' : null,
     selector: manifest?.selector ?? null,
     runner: manifest?.runner ?? null,
+    matrix_strategy: manifest?.matrix_strategy ?? null,
+    scenario_prefix: manifest?.scenario_prefix ?? null,
+    skill_groups: manifest?.skill_groups ?? [],
     preinitialized_tools: manifest?.preinitialized_tools ?? [],
     profiles,
     profile_counts_by_dimension: countProfileDimensions(profiles),
@@ -801,6 +926,12 @@ function safeAssertionId(value) {
   return String(value ?? 'tool').replace(/[^A-Za-z0-9_-]+/g, '-');
 }
 
+function safeScenarioPrefix(value) {
+  const normalized = String(value ?? '').trim();
+  if (!normalized) return '';
+  return normalized.replace(/[^A-Za-z0-9_.-]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
 function escapeRegexForYaml(value) {
   return String(value ?? '').replace(/[\\^$.*+?()[\]{}|]/g, '\\$&').replaceAll('"', '\\"');
 }
@@ -834,6 +965,74 @@ function selectorInvocationRegexForYaml() {
     `(?:^|\\s)["']?(?:ai-factory\\s+)?aifhub-memory-tools\\s+select`,
     `(?:^|\\s)["']?node\\s+scripts[\\\\/]memory-tool-recommender\\.mjs\\s+select`
   ].join('|');
+}
+
+export function resolveMatrixStrategy({ parsed = {}, metadata = {} } = {}) {
+  const matrixSize = normalizeMatrixSize(parsed.matrixSize);
+  const preset = MATRIX_SIZE_PRESETS[matrixSize];
+  const skillSet = parsed.skillSet ?? preset.skillSet;
+  const taskSet = parsed.taskSet ?? preset.taskSet;
+  const stratified = parsed.stratified || preset.profileMode === 'stratified';
+  const maxProfiles = parsed.maxProfiles ?? preset.maxProfiles;
+  const skills = parsed.skills?.length > 0
+    ? unique(parsed.skills)
+    : resolveSkillSet({ metadata, skillSet });
+  const taskScenarios = parsed.tasks?.length > 0
+    ? unique(parsed.tasks)
+    : resolveTaskSet({ metadata, taskSet });
+  const estimatedPairCountPerTool = Number.isFinite(maxProfiles)
+    ? skills.length * maxProfiles * taskScenarios.length
+    : null;
+
+  return {
+    matrix_size: matrixSize,
+    purpose: preset.purpose,
+    skill_set: parsed.skills?.length > 0 ? 'explicit' : skillSet,
+    task_set: parsed.tasks?.length > 0 ? 'explicit' : taskSet,
+    profile_mode: stratified ? 'stratified' : 'all',
+    max_profiles: maxProfiles,
+    stratified,
+    skills,
+    task_scenarios: taskScenarios,
+    estimated_pair_count_per_tool: estimatedPairCountPerTool,
+    estimated_scenario_count_per_tool: Number.isFinite(estimatedPairCountPerTool)
+      ? estimatedPairCountPerTool * 2
+      : null
+  };
+}
+
+export function resolveSkillSet({ metadata = {}, skillSet = 'metadata' } = {}) {
+  if (skillSet === 'all') return ALL_AIF_SKILLS;
+  if (skillSet === 'grouped') {
+    return unique(defaultSkillGroups(metadata).flatMap((group) => asArray(group.representatives)));
+  }
+  if (skillSet === 'high-signal') return HIGH_SIGNAL_SKILLS;
+  if (skillSet === 'default') return DEFAULT_SKILLS;
+  return defaultSkills(metadata);
+}
+
+export function resolveTaskSet({ metadata = {}, taskSet = 'primary' } = {}) {
+  if (taskSet === 'all') return defaultTaskScenarios(metadata);
+  if (taskSet === 'primary') return PRIMARY_TASK_SCENARIOS;
+  return defaultTaskScenarios(metadata);
+}
+
+function normalizeMatrixSize(value) {
+  return Object.hasOwn(MATRIX_SIZE_PRESETS, value) ? value : DEFAULT_MATRIX_SIZE;
+}
+
+function defaultSkillGroups(metadata = {}) {
+  const groups = asArray(metadata.benchmark_matrix?.ai_tester?.skill_test_groups);
+  return groups.length > 0 ? groups : DEFAULT_SKILL_GROUPS;
+}
+
+function sanitizeSkillGroups(groups = []) {
+  return asArray(groups).map((group) => ({
+    id: group.id,
+    representatives: asArray(group.representatives),
+    members: asArray(group.members),
+    rationale: group.rationale ?? ''
+  }));
 }
 
 function toPosix(value) {
@@ -871,7 +1070,11 @@ function parseArgs(args) {
     writeJson: true,
     dryRun: false,
     maxProfiles: null,
-    stratified: false
+    stratified: false,
+    matrixSize: DEFAULT_MATRIX_SIZE,
+    skillSet: null,
+    taskSet: null,
+    scenarioPrefix: ''
   };
 
   for (let index = 0; index < args.length; index += 1) {
@@ -908,6 +1111,14 @@ function parseArgs(args) {
       parsed.maxProfiles = Number(args[++index]);
     } else if (token === '--stratified') {
       parsed.stratified = true;
+    } else if (token === '--matrix-size') {
+      parsed.matrixSize = normalizeMatrixSize(args[++index]);
+    } else if (token === '--skill-set') {
+      parsed.skillSet = args[++index];
+    } else if (token === '--task-set') {
+      parsed.taskSet = args[++index];
+    } else if (token === '--scenario-prefix') {
+      parsed.scenarioPrefix = args[++index];
     }
   }
   return parsed;
@@ -929,6 +1140,12 @@ function getCliUsage() {
     '  --selector-mode installed|source-fallback',
     '  --model <id>                Codex model to write into generated ai-tester scenarios.',
     '  --dry-run                  Do not copy fixtures or write scenario YAML files.',
+    '  --matrix-size screening|profile-sweep|skill-sweep|full',
+    '                              Preset for reducing test count. Default: screening.',
+    '  --skill-set grouped|high-signal|metadata|default|all',
+    '                              Skill selection mode; explicit --skill overrides it.',
+    '  --task-set primary|all      Task scenario selection mode; explicit --task overrides it.',
+    '  --scenario-prefix <id>      Prefix scenario ids to avoid collisions with previous ai-tester traces.',
     '  --max-profiles <n>         Limit discovered profiles.',
     '  --stratified               Pick a spread of project dimensions before truncating.',
     '  --no-write-json            Do not write matrix-summary.json under --out.',
@@ -940,6 +1157,10 @@ function asArray(value) {
   if (Array.isArray(value)) return value;
   if (value === undefined || value === null || value === '') return [];
   return [value];
+}
+
+function unique(values = []) {
+  return [...new Set(asArray(values).filter(Boolean))];
 }
 
 function splitCsv(value) {

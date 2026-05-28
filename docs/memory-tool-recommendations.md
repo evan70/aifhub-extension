@@ -66,7 +66,7 @@ Protected validation artifacts:
 - `context-mode`: manual temporary index для explicit generated output или large command output.
 - Context7: optional docs provider для version-sensitive library/API questions.
 - `agent-memory`: manual notes только когда пользователь явно просит durable notes.
-- CodeGraph: `manual_cli_only` / `suggest_manual_cli_for_repo_graph_when_enabled_or_explicit`; CLI scoped read и purge прошли explicit real-root testing. `/aif-analyze` может рекомендовать его для broad repo graph questions, а `/aif-explore` может использовать его только когда command-specific `select` output возвращает его в `selected_tools`. Уже готовый индекс можно переиспользовать только после `rg` и только если `files/query/context` дает полезную непустую выборку.
+- CodeGraph: `manual_cli_only` + `avoid_by_default`; CLI scoped read и purge прошли explicit real-root testing. Selector может рекомендовать его только при exact `screening_policy` match по skill + project labels; broad repo graph question, language или multirepo label сами по себе недостаточны. Уже готовый индекс можно переиспользовать только после `rg` и только если `files/query/context` дает полезную непустую выборку.
 
 Не рекомендовать по умолчанию:
 
@@ -91,9 +91,9 @@ project_dimensions:
 Практический смысл:
 
 - mini или exact lookup: оставить `rg`, избегать on-demand CodeGraph/Graphify/context-mode setup; уже готовый CodeGraph index не является default-рекомендацией.
-- large framework или multirepo broad discovery: предлагать CodeGraph/Graphify условно, после `rg` baseline.
+- large framework или multirepo broad discovery: предлагать Graphify условно после `rg`; CodeGraph только при exact skill+labels screening match.
 - legacy integration-heavy: рекомендовать только conditional tools с явным объяснением noise/time tradeoff.
-- Go service: mini Go остается на `rg`; standard/large Go может получить conditional repo graph только для broad impact mapping.
+- Go service: Go label не дает CodeGraph recommendation; для repo graph оставлять Graphify/`rg`, пока нет exact screening match.
 - docs/version tasks: Context7 только для version-sensitive library/API вопросов.
 - continuity tasks: `codex-agent-mem` только для resume/open-work с explicit DB path.
 
@@ -118,7 +118,7 @@ Decision mapping из matrix:
 - `ctx7 --version` или `npx --no-install ctx7 --help` только когда передан `--check-docs-provider`
 - `codegraph --version`, `codegraph --help` или `codegraph status` только как availability probes
 
-Эти probes не должны install packages, run setup, register MCP servers, write hooks или start background processes. `codegraph init/index/query/uninit` разрешен только когда `select --command aif-explore --json` возвращает CodeGraph в `selected_tools` с `manual_purged_cli_execution`, explicit project path и purge через `codegraph uninit --force <project>`.
+Эти probes не должны install packages, run setup, register MCP servers, write hooks или start background processes. `codegraph init/index/query/uninit` разрешен только когда `select --command aif-explore --json` возвращает CodeGraph в `selected_tools` из-за exact screening match, с `manual_purged_cli_execution`, explicit project path и purge через `codegraph uninit --force <project>`.
 
 ## Выбор Через Config
 
@@ -149,7 +149,7 @@ Follow-up smoke от 2026-05-23 использовал пять real local proje
 
 Позже CodeGraph был установлен по явному запросу пользователя и проверен на 29 real local project roots через `init`, `index --quiet`, `status`, JSON `query` и `uninit --force`. Lifecycle прошел на всех 29 roots без protected agent/config mutations и без оставшихся `.codegraph/` directories.
 
-Повторный forced benchmark от 2026-05-26 прошел 47 sanitized anonymous profiles. Lifecycle/purge снова прошел 47/47, но useful generic `architecture_or_impact_discovery` context был ограничен: 23 mini profiles ушли в overhead, 18 profiles вернули header-only/no useful context, и только 6 profiles остались conditional useful. Дополнительный `ai-tester` warm-index режим предварительно выполнял `codegraph init/index` через `setup_commands`; на текущем standard extension profile warm CodeGraph все равно был ~2.0x total tokens против `rg`, а на одном mini js/md profile сэкономил 4.6% total tokens, но дал слабый дополнительный сигнал. Видимые строки тестов с `ai-tester` token traces, full 94-row CLI matrix и all-skills scenario matrix находятся в [CodeGraph Benchmark Results](memory-tools-research/codegraph-benchmark-results.md); таблицы по skill с реальными input/output/cache token traces находятся в [AI Tester Token Matrices](memory-tools-research/ai-tester-token-matrices.md). Принятая рекомендация - manual CLI-only с quality gate; `install`/MCP/agent-config behavior все еще не принят для AIFHub automation.
+Повторный forced benchmark от 2026-05-26 прошел 47 sanitized anonymous profiles. Lifecycle/purge снова прошел 47/47, но useful generic `architecture_or_impact_discovery` context был ограничен: 23 mini profiles ушли в overhead, 18 profiles вернули header-only/no useful context, и только 6 profiles остались conditional useful. Финальная reduced `ai-tester` screening matrix от 2026-05-27 покрыла 300/300 rows и показала, что CodeGraph в среднем хуже `rg`: +21.0% duration, +29.6% tool calls, +55.7% total tokens, +54.3% input+output tokens. При этом среди 132 PASS/PASS пар есть 46 token-saving rows (34.8%), поэтому вывод не "всегда запрещён", а `avoid_by_default` с exact conditional cases. Самые сильные win-cases: `js+php standard framework multirepo openspec_native` для `aif-docs` (-82.7% total), `js standard framework monorepo legacy_ai_factory_only multirepo` для `aif-implement`/`aif-explore`, `js mini framework single_repo none` для commit/review/verify/implement/fix/rules/explore, `no-primary-language mini` для rules/review/docs/commit/fix, плюс отдельные weak cases для `php+js`, `js+go`, `rust` и `php`. Эти cases считаются кандидатами только для warm/existing index или explicit user-owned setup, потому что savings не включают стоимость `init/index`, и только если совпали skill + project labels. Видимые строки тестов находятся в [CodeGraph Benchmark Results](memory-tools-research/codegraph-benchmark-results.md); итоговая screening table - в [AI Tester Token Matrices: Screening CodeGraph](memory-tools-research/ai-tester-token-matrices-screening-codegraph.md). Принятая рекомендация - manual CLI-only + avoid_by_default; `install`/MCP/agent-config behavior все еще не принят для AIFHub automation.
 
 Повторный safe field run от 2026-05-24 использовал 55 anonymous profiles из local projects root, но запускал инструменты только на sanitized temp copies или temp isolated dirs. Итог: `rg`, read-only `git/gh`, CodeGraph, Context7 и `context-mode` прошли; Graphify AST-only прошел на 54/55 профилей с одним timeout; `codex-agent-mem` подтвержден как GitHub/Python source package без source indexing. Context7 теперь имеет отдельный research note: [memory-tools-research/context7.md](memory-tools-research/context7.md).
 

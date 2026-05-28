@@ -71,9 +71,14 @@ describe('recommendation metadata parsing', () => {
     assert.equal(metadata.benchmark_matrix.ai_tester.result_schema, 'aifhub.memory_tools.ai_tester_matrix.v1');
     assert.deepEqual(metadata.benchmark_matrix.ai_tester.decision_actions, ['recommend', 'conditional', 'avoid', 'forbid']);
     assert.ok(metadata.benchmark_matrix.ai_tester.comparison_metrics.includes('usefulness_vs_rg'));
+    assert.equal(metadata.benchmark_matrix.ai_tester.reduced_matrix_policy.default_matrix_size, 'screening');
+    assert.equal(metadata.benchmark_matrix.ai_tester.reduced_matrix_policy.presets.screening.expected_scenarios_per_tool, 300);
+    assert.equal(metadata.benchmark_matrix.ai_tester.skill_test_groups.length, 8);
+    assert.deepEqual(metadata.benchmark_matrix.ai_tester.skill_test_groups[0].representatives, ['aif-analyze']);
     assert.ok(metadata.dimension_signals.mini_go_service.avoid_tools.includes('codegraph'));
-    assert.ok(metadata.dimension_signals.large_framework_broad_discovery.conditional_tools.includes('codegraph'));
+    assert.ok(!metadata.dimension_signals.large_framework_broad_discovery.conditional_tools.includes('codegraph'));
     assert.ok(metadata.evidence_runs.some((run) => run.id === 'codegraph-forced-benchmark-2026-05-26'));
+    assert.ok(metadata.evidence_runs.some((run) => run.id === 'codegraph-screening-preinit-nosipout-gpt54mini-2026-05-27'));
     assert.equal(metadata.tool_permissions.graphify['aif-analyze'], 'recommend_only');
     assert.equal(metadata.availability_probes.graphify[0], 'graphify --version');
     assert.ok(metadata.forbidden_operations.includes('auto_install'));
@@ -86,6 +91,8 @@ describe('recommendation metadata parsing', () => {
     assert.equal(metadata.tools['eagle-mem'].decision, 'reject_defer');
     assert.equal(metadata.tools.context7.decision, 'optional');
     assert.equal(metadata.tools.codegraph.decision, 'manual_cli_only');
+    assert.equal(metadata.tools.codegraph.screening_policy.default_decision, 'avoid_by_default');
+    assert.equal(metadata.tools.codegraph.screening_policy.aggregate.rows_executed, 300);
   });
 });
 
@@ -311,7 +318,7 @@ describe('recommendation results', () => {
     assert.ok(result.do_not_recommend.some((item) => item.tool_id === 'eagle-mem'));
   });
 
-  it('recommends CodeGraph for broad repo graph questions with command-specific permissions', async () => {
+  it('recommends CodeGraph only for screening-matched command and project labels', async () => {
     const metadata = await loadRecommendationMetadata({ metadataPath: REAL_METADATA });
     const analyzeResult = await buildRecommendationResult({
       metadata,
@@ -325,7 +332,14 @@ describe('recommendation results', () => {
     });
     const exploreResult = await buildRecommendationResult({
       metadata,
-      projectShape: 'multirepo',
+      projectProfile: {
+        project_shape: 'multirepo',
+        languages: ['js'],
+        volume: 'standard',
+        complexity: 'framework',
+        repo_shape: 'monorepo',
+        artifact_mode: 'legacy_ai_factory_only'
+      },
       taskSignals: ['multirepo_surface_mapping'],
       command: 'aif-explore',
       probeRunner: async () => ({ availability: 'installed', command: 'codegraph --version' })
@@ -334,17 +348,16 @@ describe('recommendation results', () => {
     const analyzeCodegraph = analyzeResult.recommendations.find((item) => item.tool_id === 'codegraph');
     const exploreCodegraph = exploreResult.recommendations.find((item) => item.tool_id === 'codegraph');
 
-    assert.ok(analyzeCodegraph);
-    assert.equal(analyzeCodegraph.status, 'manual_cli_only');
-    assert.equal(analyzeCodegraph.permission, 'recommend_only');
-    assert.equal(analyzeCodegraph.install_policy, 'explicit_user_opt_in_only');
-    assert.equal(analyzeCodegraph.availability, 'installed');
-    assert.match(analyzeCodegraph.next_step, /codegraph init <project>/i);
-    assert.match(analyzeCodegraph.next_step, /non-empty and useful/i);
-    assert.match(analyzeCodegraph.next_step, /codegraph uninit --force <project>/i);
-    assert.ok(!analyzeResult.do_not_recommend.some((item) => item.tool_id === 'codegraph'));
+    assert.equal(analyzeCodegraph, undefined);
     assert.ok(exploreCodegraph);
+    assert.equal(exploreCodegraph.status, 'manual_cli_only');
     assert.equal(exploreCodegraph.permission, 'manual_purged_cli_execution');
+    assert.equal(exploreCodegraph.install_policy, 'explicit_user_opt_in_only');
+    assert.equal(exploreCodegraph.availability, 'installed');
+    assert.match(exploreCodegraph.next_step, /screening policy matched/i);
+    assert.match(exploreCodegraph.next_step, /codegraph init <project>/i);
+    assert.match(exploreCodegraph.next_step, /non-empty and useful/i);
+    assert.match(exploreCodegraph.next_step, /codegraph uninit --force <project>/i);
   });
 
   it('does not recommend tools forbidden for the current command', async () => {
@@ -415,7 +428,7 @@ describe('recommendation results', () => {
 
     assert.equal(analyzeResult.project_profile.volume, 'large');
     assert.ok(analyzeResult.dimension_matches.includes('large_framework_broad_discovery'));
-    assert.ok(analyzeResult.recommendations.some((item) => item.tool_id === 'codegraph'));
+    assert.equal(analyzeResult.recommendations.some((item) => item.tool_id === 'codegraph'), false);
     assert.equal(implementResult.recommendations.some((item) => item.tool_id === 'codegraph'), false);
     assert.equal(implementResult.recommendations.some((item) => item.tool_id === 'graphify'), false);
   });
@@ -464,7 +477,17 @@ describe('recommendation results', () => {
     const explore = await runMemoryToolRecommender([
       'select',
       '--shape',
-      'large_framework_app',
+      'multirepo',
+      '--language',
+      'js',
+      '--volume',
+      'standard',
+      '--complexity',
+      'framework',
+      '--repo-shape',
+      'monorepo',
+      '--artifact-mode',
+      'legacy_ai_factory_only',
       '--task',
       'architecture_or_impact_discovery',
       '--command',
@@ -482,7 +505,17 @@ describe('recommendation results', () => {
     const plan = await runMemoryToolRecommender([
       'select',
       '--shape',
-      'large_framework_app',
+      'multirepo',
+      '--language',
+      'js',
+      '--volume',
+      'standard',
+      '--complexity',
+      'framework',
+      '--repo-shape',
+      'monorepo',
+      '--artifact-mode',
+      'legacy_ai_factory_only',
       '--task',
       'architecture_or_impact_discovery',
       '--command',
@@ -535,7 +568,17 @@ describe('recommendation results', () => {
     const result = await runMemoryToolRecommender([
       'select',
       '--shape',
-      'large_framework_app',
+      'multirepo',
+      '--language',
+      'js',
+      '--volume',
+      'standard',
+      '--complexity',
+      'framework',
+      '--repo-shape',
+      'monorepo',
+      '--artifact-mode',
+      'legacy_ai_factory_only',
       '--task',
       'architecture_or_impact_discovery',
       '--command',
@@ -573,7 +616,17 @@ describe('recommendation results', () => {
     const result = await runMemoryToolRecommender([
       'select',
       '--shape',
-      'large_framework_app',
+      'multirepo',
+      '--language',
+      'js',
+      '--volume',
+      'standard',
+      '--complexity',
+      'framework',
+      '--repo-shape',
+      'monorepo',
+      '--artifact-mode',
+      'legacy_ai_factory_only',
       '--task',
       'architecture_or_impact_discovery',
       '--command',
@@ -638,7 +691,17 @@ describe('CLI behavior', () => {
     const result = await runCli([
       'recommend',
       '--shape',
-      'large_framework_app',
+      'multirepo',
+      '--language',
+      'js',
+      '--volume',
+      'standard',
+      '--complexity',
+      'framework',
+      '--repo-shape',
+      'monorepo',
+      '--artifact-mode',
+      'legacy_ai_factory_only',
       '--task',
       'architecture_or_impact_discovery',
       '--command',

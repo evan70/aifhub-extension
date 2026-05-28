@@ -13,6 +13,8 @@ import {
   commandInvocationRegexForYaml,
   compareBenchmarkPair,
   renderAiTesterScenario,
+  resolveMatrixStrategy,
+  resolveSkillSet,
   runMemoryToolAiTesterMatrix,
   selectStratifiedProfiles
 } from './memory-tool-ai-tester-matrix.mjs';
@@ -40,6 +42,53 @@ async function writeFixtureFile(relativePath, content = 'fixture') {
 }
 
 describe('ai-tester matrix manifest', () => {
+  it('uses reduced screening strategy instead of exhaustive all-skill runs by default', async () => {
+    const metadata = await loadRecommendationMetadata({ metadataPath: REAL_METADATA });
+    const strategy = resolveMatrixStrategy({
+      parsed: {
+        matrixSize: 'screening',
+        skills: [],
+        tasks: [],
+        maxProfiles: null,
+        stratified: false
+      },
+      metadata
+    });
+    const groupedSkills = resolveSkillSet({ metadata, skillSet: 'grouped' });
+    const allSkills = resolveSkillSet({ metadata, skillSet: 'all' });
+
+    assert.equal(strategy.matrix_size, 'screening');
+    assert.equal(strategy.profile_mode, 'stratified');
+    assert.equal(strategy.max_profiles, 15);
+    assert.deepEqual(strategy.task_scenarios, ['architecture_or_impact_discovery']);
+    assert.deepEqual(strategy.skills, groupedSkills);
+    assert.ok(groupedSkills.length < allSkills.length);
+    assert.ok(groupedSkills.includes('aif-rules-check'));
+    assert.ok(groupedSkills.includes('aif-docs'));
+    assert.equal(strategy.estimated_scenario_count_per_tool, groupedSkills.length * 15 * 2);
+    assert.equal(allSkills.length, 29);
+  });
+
+  it('keeps an explicit exhaustive mode available for audit runs', async () => {
+    const metadata = await loadRecommendationMetadata({ metadataPath: REAL_METADATA });
+    const strategy = resolveMatrixStrategy({
+      parsed: {
+        matrixSize: 'full',
+        skillSet: 'all',
+        skills: [],
+        tasks: [],
+        maxProfiles: 47,
+        stratified: false
+      },
+      metadata
+    });
+
+    assert.equal(strategy.skill_set, 'all');
+    assert.equal(strategy.skills.length, 29);
+    assert.equal(strategy.max_profiles, 47);
+    assert.equal(strategy.estimated_scenario_count_per_tool, 2726);
+  });
+
   it('generates an rg baseline before every optional-tool scenario', async () => {
     const metadata = await loadRecommendationMetadata({ metadataPath: REAL_METADATA });
     const profiles = [{
@@ -81,6 +130,32 @@ describe('ai-tester matrix manifest', () => {
     }
   });
 
+  it('prefixes scenario ids so separate matrix runs do not reuse old ai-tester traces', async () => {
+    const metadata = await loadRecommendationMetadata({ metadataPath: REAL_METADATA });
+    const manifest = buildAiTesterMatrixManifest({
+      metadata,
+      profiles: [{
+        id: 'matrix-profile-01',
+        sourceRoot: path.join(tmpDir, 'fixture-project'),
+        project_shape: 'large_framework_app',
+        languages: ['js'],
+        volume: 'large',
+        complexity: 'framework',
+        repo_shape: 'single_repo',
+        artifact_mode: 'none'
+      }],
+      skills: ['aif-explore'],
+      tools: ['codegraph'],
+      taskScenarios: ['architecture_or_impact_discovery'],
+      scenarioPrefix: 'screening-codegraph'
+    });
+
+    assert.equal(manifest.scenario_prefix, 'screening-codegraph');
+    assert.equal(manifest.cases[0].id, 'screening-codegraph__matrix-profile-01__aif-explore__codegraph__architecture_or_impact_discovery__baseline_rg');
+    assert.equal(manifest.cases[1].pair_id, 'screening-codegraph__matrix-profile-01__aif-explore__codegraph__architecture_or_impact_discovery');
+    assert.equal(manifest.cases[0].profile_id, 'matrix-profile-01');
+  });
+
   it('renders ai-tester scenarios with direct ai-tester fields and selector wrapper separation', () => {
     const baselineScenario = renderAiTesterScenario({
       id: 'case-baseline',
@@ -107,7 +182,7 @@ describe('ai-tester matrix manifest', () => {
 
     assert.match(baselineScenario, /copy_trees:/);
     assert.match(baselineScenario, /system_prompt_file:/);
-    assert.match(baselineScenario, /model: "gpt-5"/);
+    assert.match(baselineScenario, /model: "gpt-5\.4-mini"/);
     assert.match(baselineScenario, /permission_mode: bypassPermissions/);
     assert.match(baselineScenario, /This is the rg baseline scenario/);
     assert.doesNotMatch(baselineScenario, /Then run codegraph/);

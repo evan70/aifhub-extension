@@ -287,13 +287,13 @@ export async function buildRecommendationResult(options = {}) {
   const baseline = [metadata?.default_policy?.baseline_tool ?? 'rg'];
   const warnings = [];
   const dimensionMatches = collectDimensionMatches(metadata, projectProfile);
-  const candidates = collectCandidateTools(metadata, projectShape, taskSignals, projectProfile, dimensionMatches);
+  const candidates = collectCandidateTools(metadata, projectShape, taskSignals, projectProfile, dimensionMatches, command);
   const recommendations = [];
 
   for (const toolId of candidates) {
     const tool = metadata.tools?.[toolId];
     if (!tool || isRejectedTool(toolId, tool)) continue;
-    if (!isAllowedForRequest(toolId, tool, projectShape, taskSignals, metadata, projectProfile, dimensionMatches)) continue;
+    if (!isAllowedForRequest(toolId, tool, projectShape, taskSignals, metadata, projectProfile, dimensionMatches, command)) continue;
     const permission = permissionForTool(metadata, toolId, command);
     if (commandBoundaryReason(tool, command, permission)) continue;
 
@@ -321,7 +321,7 @@ export async function buildRecommendationResult(options = {}) {
     task_signals: taskSignals,
     baseline,
     recommendations: dedupeRecommendations(recommendations),
-    do_not_recommend: buildDoNotRecommend(metadata, projectShape, taskSignals, projectProfile, dimensionMatches),
+    do_not_recommend: buildDoNotRecommend(metadata, projectShape, taskSignals, projectProfile, dimensionMatches, command),
     protected_artifacts: asArray(metadata.protected_artifacts),
     forbidden_operations: asArray(metadata.forbidden_operations),
     warnings
@@ -375,7 +375,7 @@ export async function buildSelectionResult(options = {}) {
       continue;
     }
 
-    if (!isAllowedForRequest(toolId, tool, projectShape, taskSignals, metadata, projectProfile, dimensionMatches)) {
+    if (!isAllowedForRequest(toolId, tool, projectShape, taskSignals, metadata, projectProfile, dimensionMatches, command)) {
       notSelectedTools.push({
         tool_id: toolId,
         reason: `${tool.display_name ?? toolId} is not applicable for ${projectShape} + ${taskSignals.join(', ')}.`,
@@ -551,7 +551,7 @@ function metadataWarning(error) {
   };
 }
 
-function collectCandidateTools(metadata, projectShape, taskSignals, projectProfile = null, dimensionMatches = null) {
+function collectCandidateTools(metadata, projectShape, taskSignals, projectProfile = null, dimensionMatches = null, command = DEFAULT_COMMAND) {
   const candidates = new Set();
   const shape = metadata.project_shape_signals?.[projectShape] ?? {};
   const matches = dimensionMatches ?? collectDimensionMatches(metadata, projectProfile);
@@ -578,6 +578,12 @@ function collectCandidateTools(metadata, projectShape, taskSignals, projectProfi
     for (const toolId of asArray(task.conditional)) candidates.add(toolId);
   }
 
+  for (const [toolId, tool] of Object.entries(metadata.tools ?? {})) {
+    if (screeningPolicyAllowsRequest(tool, projectProfile, taskSignals, command)) {
+      candidates.add(toolId);
+    }
+  }
+
   candidates.delete(metadata.default_policy?.baseline_tool ?? 'rg');
   return [...candidates];
 }
@@ -591,7 +597,7 @@ function toolMatchesTask(tool, taskSignals) {
   return taskSignals.some((signal) => recommendedTasks.includes(signal));
 }
 
-function isAllowedForRequest(toolId, tool, projectShape, taskSignals, metadata, projectProfile = null, dimensionMatches = null) {
+function isAllowedForRequest(toolId, tool, projectShape, taskSignals, metadata, projectProfile = null, dimensionMatches = null, command = DEFAULT_COMMAND) {
   if (ALWAYS_REJECTED_TOOLS.has(toolId)) return false;
 
   const manualTaskSet = MANUAL_ONLY_TASKS.get(toolId);
@@ -599,11 +605,16 @@ function isAllowedForRequest(toolId, tool, projectShape, taskSignals, metadata, 
     return false;
   }
 
+  const screeningMatch = screeningPolicyAllowsRequest(tool, projectProfile, taskSignals, command);
+  if (tool.screening_policy?.default_decision === 'avoid_by_default' && !screeningMatch) {
+    return false;
+  }
+
   const shape = metadata.project_shape_signals?.[projectShape] ?? {};
-  if (asArray(shape.avoid_tools).includes(toolId)) return false;
+  if (asArray(shape.avoid_tools).includes(toolId) && !screeningMatch) return false;
 
   const matches = dimensionMatches ?? collectDimensionMatches(metadata, projectProfile);
-  if (matches.some((match) => asArray(match.avoid_tools).includes(toolId))) return false;
+  if (matches.some((match) => asArray(match.avoid_tools).includes(toolId)) && !screeningMatch) return false;
 
   for (const signal of taskSignals) {
     const task = metadata.task_signals?.[signal] ?? {};
@@ -611,10 +622,40 @@ function isAllowedForRequest(toolId, tool, projectShape, taskSignals, metadata, 
     if (asArray(task.avoid_by_default).includes(toolId)) return false;
   }
 
-  if (asArray(tool.do_not_recommend_for?.project_shapes).includes(projectShape)) return false;
+  if (asArray(tool.do_not_recommend_for?.project_shapes).includes(projectShape) && !screeningMatch) return false;
   if (taskSignals.some((signal) => asArray(tool.do_not_recommend_for?.tasks).includes(signal))) return false;
 
   return !isRejectedTool(toolId, tool);
+}
+
+function screeningPolicyAllowsRequest(tool, projectProfile, taskSignals, command) {
+  const policy = tool?.screening_policy;
+  if (!policy || typeof policy !== 'object') return false;
+  const profile = normalizeProjectProfile(projectProfile);
+
+  return asArray(policy.conditional_cases).some((item) => {
+    const allowedSkills = asArray(item.skills);
+    if (allowedSkills.length > 0 && !allowedSkills.includes(command)) return false;
+
+    const allowedTasks = asArray(item.tasks);
+    if (allowedTasks.length > 0 && !taskSignals.some((signal) => allowedTasks.includes(signal))) return false;
+
+    if (item.match && !dimensionSignalMatches(item.match, profile)) return false;
+
+    const labels = profileLabels(profile);
+    return asArray(item.required_labels).every((label) => labels.has(String(label)));
+  });
+}
+
+function profileLabels(profile) {
+  return new Set([
+    ...asArray(profile?.languages).map(String),
+    profile?.volume,
+    profile?.complexity,
+    profile?.repo_shape,
+    profile?.artifact_mode,
+    profile?.project_shape
+  ].filter(Boolean).map(String));
 }
 
 function isRejectedTool(toolId, tool) {
@@ -677,7 +718,7 @@ function nextStepForTool(toolId, tool) {
     return 'Use only as optional user-owned docs lookup for version-sensitive library/API questions.';
   }
   if (toolId === 'codegraph') {
-    return 'Use rg first; for broad repo graph questions only, run codegraph init <project>, codegraph index --quiet <project>, codegraph query --path <project> ... --json, verify the output is non-empty and useful, then codegraph uninit --force <project>. Do not run codegraph install, sync, serve, serve --mcp, or mutate agent config.';
+    return 'Use rg first and only when the screening policy matched this skill plus project labels; run codegraph init <project>, codegraph index --quiet <project>, codegraph query --path <project> ... --json, verify the output is non-empty and useful, then codegraph uninit --force <project>. Do not run codegraph install, sync, serve, serve --mcp, or mutate agent config.';
   }
   if (toolId === 'agent-memory') {
     return 'Use only as a manual markdown notebook when the user explicitly asks for durable notes.';
@@ -685,7 +726,7 @@ function nextStepForTool(toolId, tool) {
   return tool.suggestion_text ?? 'Use only as explicit opt-in supporting context.';
 }
 
-function buildDoNotRecommend(metadata, projectShape, taskSignals, projectProfile = null, dimensionMatches = null) {
+function buildDoNotRecommend(metadata, projectShape, taskSignals, projectProfile = null, dimensionMatches = null, command = DEFAULT_COMMAND) {
   const entries = new Map();
 
   for (const [toolId, tool] of Object.entries(metadata.tools ?? {})) {
@@ -700,6 +741,7 @@ function buildDoNotRecommend(metadata, projectShape, taskSignals, projectProfile
   const shape = metadata.project_shape_signals?.[projectShape] ?? {};
   for (const toolId of asArray(shape.avoid_tools)) {
     const tool = metadata.tools?.[toolId] ?? {};
+    if (screeningPolicyAllowsRequest(tool, projectProfile, taskSignals, command)) continue;
     entries.set(toolId, {
       tool_id: toolId,
       reason: tool.avoid_reason ?? `${tool.display_name ?? toolId} is avoided for ${projectShape}.`
@@ -710,6 +752,7 @@ function buildDoNotRecommend(metadata, projectShape, taskSignals, projectProfile
   for (const match of matches) {
     for (const toolId of asArray(match.avoid_tools)) {
       const tool = metadata.tools?.[toolId] ?? {};
+      if (screeningPolicyAllowsRequest(tool, projectProfile, taskSignals, command)) continue;
       entries.set(toolId, {
         tool_id: toolId,
         reason: tool.avoid_reason ?? `${tool.display_name ?? toolId} is avoided for ${match.id}.`,

@@ -224,13 +224,76 @@ export function renderAiTesterResultsMarkdown(report) {
     lines.push(`| Output tokens | ${formatNumber(comparison.rg.output_tokens)} | ${formatNumber(comparison.codegraph.output_tokens)} | ${formatPercentDelta(comparison.deltas.output_tokens_percent)} |`);
     lines.push(`| Input+output tokens | ${formatNumber(comparison.rg.input_output_tokens)} | ${formatNumber(comparison.codegraph.input_output_tokens)} | ${formatPercentDelta(comparison.deltas.input_output_tokens_percent)} |`);
     lines.push('');
-    lines.push('| Better case count | Count | Percent of pairs |');
+    lines.push(`| PASS/PASS paired rows used for useful-case counts | ${formatNumber(comparison.pass_pair_count)} | ${formatPercent(percentOf(comparison.pass_pair_count, comparison.pair_count))} |`);
+    lines.push('');
+    lines.push('| Better case count | Count | Percent of PASS/PASS pairs |');
     lines.push('|---|---:|---:|');
     lines.push(`| CodeGraph lower total tokens | ${formatNumber(comparison.better_counts.codegraph_lower_total_tokens)} | ${formatPercent(comparison.better_counts.codegraph_lower_total_tokens_percent)} |`);
     lines.push(`| CodeGraph lower input+output tokens | ${formatNumber(comparison.better_counts.codegraph_lower_input_output_tokens)} | ${formatPercent(comparison.better_counts.codegraph_lower_input_output_tokens_percent)} |`);
     lines.push(`| CodeGraph faster | ${formatNumber(comparison.better_counts.codegraph_faster)} | ${formatPercent(comparison.better_counts.codegraph_faster_percent)} |`);
     lines.push(`| CodeGraph fewer tool calls | ${formatNumber(comparison.better_counts.codegraph_fewer_tool_calls)} | ${formatPercent(comparison.better_counts.codegraph_fewer_tool_calls_percent)} |`);
     lines.push('');
+
+    if (comparison.useful_cases.length > 0) {
+      lines.push('## CodeGraph Useful Cases', '');
+      lines.push('| skill | project | labels | useful signal | total tokens delta | input+output delta | duration delta | tool calls delta | rg total tokens | CodeGraph total tokens |');
+      lines.push('|---|---|---|---|---:|---:|---:|---:|---:|---:|');
+      for (const usefulCase of comparison.useful_cases) {
+        lines.push([
+          md(usefulCase.skill),
+          md(usefulCase.project),
+          md(usefulCase.label),
+          md(formatUsefulSignal(usefulCase)),
+          md(formatPercentDelta(usefulCase.total_tokens_delta_percent)),
+          md(formatPercentDelta(usefulCase.input_output_tokens_delta_percent)),
+          md(formatPercentDelta(usefulCase.duration_delta_percent)),
+          md(formatPercentDelta(usefulCase.tool_calls_delta_percent)),
+          mdNum(usefulCase.rg_total_tokens),
+          mdNum(usefulCase.codegraph_total_tokens)
+        ].join(' | ').replace(/^/, '| ').replace(/$/, ' |'));
+      }
+      lines.push('');
+    }
+
+    if (comparison.skill_signals.length > 0) {
+      lines.push('## CodeGraph Signals By Skill', '');
+      lines.push('| skill | pairs | lower total tokens | lower input+output | faster | fewer tool calls | avg total delta | avg input+output delta | decision |');
+      lines.push('|---|---:|---:|---:|---:|---:|---:|---:|---|');
+      for (const signal of comparison.skill_signals) {
+        lines.push([
+          md(signal.name),
+          mdNum(signal.pairs),
+          md(`${formatNumber(signal.lower_total_tokens)} (${formatPercent(signal.lower_total_tokens_percent)})`),
+          md(`${formatNumber(signal.lower_input_output_tokens)} (${formatPercent(signal.lower_input_output_tokens_percent)})`),
+          md(`${formatNumber(signal.faster)} (${formatPercent(signal.faster_percent)})`),
+          md(`${formatNumber(signal.fewer_tool_calls)} (${formatPercent(signal.fewer_tool_calls_percent)})`),
+          md(formatPercentDelta(signal.avg_total_tokens_delta_percent)),
+          md(formatPercentDelta(signal.avg_input_output_tokens_delta_percent)),
+          md(signal.decision)
+        ].join(' | ').replace(/^/, '| ').replace(/$/, ' |'));
+      }
+      lines.push('');
+    }
+
+    if (comparison.label_signals.length > 0) {
+      lines.push('## CodeGraph Signals By Label', '');
+      lines.push('| label | pairs | lower total tokens | lower input+output | faster | fewer tool calls | avg total delta | avg input+output delta | decision |');
+      lines.push('|---|---:|---:|---:|---:|---:|---:|---:|---|');
+      for (const signal of comparison.label_signals) {
+        lines.push([
+          md(signal.name),
+          mdNum(signal.pairs),
+          md(`${formatNumber(signal.lower_total_tokens)} (${formatPercent(signal.lower_total_tokens_percent)})`),
+          md(`${formatNumber(signal.lower_input_output_tokens)} (${formatPercent(signal.lower_input_output_tokens_percent)})`),
+          md(`${formatNumber(signal.faster)} (${formatPercent(signal.faster_percent)})`),
+          md(`${formatNumber(signal.fewer_tool_calls)} (${formatPercent(signal.fewer_tool_calls_percent)})`),
+          md(formatPercentDelta(signal.avg_total_tokens_delta_percent)),
+          md(formatPercentDelta(signal.avg_input_output_tokens_delta_percent)),
+          md(signal.decision)
+        ].join(' | ').replace(/^/, '| ').replace(/$/, ' |'));
+      }
+      lines.push('');
+    }
   }
 
   for (const skill of report.skills) {
@@ -278,17 +341,19 @@ function buildPairedComparison(rows) {
   }
 
   const pairs = [...byPair.values()].filter((pair) => pair.rg && pair.codegraph);
+  const passPairs = pairs.filter((pair) => pair.rg.status === 'PASS' && pair.codegraph.status === 'PASS');
   const rg = summarizeMetricRows(pairs.map((pair) => pair.rg));
   const codegraph = summarizeMetricRows(pairs.map((pair) => pair.codegraph));
   const betterCounts = {
-    codegraph_lower_total_tokens: pairs.filter((pair) => pair.codegraph.total_tokens < pair.rg.total_tokens).length,
-    codegraph_lower_input_output_tokens: pairs.filter((pair) => pair.codegraph.input_output_tokens < pair.rg.input_output_tokens).length,
-    codegraph_faster: pairs.filter((pair) => pair.codegraph.duration_seconds < pair.rg.duration_seconds).length,
-    codegraph_fewer_tool_calls: pairs.filter((pair) => pair.codegraph.tool_calls < pair.rg.tool_calls).length
+    codegraph_lower_total_tokens: passPairs.filter((pair) => pair.codegraph.total_tokens < pair.rg.total_tokens).length,
+    codegraph_lower_input_output_tokens: passPairs.filter((pair) => pair.codegraph.input_output_tokens < pair.rg.input_output_tokens).length,
+    codegraph_faster: passPairs.filter((pair) => pair.codegraph.duration_seconds < pair.rg.duration_seconds).length,
+    codegraph_fewer_tool_calls: passPairs.filter((pair) => pair.codegraph.tool_calls < pair.rg.tool_calls).length
   };
 
   return {
     pair_count: pairs.length,
+    pass_pair_count: passPairs.length,
     rg,
     codegraph,
     ratios: {
@@ -311,12 +376,135 @@ function buildPairedComparison(rows) {
     },
     better_counts: {
       ...betterCounts,
-      codegraph_lower_total_tokens_percent: percentOf(betterCounts.codegraph_lower_total_tokens, pairs.length),
-      codegraph_lower_input_output_tokens_percent: percentOf(betterCounts.codegraph_lower_input_output_tokens, pairs.length),
-      codegraph_faster_percent: percentOf(betterCounts.codegraph_faster, pairs.length),
-      codegraph_fewer_tool_calls_percent: percentOf(betterCounts.codegraph_fewer_tool_calls, pairs.length)
-    }
+      codegraph_lower_total_tokens_percent: percentOf(betterCounts.codegraph_lower_total_tokens, passPairs.length),
+      codegraph_lower_input_output_tokens_percent: percentOf(betterCounts.codegraph_lower_input_output_tokens, passPairs.length),
+      codegraph_faster_percent: percentOf(betterCounts.codegraph_faster, passPairs.length),
+      codegraph_fewer_tool_calls_percent: percentOf(betterCounts.codegraph_fewer_tool_calls, passPairs.length)
+    },
+    useful_cases: buildUsefulCases(passPairs),
+    skill_signals: buildSignalSummaries(passPairs, (pair) => [pair.rg.skill]),
+    label_signals: buildSignalSummaries(passPairs, (pair) => unique(asArray(pair.rg.tags)))
   };
+}
+
+function buildUsefulCases(pairs) {
+  return pairs
+    .map(pairToUsefulCase)
+    .filter((item) => (
+      item.lower_total_tokens
+      || item.lower_input_output_tokens
+      || item.faster
+      || item.fewer_tool_calls
+    ))
+    .sort((left, right) => (
+      compareNumbers(left.total_tokens_delta_percent, right.total_tokens_delta_percent)
+      || compareNumbers(left.input_output_tokens_delta_percent, right.input_output_tokens_delta_percent)
+      || compareNumbers(left.duration_delta_percent, right.duration_delta_percent)
+      || left.skill.localeCompare(right.skill)
+      || left.project.localeCompare(right.project)
+    ));
+}
+
+function pairToUsefulCase(pair) {
+  const rg = pair.rg;
+  const codegraph = pair.codegraph;
+  return {
+    skill: rg.skill,
+    project: rg.project,
+    label: rg.label,
+    tags: asArray(rg.tags),
+    rg_total_tokens: rg.total_tokens,
+    codegraph_total_tokens: codegraph.total_tokens,
+    rg_input_output_tokens: rg.input_output_tokens,
+    codegraph_input_output_tokens: codegraph.input_output_tokens,
+    rg_duration_seconds: rg.duration_seconds,
+    codegraph_duration_seconds: codegraph.duration_seconds,
+    rg_tool_calls: rg.tool_calls,
+    codegraph_tool_calls: codegraph.tool_calls,
+    total_tokens_delta_percent: percentDelta(codegraph.total_tokens, rg.total_tokens),
+    input_output_tokens_delta_percent: percentDelta(codegraph.input_output_tokens, rg.input_output_tokens),
+    duration_delta_percent: percentDelta(codegraph.duration_seconds, rg.duration_seconds),
+    tool_calls_delta_percent: percentDelta(codegraph.tool_calls, rg.tool_calls),
+    lower_total_tokens: codegraph.total_tokens < rg.total_tokens,
+    lower_input_output_tokens: codegraph.input_output_tokens < rg.input_output_tokens,
+    faster: codegraph.duration_seconds < rg.duration_seconds,
+    fewer_tool_calls: codegraph.tool_calls < rg.tool_calls
+  };
+}
+
+function buildSignalSummaries(pairs, groupSelector) {
+  const groups = new Map();
+  for (const pair of pairs) {
+    const usefulCase = pairToUsefulCase(pair);
+    for (const name of unique(asArray(groupSelector(pair))).filter(Boolean)) {
+      const current = groups.get(name) ?? {
+        name,
+        pairs: 0,
+        lower_total_tokens: 0,
+        lower_input_output_tokens: 0,
+        faster: 0,
+        fewer_tool_calls: 0,
+        total_tokens_delta_percent_sum: 0,
+        input_output_tokens_delta_percent_sum: 0,
+        duration_delta_percent_sum: 0,
+        tool_calls_delta_percent_sum: 0
+      };
+      current.pairs += 1;
+      current.lower_total_tokens += usefulCase.lower_total_tokens ? 1 : 0;
+      current.lower_input_output_tokens += usefulCase.lower_input_output_tokens ? 1 : 0;
+      current.faster += usefulCase.faster ? 1 : 0;
+      current.fewer_tool_calls += usefulCase.fewer_tool_calls ? 1 : 0;
+      current.total_tokens_delta_percent_sum += numeric(usefulCase.total_tokens_delta_percent);
+      current.input_output_tokens_delta_percent_sum += numeric(usefulCase.input_output_tokens_delta_percent);
+      current.duration_delta_percent_sum += numeric(usefulCase.duration_delta_percent);
+      current.tool_calls_delta_percent_sum += numeric(usefulCase.tool_calls_delta_percent);
+      groups.set(name, current);
+    }
+  }
+
+  return [...groups.values()]
+    .map((group) => {
+      const summary = {
+        name: group.name,
+        pairs: group.pairs,
+        lower_total_tokens: group.lower_total_tokens,
+        lower_input_output_tokens: group.lower_input_output_tokens,
+        faster: group.faster,
+        fewer_tool_calls: group.fewer_tool_calls,
+        lower_total_tokens_percent: percentOf(group.lower_total_tokens, group.pairs),
+        lower_input_output_tokens_percent: percentOf(group.lower_input_output_tokens, group.pairs),
+        faster_percent: percentOf(group.faster, group.pairs),
+        fewer_tool_calls_percent: percentOf(group.fewer_tool_calls, group.pairs),
+        avg_total_tokens_delta_percent: group.total_tokens_delta_percent_sum / group.pairs,
+        avg_input_output_tokens_delta_percent: group.input_output_tokens_delta_percent_sum / group.pairs,
+        avg_duration_delta_percent: group.duration_delta_percent_sum / group.pairs,
+        avg_tool_calls_delta_percent: group.tool_calls_delta_percent_sum / group.pairs
+      };
+      return {
+        ...summary,
+        decision: classifySignal(summary)
+      };
+    })
+    .sort((left, right) => (
+      compareNumbers(right.lower_total_tokens, left.lower_total_tokens)
+      || compareNumbers(right.lower_input_output_tokens, left.lower_input_output_tokens)
+      || compareNumbers(left.avg_total_tokens_delta_percent, right.avg_total_tokens_delta_percent)
+      || left.name.localeCompare(right.name)
+    ));
+}
+
+function classifySignal(signal) {
+  if (signal.pairs < 2) {
+    if (signal.lower_total_tokens > 0 && signal.avg_total_tokens_delta_percent <= -10) return 'candidate; needs more runs';
+    return 'sample too small';
+  }
+  if (signal.lower_total_tokens_percent >= 60 && signal.avg_total_tokens_delta_percent < 0) {
+    return 'recommend conditionally';
+  }
+  if (signal.lower_total_tokens === 0 || signal.avg_total_tokens_delta_percent >= 50) {
+    return 'avoid by default';
+  }
+  return 'sample more';
 }
 
 function summarizeMetricRows(rows) {
@@ -472,6 +660,22 @@ function formatPercentDelta(value) {
   return `${sign}${Number(value).toFixed(1)}%`;
 }
 
+function formatUsefulSignal(usefulCase) {
+  return [
+    usefulCase.lower_total_tokens ? 'total tokens' : null,
+    usefulCase.lower_input_output_tokens ? 'input+output' : null,
+    usefulCase.faster ? 'duration' : null,
+    usefulCase.fewer_tool_calls ? 'tool calls' : null
+  ].filter(Boolean).join(', ');
+}
+
+function compareNumbers(left, right) {
+  if (!Number.isFinite(left) && !Number.isFinite(right)) return 0;
+  if (!Number.isFinite(left)) return 1;
+  if (!Number.isFinite(right)) return -1;
+  return left - right;
+}
+
 function numeric(value, fallback = 0) {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
@@ -479,6 +683,10 @@ function numeric(value, fallback = 0) {
 
 function asArray(value) {
   return Array.isArray(value) ? value : [];
+}
+
+function unique(values) {
+  return [...new Set(values)];
 }
 
 function parseArgs(args) {

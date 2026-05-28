@@ -2,6 +2,8 @@
 
 Источник этой таблицы - реальные `ai-tester` trace JSON из `runs/`. `NOT_RUN` означает, что сценарий есть в матрице, но model run для него еще не выполнен.
 
+> Superseded for CodeGraph recommendation policy by [AI Tester Token Matrices: Screening CodeGraph](ai-tester-token-matrices-screening-codegraph.md). Этот файл оставлен как historical all-skills partial trace sample (59/940 rows), а финальные selector rules берутся из screening report 300/300 rows.
+
 | Metric | Value |
 |---|---:|
 | Total rows | 940 |
@@ -25,12 +27,68 @@
 | Output tokens | 192,121 | 218,542 | +13.8% |
 | Input+output tokens | 21,045,480 | 31,579,631 | +50.1% |
 
-| Better case count | Count | Percent of pairs |
+| PASS/PASS paired rows used for useful-case counts | 27 | 93.1% |
+
+| Better case count | Count | Percent of PASS/PASS pairs |
 |---|---:|---:|
-| CodeGraph lower total tokens | 12 | 41.4% |
-| CodeGraph lower input+output tokens | 11 | 37.9% |
-| CodeGraph faster | 11 | 37.9% |
-| CodeGraph fewer tool calls | 10 | 34.5% |
+| CodeGraph lower total tokens | 11 | 40.7% |
+| CodeGraph lower input+output tokens | 11 | 40.7% |
+| CodeGraph faster | 11 | 40.7% |
+| CodeGraph fewer tool calls | 10 | 37.0% |
+
+## CodeGraph Useful Cases
+
+| skill | project | labels | useful signal | total tokens delta | input+output delta | duration delta | tool calls delta | rg total tokens | CodeGraph total tokens |
+|---|---|---|---|---:|---:|---:|---:|---:|---:|
+| aif-plan | matrix-profile-02 | rust ; mini ; framework ; single_repo ; none ; small_microservice | total tokens, input+output, duration, tool calls | -62.7% | -60.5% | -40.3% | -35.0% | 2,462,399 | 918,974 |
+| aif-rules-check | matrix-profile-01 | no-primary-language ; mini ; mini ; single_repo ; none ; small_microservice | total tokens, input+output, duration, tool calls | -61.6% | -61.5% | -52.1% | -54.5% | 1,079,931 | 415,046 |
+| aif-analyze | matrix-profile-02 | rust ; mini ; framework ; single_repo ; none ; small_microservice | total tokens, input+output, duration, tool calls | -43.2% | -42.8% | -45.8% | -50.8% | 3,045,877 | 1,730,318 |
+| aif-rules-check | matrix-profile-02 | rust ; mini ; framework ; single_repo ; none ; small_microservice | total tokens, input+output, duration | -25.9% | -15.5% | -23.7% | +12.5% | 1,119,910 | 829,500 |
+| aif-review | matrix-profile-02 | rust ; mini ; framework ; single_repo ; none ; small_microservice | total tokens, input+output, duration | -25.9% | -22.0% | -6.6% | 0.0% | 1,501,995 | 1,113,712 |
+| aif-commit | matrix-profile-01 | no-primary-language ; mini ; mini ; single_repo ; none ; small_microservice | total tokens, input+output, tool calls | -16.6% | -12.5% | +5.1% | -10.3% | 1,319,485 | 1,100,906 |
+| aif-fix | matrix-profile-02 | rust ; mini ; framework ; single_repo ; none ; small_microservice | total tokens, input+output, duration, tool calls | -9.0% | -11.2% | -7.5% | -5.7% | 1,543,960 | 1,404,672 |
+| aif-review | matrix-profile-01 | no-primary-language ; mini ; mini ; single_repo ; none ; small_microservice | total tokens, input+output, duration, tool calls | -7.7% | -7.2% | -18.0% | -29.4% | 1,555,837 | 1,436,004 |
+| aif-explore | matrix-profile-20 | go+js ; standard ; framework ; single_repo ; legacy_ai_factory_only ; large_framework_app | total tokens, input+output, duration, tool calls | -4.6% | -1.4% | -14.7% | -25.0% | 905,731 | 863,813 |
+| aif-implement | matrix-profile-02 | rust ; mini ; framework ; single_repo ; none ; small_microservice | total tokens, input+output, duration, tool calls | -2.4% | -2.4% | -0.5% | -22.7% | 2,374,919 | 2,316,820 |
+| aif-implement | matrix-profile-01 | no-primary-language ; mini ; mini ; single_repo ; none ; small_microservice | total tokens, input+output, duration | -1.7% | -2.0% | -1.4% | +4.3% | 1,111,634 | 1,092,639 |
+| aif-analyze | matrix-profile-11 | js ; mini ; framework ; single_repo ; none ; small_microservice | tool calls | +6.4% | +4.6% | +19.9% | -29.4% | 2,357,436 | 2,507,681 |
+| aif-analyze | matrix-profile-12 | php+js ; standard ; framework ; monorepo ; openspec_native ; multirepo | duration, tool calls | +19.1% | +21.0% | -2.8% | -24.5% | 2,279,890 | 2,715,415 |
+
+## CodeGraph Signals By Skill
+
+| skill | pairs | lower total tokens | lower input+output | faster | fewer tool calls | avg total delta | avg input+output delta | decision |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+| aif-rules-check | 2 | 2 (100.0%) | 2 (100.0%) | 2 (100.0%) | 1 (50.0%) | -43.7% | -38.5% | recommend conditionally |
+| aif-review | 2 | 2 (100.0%) | 2 (100.0%) | 2 (100.0%) | 1 (50.0%) | -16.8% | -14.6% | recommend conditionally |
+| aif-implement | 2 | 2 (100.0%) | 2 (100.0%) | 2 (100.0%) | 1 (50.0%) | -2.1% | -2.2% | recommend conditionally |
+| aif-plan | 2 | 1 (50.0%) | 1 (50.0%) | 1 (50.0%) | 1 (50.0%) | -29.4% | -27.2% | sample more |
+| aif-commit | 1 | 1 (100.0%) | 1 (100.0%) | 0 (0.0%) | 1 (100.0%) | -16.6% | -12.5% | candidate; needs more runs |
+| aif-fix | 1 | 1 (100.0%) | 1 (100.0%) | 1 (100.0%) | 1 (100.0%) | -9.0% | -11.2% | sample too small |
+| aif-explore | 4 | 1 (25.0%) | 1 (25.0%) | 1 (25.0%) | 1 (25.0%) | +88.4% | +71.6% | avoid by default |
+| aif-analyze | 11 | 1 (9.1%) | 1 (9.1%) | 2 (18.2%) | 3 (27.3%) | +197.6% | +179.2% | avoid by default |
+| aif-verify | 1 | 0 (0.0%) | 0 (0.0%) | 0 (0.0%) | 0 (0.0%) | +3.3% | +11.6% | sample too small |
+| aif-done | 1 | 0 (0.0%) | 0 (0.0%) | 0 (0.0%) | 0 (0.0%) | +41.2% | +48.7% | sample too small |
+
+## CodeGraph Signals By Label
+
+| label | pairs | lower total tokens | lower input+output | faster | fewer tool calls | avg total delta | avg input+output delta | decision |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+| single_repo | 24 | 11 (45.8%) | 11 (45.8%) | 10 (41.7%) | 9 (37.5%) | +81.6% | +73.7% | avoid by default |
+| mini | 19 | 10 (52.6%) | 10 (52.6%) | 9 (47.4%) | 8 (42.1%) | +50.6% | +47.5% | avoid by default |
+| small_microservice | 19 | 10 (52.6%) | 10 (52.6%) | 9 (47.4%) | 8 (42.1%) | +50.6% | +47.5% | avoid by default |
+| none | 19 | 10 (52.6%) | 10 (52.6%) | 9 (47.4%) | 8 (42.1%) | +50.6% | +48.4% | avoid by default |
+| framework | 18 | 7 (38.9%) | 7 (38.9%) | 8 (44.4%) | 7 (38.9%) | +107.8% | +97.5% | avoid by default |
+| rust | 8 | 6 (75.0%) | 6 (75.0%) | 6 (75.0%) | 4 (50.0%) | +3.7% | +2.7% | sample more |
+| no-primary-language | 9 | 4 (44.4%) | 4 (44.4%) | 3 (33.3%) | 3 (33.3%) | +47.0% | +41.5% | sample more |
+| go | 2 | 1 (50.0%) | 1 (50.0%) | 1 (50.0%) | 1 (50.0%) | +60.7% | +52.9% | avoid by default |
+| legacy_ai_factory_only | 4 | 1 (25.0%) | 1 (25.0%) | 1 (25.0%) | 1 (25.0%) | +89.6% | +77.6% | avoid by default |
+| standard | 8 | 1 (12.5%) | 1 (12.5%) | 2 (25.0%) | 2 (25.0%) | +175.3% | +153.2% | avoid by default |
+| js | 10 | 1 (10.0%) | 1 (10.0%) | 2 (20.0%) | 3 (30.0%) | +191.0% | +173.3% | avoid by default |
+| large_framework_app | 5 | 1 (20.0%) | 1 (20.0%) | 1 (20.0%) | 1 (20.0%) | +199.4% | +173.3% | avoid by default |
+| monorepo | 2 | 0 (0.0%) | 0 (0.0%) | 1 (50.0%) | 1 (50.0%) | +56.0% | +52.4% | avoid by default |
+| multirepo | 3 | 0 (0.0%) | 0 (0.0%) | 1 (33.3%) | 1 (33.3%) | +135.0% | +119.7% | avoid by default |
+| php | 2 | 0 (0.0%) | 0 (0.0%) | 1 (50.0%) | 1 (50.0%) | +156.1% | +137.6% | avoid by default |
+| openspec_native | 4 | 0 (0.0%) | 0 (0.0%) | 1 (25.0%) | 1 (25.0%) | +260.6% | +224.5% | avoid by default |
 
 ## aif-analyze
 
@@ -1111,4 +1169,3 @@
 | matrix-profile-46 | js ; mini ; framework ; single_repo ; none ; small_microservice | codegraph tool_run | NOT_RUN |  |  |  |  |  |  |  |
 | matrix-profile-47 | js ; mini ; framework ; single_repo ; none ; small_microservice | rg baseline | NOT_RUN |  |  |  |  |  |  |  |
 | matrix-profile-47 | js ; mini ; framework ; single_repo ; none ; small_microservice | codegraph tool_run | NOT_RUN |  |  |  |  |  |  |  |
-
