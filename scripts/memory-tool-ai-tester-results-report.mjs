@@ -734,7 +734,14 @@ function getCliUsage() {
 }
 
 function emit(body, exitCode, options = {}) {
-  options.stdout?.push?.(`${JSON.stringify(body, null, 2)}\n`);
+  const output = `${JSON.stringify(body, null, 2)}\n`;
+  if (Array.isArray(options.stdout)) {
+    options.stdout.push(output);
+  } else if (options.stdout && typeof options.stdout.write === 'function') {
+    options.stdout.write(output);
+  } else {
+    process.stdout.write(output);
+  }
   if (options.exit !== false && exitCode !== 0) process.exit(exitCode);
   return { exitCode, body };
 }

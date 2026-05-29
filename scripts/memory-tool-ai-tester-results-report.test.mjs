@@ -177,6 +177,42 @@ describe('ai-tester results report', () => {
     const json = JSON.parse(await readFile(path.join(outDir, 'ai-tester-token-matrices.json'), 'utf8'));
     assert.equal(json.summary.total_rows, 2);
   });
+
+  it('prints JSON to process stdout when --json runs without a test stdout mock', async () => {
+    const matrixDir = path.join(tmpDir, 'matrix');
+    const runsDir = path.join(tmpDir, 'runs');
+    await mkdir(matrixDir, { recursive: true });
+    await writeFile(path.join(matrixDir, 'matrix-summary.json'), `${JSON.stringify(makeMatrixSummary(), null, 2)}\n`, 'utf8');
+
+    let captured = '';
+    const originalWrite = process.stdout.write;
+    process.stdout.write = function patchedWrite(chunk, encoding, callback) {
+      captured += String(chunk);
+      if (typeof encoding === 'function') encoding();
+      if (typeof callback === 'function') callback();
+      return true;
+    };
+    try {
+      const result = await runMemoryToolAiTesterResultsReport([
+        '--matrix-dir',
+        matrixDir,
+        '--runs-dir',
+        runsDir,
+        '--json'
+      ], {
+        cwd: tmpDir,
+        exit: false
+      });
+
+      assert.equal(result.exitCode, 0);
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+
+    const printed = JSON.parse(captured);
+    assert.equal(printed.schema, AI_TESTER_RESULTS_REPORT_SCHEMA);
+    assert.equal(printed.summary.total_rows, 2);
+  });
 });
 
 function makeMatrixSummary() {
