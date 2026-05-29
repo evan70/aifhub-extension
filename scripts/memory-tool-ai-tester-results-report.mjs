@@ -143,6 +143,8 @@ export function buildAiTesterResultsReport({
       project: matrixCase.profile_id,
       label: profile.project_label ?? '',
       tags: asArray(profile.tags),
+      pair_id: matrixCase.pair_id ?? null,
+      task_scenario: matrixCase.task_scenario ?? null,
       run: formatRunName(matrixCase),
       tool_id: matrixCase.tool_id,
       optional_tool_id: matrixCase.optional_tool_id ?? null,
@@ -236,12 +238,13 @@ export function renderAiTesterResultsMarkdown(report) {
 
     if (comparison.useful_cases.length > 0) {
       lines.push('## CodeGraph Useful Cases', '');
-      lines.push('| skill | project | labels | useful signal | total tokens delta | input+output delta | duration delta | tool calls delta | rg total tokens | CodeGraph total tokens |');
-      lines.push('|---|---|---|---|---:|---:|---:|---:|---:|---:|');
+      lines.push('| skill | project | task | labels | useful signal | total tokens delta | input+output delta | duration delta | tool calls delta | rg total tokens | CodeGraph total tokens |');
+      lines.push('|---|---|---|---|---|---:|---:|---:|---:|---:|---:|');
       for (const usefulCase of comparison.useful_cases) {
         lines.push([
           md(usefulCase.skill),
           md(usefulCase.project),
+          md(usefulCase.task_scenario ?? ''),
           md(usefulCase.label),
           md(formatUsefulSignal(usefulCase)),
           md(formatPercentDelta(usefulCase.total_tokens_delta_percent)),
@@ -307,11 +310,12 @@ export function renderAiTesterResultsMarkdown(report) {
     lines.push(`| rg executed | ${formatNumber(skill.rg_executed_rows)} |`);
     lines.push(`| CodeGraph executed | ${formatNumber(skill.codegraph_executed_rows)} |`);
     lines.push('');
-    lines.push('| project | labels | run | status | duration | tool calls | total tokens | input tokens | output tokens | input+output tokens | cache-read tokens |');
-    lines.push('|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|');
+    lines.push('| project | task | labels | run | status | duration | tool calls | total tokens | input tokens | output tokens | input+output tokens | cache-read tokens |');
+    lines.push('|---|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|');
     for (const row of report.rows.filter((item) => item.skill === skill.skill)) {
       lines.push([
         md(row.project),
+        md(row.task_scenario ?? ''),
         md(row.label),
         md(row.run),
         md(row.status),
@@ -333,7 +337,12 @@ export function renderAiTesterResultsMarkdown(report) {
 function buildPairedComparison(rows) {
   const byPair = new Map();
   for (const row of rows.filter((item) => item.status !== 'NOT_RUN')) {
-    const key = `${row.skill}::${row.project}::${row.optional_tool_id ?? 'unknown'}`;
+    const key = row.pair_id || [
+      row.skill,
+      row.project,
+      row.optional_tool_id ?? 'unknown',
+      row.task_scenario ?? 'default'
+    ].join('::');
     if (!byPair.has(key)) byPair.set(key, {});
     const pair = byPair.get(key);
     if (row.tool_id === 'rg') pair.rg = row;
@@ -411,6 +420,8 @@ function pairToUsefulCase(pair) {
   return {
     skill: rg.skill,
     project: rg.project,
+    pair_id: rg.pair_id ?? null,
+    task_scenario: rg.task_scenario ?? null,
     label: rg.label,
     tags: asArray(rg.tags),
     rg_total_tokens: rg.total_tokens,

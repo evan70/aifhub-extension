@@ -118,8 +118,38 @@ describe('ai-tester results report', () => {
     assert.match(markdown, /\| Total tokens \| 100 \| 150 \| \+50\.0% \|/);
     assert.match(markdown, /\| CodeGraph lower total tokens \| 0 \| 0\.0% \|/);
     assert.match(markdown, /## aif-explore/);
-    assert.match(markdown, /\| project \| labels \| run \| status \| duration \| tool calls \| total tokens \| input tokens \| output tokens \| input\+output tokens \| cache-read tokens \|/);
+    assert.match(markdown, /\| project \| task \| labels \| run \| status \| duration \| tool calls \| total tokens \| input tokens \| output tokens \| input\+output tokens \| cache-read tokens \|/);
     assert.match(markdown, /matrix-profile-01/);
+  });
+
+  it('keeps paired comparisons separate by task scenario', () => {
+    const matrixSummary = makeMultiTaskMatrixSummary();
+    const report = buildAiTesterResultsReport({
+      matrixSummary,
+      traceIndex: {
+        latest_by_scenario: {
+          [matrixSummary.cases[0].id]: makeTraceResult({ totalTokens: 100, inputTokens: 80, outputTokens: 10, durationSeconds: 10, toolCalls: 2 }),
+          [matrixSummary.cases[1].id]: makeTraceResult({ totalTokens: 50, inputTokens: 35, outputTokens: 5, durationSeconds: 5, toolCalls: 1 }),
+          [matrixSummary.cases[2].id]: makeTraceResult({ totalTokens: 200, inputTokens: 160, outputTokens: 20, durationSeconds: 20, toolCalls: 4 }),
+          [matrixSummary.cases[3].id]: makeTraceResult({ totalTokens: 250, inputTokens: 220, outputTokens: 20, durationSeconds: 25, toolCalls: 5 })
+        }
+      },
+      generatedAt: '2026-05-26T03:00:00.000Z'
+    });
+
+    assert.equal(report.rows[0].pair_id, 'pair-architecture');
+    assert.equal(report.rows[0].task_scenario, 'architecture_or_impact_discovery');
+    assert.equal(report.rows[2].pair_id, 'pair-surface');
+    assert.equal(report.rows[2].task_scenario, 'multirepo_surface_mapping');
+    assert.equal(report.paired_comparison.pair_count, 2);
+    assert.equal(report.paired_comparison.pass_pair_count, 2);
+    assert.equal(report.paired_comparison.better_counts.codegraph_lower_total_tokens, 1);
+    assert.equal(report.paired_comparison.rg.total_tokens, 300);
+    assert.equal(report.paired_comparison.codegraph.total_tokens, 300);
+    assert.deepEqual(
+      report.paired_comparison.useful_cases.map((item) => item.task_scenario),
+      ['architecture_or_impact_discovery']
+    );
   });
 
   it('identifies CodeGraph useful cases from PASS/PASS pairs only', () => {
@@ -148,7 +178,7 @@ describe('ai-tester results report', () => {
     assert.equal(report.paired_comparison.label_signals.find((item) => item.name === 'mini').pairs, 1);
     assert.match(markdown, /\| PASS\/PASS paired rows used for useful-case counts \| 1 \| 50\.0% \|/);
     assert.match(markdown, /## CodeGraph Useful Cases/);
-    assert.match(markdown, /\| aif-explore \| matrix-profile-01 \| js ; mini ; framework ; single_repo ; none ; small_microservice \| total tokens, input\+output, duration, tool calls \| -50\.0% \| -55\.6% \| -50\.0% \| -50\.0% \| 1,000 \| 500 \|/);
+    assert.match(markdown, /\| aif-explore \| matrix-profile-01 \|  \| js ; mini ; framework ; single_repo ; none ; small_microservice \| total tokens, input\+output, duration, tool calls \| -50\.0% \| -55\.6% \| -50\.0% \| -50\.0% \| 1,000 \| 500 \|/);
   });
 
   it('writes JSON and Markdown outputs from the CLI wrapper', async () => {
@@ -287,6 +317,56 @@ function makeTwoPairMatrixSummary() {
         tool_id: 'codegraph',
         optional_tool_id: 'codegraph',
         profile_id: 'matrix-profile-02'
+      }
+    ]
+  };
+}
+
+function makeMultiTaskMatrixSummary() {
+  return {
+    schema: 'aifhub.memory_tools.ai_tester_matrix.v1',
+    generated_at: '2026-05-26T00:00:00.000Z',
+    profiles: [{
+      id: 'matrix-profile-01',
+      project_label: 'js | standard | framework | monorepo | legacy_ai_factory_only | multirepo',
+      tags: ['js', 'standard', 'framework', 'monorepo', 'legacy_ai_factory_only', 'multirepo']
+    }],
+    cases: [
+      {
+        id: 'matrix-profile-01__aif-explore__codegraph__architecture_or_impact_discovery__baseline_rg',
+        pair_id: 'pair-architecture',
+        task_scenario: 'architecture_or_impact_discovery',
+        skill: 'aif-explore',
+        tool_id: 'rg',
+        optional_tool_id: 'codegraph',
+        profile_id: 'matrix-profile-01'
+      },
+      {
+        id: 'matrix-profile-01__aif-explore__codegraph__architecture_or_impact_discovery__tool_run',
+        pair_id: 'pair-architecture',
+        task_scenario: 'architecture_or_impact_discovery',
+        skill: 'aif-explore',
+        tool_id: 'codegraph',
+        optional_tool_id: 'codegraph',
+        profile_id: 'matrix-profile-01'
+      },
+      {
+        id: 'matrix-profile-01__aif-explore__codegraph__multirepo_surface_mapping__baseline_rg',
+        pair_id: 'pair-surface',
+        task_scenario: 'multirepo_surface_mapping',
+        skill: 'aif-explore',
+        tool_id: 'rg',
+        optional_tool_id: 'codegraph',
+        profile_id: 'matrix-profile-01'
+      },
+      {
+        id: 'matrix-profile-01__aif-explore__codegraph__multirepo_surface_mapping__tool_run',
+        pair_id: 'pair-surface',
+        task_scenario: 'multirepo_surface_mapping',
+        skill: 'aif-explore',
+        tool_id: 'codegraph',
+        optional_tool_id: 'codegraph',
+        profile_id: 'matrix-profile-01'
       }
     ]
   };
