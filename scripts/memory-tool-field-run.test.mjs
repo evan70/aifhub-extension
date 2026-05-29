@@ -120,6 +120,26 @@ describe('sanitized copies', () => {
     assert.equal(await exists(path.join(copy.copyPath, 'package-lock.json')), false);
     assert.equal(await exists(path.join(copy.copyPath, 'dist')), false);
   });
+
+  it('treats leading ** slash ignore globs as zero or more directories', async () => {
+    const sourceRoot = path.join(tmpDir, 'source-project');
+    await writeFixtureFile(path.join('source-project', 'package.json'), '{}');
+    await writeFixtureFile(path.join('source-project', '.gitignore'), '**/*.secret\n');
+    await writeFixtureFile(path.join('source-project', 'top.secret'), 'root secret');
+    await writeFixtureFile(path.join('source-project', 'src', 'nested.secret'), 'nested secret');
+    await writeFixtureFile(path.join('source-project', 'src', 'index.js'), 'console.log("ok");');
+
+    const outDir = path.join(tmpDir, 'run-output');
+    await mkdir(outDir, { recursive: true });
+    const copy = await prepareSanitizedCopy({
+      profile: { id: 'field-profile-01', sourceRoot },
+      outDir
+    });
+
+    assert.equal(await exists(path.join(copy.copyPath, 'top.secret')), false);
+    assert.equal(await exists(path.join(copy.copyPath, 'src', 'nested.secret')), false);
+    assert.equal(await exists(path.join(copy.copyPath, 'src', 'index.js')), true);
+  });
 });
 
 describe('path guards', () => {

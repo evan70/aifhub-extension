@@ -981,8 +981,13 @@ function globToRegExp(pattern) {
     const char = pattern[index];
     if (char === '*') {
       if (pattern[index + 1] === '*') {
-        source += '.*';
-        index += 1;
+        if (pattern[index + 2] === '/') {
+          source += '(?:.*/)?';
+          index += 2;
+        } else {
+          source += '.*';
+          index += 1;
+        }
       } else {
         source += '[^/]*';
       }
