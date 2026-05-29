@@ -767,11 +767,61 @@ function expectedToolBehavior({ metadata, profile, skill, toolId, taskScenario }
   if (permission === 'forbidden' || asArray(tool.forbidden_in).includes(skill)) return 'negative';
   const allowedIn = asArray(tool.allowed_in).filter((scope) => String(scope).startsWith('aif-'));
   if (allowedIn.length > 0 && !allowedIn.includes(skill)) return 'negative';
+
+  if (screeningPolicyAvoidsRequest(tool, profile, taskScenario, skill)) return 'negative';
+  const screeningMatch = screeningPolicyAllowsRequest(tool, profile, taskScenario, skill);
+  if (tool.screening_policy?.default_decision === 'avoid_by_default') {
+    return screeningMatch ? 'positive' : 'negative';
+  }
+
   if (isMiniProject(profile) && REPO_GRAPH_TOOLS.has(toolId)) return 'overhead';
   if (dimensionAvoidsTool(metadata, profile, toolId)) return 'overhead';
   if (taskAvoidsTool(metadata, taskScenario, toolId)) return 'overhead';
   if (toolMatchesTask(tool, taskScenario) || taskRecommendsTool(metadata, taskScenario, toolId)) return 'positive';
   return 'not_applicable';
+}
+
+function screeningPolicyAllowsRequest(tool, profile, taskScenario, skill) {
+  const policy = tool?.screening_policy;
+  if (!policy || typeof policy !== 'object') return false;
+  return asArray(policy.conditional_cases).some((item) => (
+    screeningPolicyCaseMatches(item, profile, taskScenario, skill)
+  ));
+}
+
+function screeningPolicyAvoidsRequest(tool, profile, taskScenario, skill) {
+  const policy = tool?.screening_policy;
+  if (!policy || typeof policy !== 'object') return false;
+  return asArray(policy.known_avoid_cases).some((item) => (
+    screeningPolicyCaseMatches(item, profile, taskScenario, skill)
+  ));
+}
+
+function screeningPolicyCaseMatches(item, profile, taskScenario, skill) {
+  const allowedSkills = asArray(item.skills);
+  if (allowedSkills.length > 0 && !allowedSkills.includes(skill)) return false;
+
+  const allowedTasks = asArray(item.tasks);
+  if (allowedTasks.length > 0 && !allowedTasks.includes(taskScenario)) return false;
+
+  if (item.match && !dimensionSignalMatches(item.match, profile)) return false;
+
+  const labels = profileLabels(profile);
+  return asArray(item.required_labels).every((label) => labels.has(String(label)));
+}
+
+function profileLabels(profile) {
+  const languages = asArray(profile?.languages).length > 0
+    ? asArray(profile.languages).map(String)
+    : ['no-primary-language'];
+  return new Set([
+    ...languages,
+    profile?.volume,
+    profile?.complexity,
+    profile?.repo_shape,
+    profile?.artifact_mode,
+    profile?.project_shape
+  ].filter(Boolean).map(String));
 }
 
 function dimensionAvoidsTool(metadata, profile, toolId) {

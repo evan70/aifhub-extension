@@ -114,7 +114,7 @@ describe('ai-tester matrix manifest', () => {
     assert.ok(manifest.cases.length > 0);
 
     const optionalCases = manifest.cases.filter((item) => item.tool_id !== 'rg');
-    assert.ok(optionalCases.some((item) => item.expectation === 'positive'));
+    assert.ok(optionalCases.length > 0);
     assert.ok(optionalCases.some((item) => item.expectation === 'not_applicable'));
 
     for (const toolCase of optionalCases) {
@@ -154,6 +154,50 @@ describe('ai-tester matrix manifest', () => {
     assert.equal(manifest.cases[0].id, 'screening-codegraph__matrix-profile-01__aif-explore__codegraph__architecture_or_impact_discovery__baseline_rg');
     assert.equal(manifest.cases[1].pair_id, 'screening-codegraph__matrix-profile-01__aif-explore__codegraph__architecture_or_impact_discovery');
     assert.equal(manifest.cases[0].profile_id, 'matrix-profile-01');
+  });
+
+  it('honors CodeGraph screening policy exact cases when classifying matrix expectations', async () => {
+    const metadata = await loadRecommendationMetadata({ metadataPath: REAL_METADATA });
+    const knownAvoidManifest = buildAiTesterMatrixManifest({
+      metadata,
+      profiles: [{
+        id: 'matrix-profile-01',
+        sourceRoot: path.join(tmpDir, 'fixture-project'),
+        project_shape: 'multirepo',
+        languages: ['js'],
+        volume: 'standard',
+        complexity: 'framework',
+        repo_shape: 'monorepo',
+        artifact_mode: 'legacy_ai_factory_only'
+      }],
+      skills: ['aif-explore'],
+      tools: ['codegraph'],
+      taskScenarios: ['architecture_or_impact_discovery', 'multirepo_surface_mapping']
+    });
+
+    const toolRuns = knownAvoidManifest.cases.filter((item) => item.tool_id === 'codegraph');
+    assert.equal(toolRuns.length, 2);
+    assert.deepEqual(toolRuns.map((item) => item.expectation), ['negative', 'negative']);
+
+    const exactAllowManifest = buildAiTesterMatrixManifest({
+      metadata,
+      profiles: [{
+        id: 'matrix-profile-02',
+        sourceRoot: path.join(tmpDir, 'fixture-project'),
+        project_shape: 'small_microservice',
+        languages: ['js'],
+        volume: 'mini',
+        complexity: 'framework',
+        repo_shape: 'single_repo',
+        artifact_mode: 'none'
+      }],
+      skills: ['aif-explore'],
+      tools: ['codegraph'],
+      taskScenarios: ['architecture_or_impact_discovery']
+    });
+
+    const exactAllowRun = exactAllowManifest.cases.find((item) => item.tool_id === 'codegraph');
+    assert.equal(exactAllowRun.expectation, 'positive');
   });
 
   it('renders ai-tester scenarios with direct ai-tester fields and selector wrapper separation', () => {
