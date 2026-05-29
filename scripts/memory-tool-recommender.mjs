@@ -733,6 +733,10 @@ function isAllowedForRequest(toolId, tool, projectShape, taskSignals, metadata, 
     return false;
   }
 
+  if (screeningPolicyAvoidsRequest(tool, projectProfile, taskSignals, command)) {
+    return false;
+  }
+
   const screeningMatch = screeningPolicyAllowsRequest(tool, projectProfile, taskSignals, command);
   if (tool.screening_policy?.default_decision === 'avoid_by_default' && !screeningMatch) {
     return false;
@@ -761,18 +765,28 @@ function screeningPolicyAllowsRequest(tool, projectProfile, taskSignals, command
   if (!policy || typeof policy !== 'object') return false;
   const profile = normalizeProjectProfile(projectProfile);
 
-  return asArray(policy.conditional_cases).some((item) => {
-    const allowedSkills = asArray(item.skills);
-    if (allowedSkills.length > 0 && !allowedSkills.includes(command)) return false;
+  return asArray(policy.conditional_cases).some((item) => screeningPolicyCaseMatches(item, profile, taskSignals, command));
+}
 
-    const allowedTasks = asArray(item.tasks);
-    if (allowedTasks.length > 0 && !taskSignals.some((signal) => allowedTasks.includes(signal))) return false;
+function screeningPolicyAvoidsRequest(tool, projectProfile, taskSignals, command) {
+  const policy = tool?.screening_policy;
+  if (!policy || typeof policy !== 'object') return false;
+  const profile = normalizeProjectProfile(projectProfile);
 
-    if (item.match && !dimensionSignalMatches(item.match, profile)) return false;
+  return asArray(policy.known_avoid_cases).some((item) => screeningPolicyCaseMatches(item, profile, taskSignals, command));
+}
 
-    const labels = profileLabels(profile);
-    return asArray(item.required_labels).every((label) => labels.has(String(label)));
-  });
+function screeningPolicyCaseMatches(item, profile, taskSignals, command) {
+  const allowedSkills = asArray(item.skills);
+  if (allowedSkills.length > 0 && !allowedSkills.includes(command)) return false;
+
+  const allowedTasks = asArray(item.tasks);
+  if (allowedTasks.length > 0 && !taskSignals.some((signal) => allowedTasks.includes(signal))) return false;
+
+  if (item.match && !dimensionSignalMatches(item.match, profile)) return false;
+
+  const labels = profileLabels(profile);
+  return asArray(item.required_labels).every((label) => labels.has(String(label)));
 }
 
 function profileLabels(profile) {

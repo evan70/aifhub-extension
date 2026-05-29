@@ -369,6 +369,26 @@ describe('recommendation results', () => {
     assert.match(exploreCodegraph.next_step, /codegraph uninit --force <project>/i);
   });
 
+  it('keeps CodeGraph out when an exact known avoid case matches the command, task, and labels', async () => {
+    const metadata = await loadRecommendationMetadata({ metadataPath: REAL_METADATA });
+    const result = await buildRecommendationResult({
+      metadata,
+      projectProfile: {
+        project_shape: 'multirepo',
+        languages: ['js'],
+        volume: 'standard',
+        complexity: 'framework',
+        repo_shape: 'monorepo',
+        artifact_mode: 'legacy_ai_factory_only'
+      },
+      taskSignals: ['architecture_or_impact_discovery'],
+      command: 'aif-explore',
+      probeRunner: async () => ({ availability: 'installed', command: 'codegraph --version' })
+    });
+
+    assert.equal(result.recommendations.some((item) => item.tool_id === 'codegraph'), false);
+  });
+
   it('does not recommend tools forbidden for the current command', async () => {
     const metadata = await loadRecommendationMetadata({ metadataPath: REAL_METADATA });
     const planResult = await buildRecommendationResult({
@@ -498,7 +518,7 @@ describe('recommendation results', () => {
       '--artifact-mode',
       'legacy_ai_factory_only',
       '--task',
-      'architecture_or_impact_discovery',
+      'multirepo_surface_mapping',
       '--command',
       'aif-explore',
       '--metadata',
@@ -526,7 +546,7 @@ describe('recommendation results', () => {
       '--artifact-mode',
       'legacy_ai_factory_only',
       '--task',
-      'architecture_or_impact_discovery',
+      'multirepo_surface_mapping',
       '--command',
       'aif-plan',
       '--metadata',
@@ -554,7 +574,7 @@ describe('recommendation results', () => {
       '--artifact-mode',
       'legacy_ai_factory_only',
       '--task',
-      'architecture_or_impact_discovery',
+      'multirepo_surface_mapping',
       '--command',
       'aif-implement',
       '--metadata',
@@ -628,7 +648,7 @@ describe('recommendation results', () => {
       '--artifact-mode',
       'legacy_ai_factory_only',
       '--task',
-      'architecture_or_impact_discovery',
+      'multirepo_surface_mapping',
       '--command',
       'aif-explore',
       '--metadata',
@@ -677,7 +697,7 @@ describe('recommendation results', () => {
       '--artifact-mode',
       'legacy_ai_factory_only',
       '--task',
-      'architecture_or_impact_discovery',
+      'multirepo_surface_mapping',
       '--command',
       'aif-explore',
       '--metadata',
@@ -752,7 +772,7 @@ describe('CLI behavior', () => {
       '--artifact-mode',
       'legacy_ai_factory_only',
       '--task',
-      'architecture_or_impact_discovery',
+      'multirepo_surface_mapping',
       '--command',
       'aif-explore',
       '--metadata',
