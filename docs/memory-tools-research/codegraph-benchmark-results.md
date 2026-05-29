@@ -172,7 +172,7 @@ CodeGraph можно рекомендовать только если однов
 | Labels | Skills | Лучший observed signal | Решение |
 |---|---|---|---|
 | `js+php`, `standard`, `framework`, `multirepo`, `openspec_native` | `aif-docs`, `aif-implement` | `aif-docs`: -82.7% total, -80.6% input+output; `aif-implement`: -54.5% total | Использовать только exact case; docs skill overall все равно avoid |
-| `js`, `standard`, `framework`, `monorepo`, `legacy_ai_factory_only`, `multirepo` | `aif-implement`, `aif-explore`, `aif-review`, `aif-verify`, `aif-commit` | `aif-implement`: -74.0%; `aif-explore`: -60.6%; `aif-review`: -55.4% total | Лучший current explore/implement case |
+| `js`, `standard`, `framework`, `monorepo`, `legacy_ai_factory_only`, `multirepo` | `aif-implement`, `aif-review`, `aif-verify`, `aif-commit`; `aif-explore` только если нет known avoid | `aif-implement`: -74.0%; `aif-explore`: -60.6%; `aif-review`: -55.4% total в screening | Screening signal; project-specific `aif-handoff` retests запрещают `aif-analyze`/`aif-explore` для architecture/surface |
 | `js`, `mini`, `framework`, `single_repo`, `none`, `small_microservice` | `aif-commit`, `aif-review`, `aif-verify`, `aif-implement`, `aif-fix`, `aif-rules-check`, `aif-explore`, `aif-docs` | `aif-commit`: -73.9%; `aif-review`: -63.2%; `aif-implement`: -54.0%/-41.0% total | Исключение из mini avoidance; не применять для exact lookup |
 | `no-primary-language`, `mini`, `single_repo`, `none`, `small_microservice` | `aif-rules-check`, `aif-review`, `aif-docs`, `aif-commit`, `aif-fix`, `aif-implement` | `aif-rules-check`: -68.9%; `aif-review`: -46.2%; `aif-docs`: -44.6% total | Только exact labels; no-primary-language alone недостаточно |
 | `php+js`, `standard`, `framework`, `multirepo`, `legacy_ai_factory_only` | `aif-verify`, `aif-rules-check` | `aif-verify`: -67.4%; `aif-rules-check`: -17.6% total | Gate-only case |
@@ -194,6 +194,7 @@ CodeGraph можно рекомендовать только если однов
 | `mini` или `small_microservice` для exact lookup | `rg` проще и дешевле; CodeGraph allowed только для записанных exception cases |
 | `aif-analyze` | 0/15 lower total-token rows, средний total tokens +291.8% |
 | `aif-plan` | 1/14 lower total-token rows, средний total tokens +158.4% |
+| `js+standard+framework+monorepo+legacy_ai_factory_only+multirepo` для `aif-analyze`/`aif-explore` architecture или surface mapping | Project-specific ai-tester retests на `aif-handoff`: обе positive rows проиграли `rg` по total/input+output tokens и duration |
 | `aif-docs`, `aif-review`, `aif-fix`, `aif-verify`, `aif-commit`, `aif-explore` по skill-only | У каждого есть отдельные wins, но среднее хуже `rg`; нужен exact labels match |
 | Header-only или пустой CodeGraph output | Low token count не считается полезностью |
 | On-demand setup без user opt-in | `init/index` cost часто съедает всю потенциальную экономию |
@@ -219,6 +220,28 @@ Labels: `python`, `standard`, `framework`, `single_repo`, `openspec_native`, `la
 | `aif-explore` | +76.1% | +200.0% | +142.0% | +143.2% | avoid |
 
 Вывод: для `python + standard + framework + single_repo + openspec_native + large_framework_app` CodeGraph не попадает в useful cases. Даже когда positive rows разрешили CodeGraph для `aif-analyze` и `aif-explore`, `rg` был быстрее и дешевле.
+
+## AI Tester AIF Handoff Surface 2026-05-29
+
+Raw artifact: `.ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/aif-handoff-codegraph-multirepo-surface-20260529-072710/ai-tester-token-matrices.json`.
+
+Labels: `js`, `standard`, `framework`, `monorepo`, `legacy_ai_factory_only`, `multirepo`. Task: `multirepo_surface_mapping`. Tool: `codegraph`. Matrix: 20 rows, 20 PASS, 0 FAIL, 0 NOT_RUN.
+
+Важно: в этой матрице только `aif-analyze` и `aif-explore` были positive rows с реальным использованием CodeGraph. Остальные 8 tool-run rows были negative policy checks: сценарий прямо запрещал CodeGraph и проверял, что selector не должен его использовать.
+
+| skill | run | status | duration | tool calls | total tokens | input tokens | output tokens | input+output tokens |
+|---|---|---|---:|---:|---:|---:|---:|---:|
+| `aif-analyze` | `rg baseline` | PASS | 81.1s | 3 | 357,479 | 202,552 | 1,839 | 204,391 |
+| `aif-analyze` | `codegraph tool_run` | PASS | 112.0s | 14 | 1,016,944 | 538,334 | 4,114 | 542,448 |
+| `aif-explore` | `rg baseline` | PASS | 82.5s | 1 | 199,851 | 99,411 | 1,880 | 101,291 |
+| `aif-explore` | `codegraph tool_run` | PASS | 183.3s | 23 | 2,674,301 | 1,377,265 | 8,716 | 1,385,981 |
+
+| skill | duration | tool calls | total tokens | input+output tokens | decision |
+|---|---:|---:|---:|---:|---|
+| `aif-analyze` | +38.1% | +366.7% | +184.5% | +165.4% | avoid |
+| `aif-explore` | +122.2% | +2200.0% | +1238.1% | +1268.3% | avoid |
+
+Вывод: для `aif-handoff` CodeGraph не подтвердил пользу даже на отдельной задаче `multirepo_surface_mapping`. На этих exact labels `aif-analyze` и `aif-explore` должны выбирать `rg baseline`; CodeGraph не рекомендовать.
 
 ## Итоговая Политика
 

@@ -1,5 +1,5 @@
 schema: aifhub.memory_tools.recommendation.v1
-updated: "2026-05-28"
+updated: "2026-05-29"
 purpose: "Метаданные для этапа анализа проекта: какие memory/retrieval инструменты можно предлагать пользователю, когда и с какими ограничениями."
 default_policy:
   install_policy: explicit_user_opt_in_only
@@ -863,7 +863,7 @@ tools:
             - "aif-implement / matrix-profile-05: -74.0% total, -71.4% input+output, -29.0% duration"
             - "aif-explore / matrix-profile-05: -60.6% total, -60.8% input+output, -48.5% duration"
             - "aif-review / matrix-profile-05: -55.4% total, -56.2% input+output, -30.4% duration"
-          recommendation_gate: "Best current aif-explore case; still require rg first and non-empty CodeGraph output."
+          recommendation_gate: "Historical screening signal only. known_avoid_cases override this case for aif-analyze/aif-explore on the exact aif-handoff label set after project-specific retests."
         - id: js_mini_framework_small_microservice
           required_labels: [js, mini, framework, single_repo, none, small_microservice]
           skills: [aif-commit, aif-review, aif-verify, aif-implement, aif-fix, aif-rules-check, aif-explore, aif-docs]
@@ -939,7 +939,16 @@ tools:
           observed_rows:
             - "aif-analyze: CodeGraph +112.2% total tokens, +106.1% input+output, +76.8% duration, +136.4% tool calls"
             - "aif-explore: CodeGraph +77.3% total tokens, +68.5% input+output, -13.2% duration, +29.6% tool calls"
-          recommendation_gate: "For architecture_or_impact_discovery on this exact label set, do not select CodeGraph as token saver. The multirepo_surface_mapping task remains governed by conditional_cases until separately retested."
+          recommendation_gate: "For architecture_or_impact_discovery on this exact label set, do not select CodeGraph as token saver."
+        - id: js_standard_monorepo_legacy_multirepo_surface_mapping
+          required_labels: [js, standard, framework, monorepo, legacy_ai_factory_only, multirepo]
+          skills: [aif-analyze, aif-explore]
+          tasks: [multirepo_surface_mapping]
+          evidence: aif-handoff-codegraph-surface-ai-tester-2026-05-29
+          observed_rows:
+            - "aif-analyze: CodeGraph +184.5% total tokens, +165.4% input+output, +38.1% duration, +366.7% tool calls"
+            - "aif-explore: CodeGraph +1238.1% total tokens, +1268.3% input+output, +122.2% duration, +2200.0% tool calls"
+          recommendation_gate: "For multirepo_surface_mapping on this exact label set, do not select CodeGraph for aif-analyze/aif-explore; rg baseline was cheaper and faster in both positive rows."
     do_not_recommend_for:
       project_shapes:
         - small_microservice
@@ -1846,3 +1855,116 @@ evidence_runs:
         policy_rows_passed: 10
         recommendation_update: "Do not use for initial code discovery; keep continuity-only."
     recommendation_update: "For architecture_or_impact_discovery on this profile, recommendations are rg baseline only. Keep CodeGraph conditional only for multirepo_surface_mapping until that task is retested."
+  - id: aif-handoff-codegraph-surface-ai-tester-2026-05-29
+    date: "2026-05-29"
+    scope: "Focused ai-tester retest on the same sanitized JS/TypeScript monorepo legacy AI Factory multirepo profile for CodeGraph and task multirepo_surface_mapping."
+    privacy: "Durable docs store labels and aggregate token/time/tool-call counts. Source snippets and raw transcripts are not stored in docs."
+    project_profile:
+      labels: [js, standard, framework, monorepo, legacy_ai_factory_only, multirepo]
+      project_shape: multirepo
+      language: js
+      volume: standard
+      complexity: framework
+      repo_shape: monorepo
+      artifact_mode: legacy_ai_factory_only
+    sanitization:
+      fixture_files: 608
+      excluded:
+        - ".git"
+        - ".env*"
+        - ".agents"
+        - ".claude"
+        - ".codex"
+        - ".cursor"
+        - ".idea"
+        - ".vscode"
+        - "node_modules"
+        - "logs"
+        - "project ignore files: .gitignore, .dockerignore, .ignore, .rgignore, .fdignore"
+    harness:
+      script: "scripts/memory-tool-ai-tester-matrix.mjs"
+      runner: "ai-tester.exe"
+      baseline: rg
+      model: gpt-5.4-mini
+      matrix_size: screening
+      skill_set: grouped
+      task: multirepo_surface_mapping
+      tool: codegraph
+      run_dir: ".ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/aif-handoff-codegraph-multirepo-surface-20260529-072710"
+    matrix:
+      rows_total: 20
+      rows_executed: 20
+      rows_pass: 20
+      rows_fail: 0
+      rows_not_run: 0
+      skills: [aif-analyze, aif-explore, aif-plan, aif-implement, aif-fix, aif-review, aif-rules-check, aif-verify, aif-docs, aif-commit]
+      expectation_counts:
+        baseline_rg: 10
+        positive: 2
+        negative: 8
+      paired_comparison:
+        rg:
+          rows: 10
+          duration_seconds: 786.6
+          tool_calls: 22
+          total_tokens: 2346684
+          input_tokens: 1304131
+          output_tokens: 16505
+          input_output_tokens: 1320636
+        codegraph:
+          rows: 10
+          duration_seconds: 1106.2
+          tool_calls: 90
+          total_tokens: 9082123
+          input_tokens: 4731274
+          output_tokens: 48001
+          input_output_tokens: 4779275
+        deltas:
+          duration_percent: 40.6
+          tool_calls_percent: 309.1
+          total_tokens_percent: 287.0
+          input_output_tokens_percent: 261.9
+        caveat: "Only positive rows represent actual CodeGraph usage. Negative rows intentionally forbid CodeGraph and are policy checks, not useful-tool comparisons."
+    outcomes:
+      codegraph:
+        positive_usage_rows: 2
+        positive_usage_pass_rows: 2
+        cases:
+          - skill: aif-analyze
+            task: multirepo_surface_mapping
+            rg_duration_seconds: 81.1
+            tool_duration_seconds: 112.0
+            rg_tool_calls: 3
+            tool_calls: 14
+            rg_total_tokens: 357479
+            tool_total_tokens: 1016944
+            rg_input_tokens: 202552
+            tool_input_tokens: 538334
+            rg_output_tokens: 1839
+            tool_output_tokens: 4114
+            rg_input_output_tokens: 204391
+            tool_input_output_tokens: 542448
+            tool_total_tokens_delta_percent: 184.5
+            tool_input_output_tokens_delta_percent: 165.4
+            tool_duration_delta_percent: 38.1
+            tool_calls_delta_percent: 366.7
+          - skill: aif-explore
+            task: multirepo_surface_mapping
+            rg_duration_seconds: 82.5
+            tool_duration_seconds: 183.3
+            rg_tool_calls: 1
+            tool_calls: 23
+            rg_total_tokens: 199851
+            tool_total_tokens: 2674301
+            rg_input_tokens: 99411
+            tool_input_tokens: 1377265
+            rg_output_tokens: 1880
+            tool_output_tokens: 8716
+            rg_input_output_tokens: 101291
+            tool_input_output_tokens: 1385981
+            tool_total_tokens_delta_percent: 1238.1
+            tool_input_output_tokens_delta_percent: 1268.3
+            tool_duration_delta_percent: 122.2
+            tool_calls_delta_percent: 2200.0
+        recommendation_update: "Avoid CodeGraph for multirepo_surface_mapping on js+standard+framework+monorepo+legacy_ai_factory_only+multirepo for aif-analyze and aif-explore. In this exact profile, CodeGraph was both slower and more expensive than rg."
+    recommendation_update: "For this profile, CodeGraph is not recommended for aif-analyze/aif-explore architecture_or_impact_discovery or multirepo_surface_mapping. Negative rows for other skills only confirm selector forbids CodeGraph there."

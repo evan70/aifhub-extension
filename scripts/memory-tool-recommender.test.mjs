@@ -342,14 +342,14 @@ describe('recommendation results', () => {
     const exploreResult = await buildRecommendationResult({
       metadata,
       projectProfile: {
-        project_shape: 'multirepo',
+        project_shape: 'small_microservice',
         languages: ['js'],
-        volume: 'standard',
+        volume: 'mini',
         complexity: 'framework',
-        repo_shape: 'monorepo',
-        artifact_mode: 'legacy_ai_factory_only'
+        repo_shape: 'single_repo',
+        artifact_mode: 'none'
       },
-      taskSignals: ['multirepo_surface_mapping'],
+      taskSignals: ['architecture_or_impact_discovery'],
       command: 'aif-explore',
       probeRunner: async () => ({ availability: 'installed', command: 'codegraph --version' })
     });
@@ -371,22 +371,24 @@ describe('recommendation results', () => {
 
   it('keeps CodeGraph out when an exact known avoid case matches the command, task, and labels', async () => {
     const metadata = await loadRecommendationMetadata({ metadataPath: REAL_METADATA });
-    const result = await buildRecommendationResult({
-      metadata,
-      projectProfile: {
-        project_shape: 'multirepo',
-        languages: ['js'],
-        volume: 'standard',
-        complexity: 'framework',
-        repo_shape: 'monorepo',
-        artifact_mode: 'legacy_ai_factory_only'
-      },
-      taskSignals: ['architecture_or_impact_discovery'],
-      command: 'aif-explore',
-      probeRunner: async () => ({ availability: 'installed', command: 'codegraph --version' })
-    });
+    for (const taskSignal of ['architecture_or_impact_discovery', 'multirepo_surface_mapping']) {
+      const result = await buildRecommendationResult({
+        metadata,
+        projectProfile: {
+          project_shape: 'multirepo',
+          languages: ['js'],
+          volume: 'standard',
+          complexity: 'framework',
+          repo_shape: 'monorepo',
+          artifact_mode: 'legacy_ai_factory_only'
+        },
+        taskSignals: [taskSignal],
+        command: 'aif-explore',
+        probeRunner: async () => ({ availability: 'installed', command: 'codegraph --version' })
+      });
 
-    assert.equal(result.recommendations.some((item) => item.tool_id === 'codegraph'), false);
+      assert.equal(result.recommendations.some((item) => item.tool_id === 'codegraph'), false);
+    }
   });
 
   it('does not recommend tools forbidden for the current command', async () => {
@@ -506,19 +508,19 @@ describe('recommendation results', () => {
     const explore = await runMemoryToolRecommender([
       'select',
       '--shape',
-      'multirepo',
+      'small_microservice',
       '--language',
       'js',
       '--volume',
-      'standard',
+      'mini',
       '--complexity',
       'framework',
       '--repo-shape',
-      'monorepo',
+      'single_repo',
       '--artifact-mode',
-      'legacy_ai_factory_only',
+      'none',
       '--task',
-      'multirepo_surface_mapping',
+      'architecture_or_impact_discovery',
       '--command',
       'aif-explore',
       '--metadata',
@@ -598,7 +600,7 @@ describe('recommendation results', () => {
     assert.equal(exploreCodegraph.permission, 'manual_purged_cli_execution');
     const skippedExploreGraphify = explore.body.not_selected_tools.find((item) => item.tool_id === 'graphify');
     assert.ok(skippedExploreGraphify);
-    assert.match(skippedExploreGraphify.reason, /not applicable/i);
+    assert.match(skippedExploreGraphify.reason, /not applicable|avoided/i);
     assert.match(JSON.stringify(exploreCodegraph.execution), /codegraph init <project>/);
     assert.match(JSON.stringify(exploreCodegraph.execution), /codegraph uninit --force <project>/);
 
@@ -636,19 +638,19 @@ describe('recommendation results', () => {
     const result = await runMemoryToolRecommender([
       'select',
       '--shape',
-      'multirepo',
+      'small_microservice',
       '--language',
       'js',
       '--volume',
-      'standard',
+      'mini',
       '--complexity',
       'framework',
       '--repo-shape',
-      'monorepo',
+      'single_repo',
       '--artifact-mode',
-      'legacy_ai_factory_only',
+      'none',
       '--task',
-      'multirepo_surface_mapping',
+      'architecture_or_impact_discovery',
       '--command',
       'aif-explore',
       '--metadata',
@@ -685,19 +687,19 @@ describe('recommendation results', () => {
     const result = await runMemoryToolRecommender([
       'select',
       '--shape',
-      'multirepo',
+      'small_microservice',
       '--language',
       'js',
       '--volume',
-      'standard',
+      'mini',
       '--complexity',
       'framework',
       '--repo-shape',
-      'monorepo',
+      'single_repo',
       '--artifact-mode',
-      'legacy_ai_factory_only',
+      'none',
       '--task',
-      'multirepo_surface_mapping',
+      'architecture_or_impact_discovery',
       '--command',
       'aif-explore',
       '--metadata',
@@ -760,19 +762,19 @@ describe('CLI behavior', () => {
     const result = await runCli([
       'recommend',
       '--shape',
-      'multirepo',
+      'small_microservice',
       '--language',
       'js',
       '--volume',
-      'standard',
+      'mini',
       '--complexity',
       'framework',
       '--repo-shape',
-      'monorepo',
+      'single_repo',
       '--artifact-mode',
-      'legacy_ai_factory_only',
+      'none',
       '--task',
-      'multirepo_surface_mapping',
+      'architecture_or_impact_discovery',
       '--command',
       'aif-explore',
       '--metadata',
