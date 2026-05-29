@@ -44,23 +44,72 @@ const MANIFEST_NAMES = new Set([
   'build.gradle',
   'extension.json'
 ]);
+const PROJECT_IGNORE_FILES = new Set([
+  '.gitignore',
+  '.dockerignore',
+  '.ignore',
+  '.rgignore',
+  '.fdignore'
+]);
+const IGNORE_FILE_NAMES = new Set([
+  '.aider.conf.yml',
+  '.aider.model.settings.yml',
+  '.aiderignore',
+  '.cursorrules',
+  '.mcp.json',
+  '.opencode.json',
+  '.roomodes',
+  '.windsurfrules',
+  'agents.md',
+  'claude.md',
+  'copilot-instructions.md',
+  'gemini.md',
+  'opencode.json'
+]);
 const IGNORE_DIR_NAMES = new Set([
   '.git',
   '.hg',
   '.svn',
+  '.agents',
+  '.codex',
+  '.claude',
+  '.opencode',
+  '.cursor',
+  '.continue',
   'node_modules',
   'vendor',
   'dist',
   'build',
   'coverage',
+  '.ai-factory',
   '.cache',
+  '.uv-cache',
+  '.pytest_cache',
+  '.mypy_cache',
+  '.ruff_cache',
+  '.venv',
+  'venv',
+  '__pycache__',
   '.next',
   '.turbo',
   'target',
   'tmp',
   'temp',
+  'logs',
   'graphify-out',
-  '.codegraph'
+  '.codegraph',
+  '.idea',
+  '.vscode',
+  '.windsurf',
+  '.roo',
+  '.kiro',
+  '.qodo',
+  '.aider',
+  '.openhands'
+]);
+const IGNORE_DIR_PATHS = new Set([
+  '.github/skills',
+  '.github/copilot'
 ]);
 const LOCK_FILE_NAMES = new Set([
   'package-lock.json',
@@ -86,7 +135,10 @@ export async function runMemoryToolFieldRun(args = [], options = {}) {
 
   const rootInputs = parsed.roots.length > 0 ? parsed.roots : [process.cwd()];
   const tools = getToolPlan(parsed.tools);
-  const profiles = await discoverProjectRoots(rootInputs, { maxProfiles: parsed.maxProfiles });
+  const profiles = await discoverProjectRoots(rootInputs, {
+    maxProfiles: parsed.maxProfiles,
+    excludeRoots: parsed.excludeRoots
+  });
   const selectedProfiles = parsed.dryRun ? profiles : profiles;
   const toolResults = [];
   const copies = [];
@@ -144,24 +196,27 @@ export async function discoverProjectRoots(rootInputs, options = {}) {
   const maxProfiles = Number.isFinite(options.maxProfiles) && options.maxProfiles >= 0
     ? options.maxProfiles
     : null;
+  const excludeRoots = asArray(options.excludeRoots).map((item) => path.resolve(item));
 
   for (const input of rootInputs) {
     const root = path.resolve(input);
     if (!await pathExists(root)) continue;
+    if (isExcludedPath(root, excludeRoots)) continue;
     const entries = await readdir(root, { withFileTypes: true }).catch(() => []);
 
     if (await isProjectRoot(root)) {
-      addRoot(roots, seen, root);
+      addRoot(roots, seen, root, excludeRoots);
     }
 
     for (const entry of entries) {
-      if (!entry.isDirectory() || shouldIgnoreDirectory(entry.name)) continue;
+      if (!entry.isDirectory() || shouldIgnoreDirectoryPath(entry.name)) continue;
       const candidate = path.join(root, entry.name);
+      if (isExcludedPath(candidate, excludeRoots)) continue;
       if (await isProjectRoot(candidate)) {
-        addRoot(roots, seen, candidate);
+        addRoot(roots, seen, candidate, excludeRoots);
       }
       for (const nested of await findNestedProjectRoots(candidate, { maxDepth: 3 })) {
-        addRoot(roots, seen, nested);
+        addRoot(roots, seen, nested, excludeRoots);
       }
     }
   }
@@ -715,17 +770,25 @@ function sanitizeToolResult(result) {
   }));
 }
 
-async function copySanitizedDirectory(sourceDir, targetDir) {
+async function copySanitizedDirectory(sourceDir, targetDir, relativeDir = '', inheritedIgnoreRules = []) {
+  const localIgnoreRules = await loadProjectIgnoreRules(sourceDir, relativeDir);
+  const activeIgnoreRules = [...inheritedIgnoreRules, ...localIgnoreRules];
   const entries = await readdir(sourceDir, { withFileTypes: true }).catch(() => []);
   for (const entry of entries) {
-    if (shouldIgnoreEntry(entry.name, entry.isDirectory())) continue;
+    const relativePath = toPosix(relativeDir ? path.join(relativeDir, entry.name) : entry.name);
+    if (
+      shouldIgnoreEntry(entry.name, entry.isDirectory(), relativePath)
+      || shouldIgnoreByProjectRules(relativePath, entry.isDirectory(), activeIgnoreRules)
+    ) {
+      continue;
+    }
     const source = path.join(sourceDir, entry.name);
     const target = path.join(targetDir, entry.name);
     const stats = await lstat(source).catch(() => null);
     if (!stats || stats.isSymbolicLink()) continue;
     if (stats.isDirectory()) {
       await mkdir(target, { recursive: true });
-      await copySanitizedDirectory(source, target);
+      await copySanitizedDirectory(source, target, relativePath, activeIgnoreRules);
     } else if (stats.isFile()) {
       await mkdir(path.dirname(target), { recursive: true });
       await cp(source, target, { force: false });
@@ -740,7 +803,8 @@ async function findNestedProjectRoots(root, options = {}) {
     if (depth > maxDepth) return;
     const entries = await readdir(current, { withFileTypes: true }).catch(() => []);
     for (const entry of entries) {
-      if (!entry.isDirectory() || shouldIgnoreDirectory(entry.name)) continue;
+      const relativePath = toPosix(path.relative(root, path.join(current, entry.name)));
+      if (!entry.isDirectory() || shouldIgnoreDirectoryPath(relativePath)) continue;
       const candidate = path.join(current, entry.name);
       if (await isProjectRoot(candidate)) {
         results.push(candidate);
@@ -761,12 +825,32 @@ async function isProjectRoot(candidate) {
   return false;
 }
 
-function addRoot(roots, seen, root) {
+function addRoot(roots, seen, root, excludeRoots = []) {
   const resolved = path.resolve(root);
+  if (isExcludedPath(resolved, excludeRoots)) return;
   const key = resolved.toLowerCase();
   if (seen.has(key)) return;
   seen.add(key);
   roots.push(resolved);
+}
+
+function isExcludedPath(candidate, excludeRoots = []) {
+  const resolved = path.resolve(candidate);
+  const normalized = normalizePathForCompare(resolved);
+  return excludeRoots.some((root) => {
+    const normalizedRoot = normalizePathForCompare(path.resolve(root));
+    return normalized === normalizedRoot || normalized.startsWith(`${normalizedRoot}${path.sep}`);
+  });
+}
+
+function normalizePathForCompare(value) {
+  return process.platform === 'win32' ? String(value).toLowerCase() : String(value);
+}
+
+function asArray(value) {
+  if (Array.isArray(value)) return value;
+  if (value === undefined || value === null || value === '') return [];
+  return [value];
 }
 
 function classifyShapeFromPath(sourceRoot) {
@@ -777,13 +861,153 @@ function classifyShapeFromPath(sourceRoot) {
   return 'large_framework_app';
 }
 
-function shouldIgnoreEntry(name, isDirectory) {
-  if (isDirectory) return shouldIgnoreDirectory(name);
-  return name.startsWith('.env') || LOCK_FILE_NAMES.has(name);
+function shouldIgnoreEntry(name, isDirectory, relativePath = name) {
+  if (isDirectory) return shouldIgnoreDirectoryPath(relativePath);
+  const lowerName = String(name).toLowerCase();
+  const lowerPath = toPosix(relativePath).toLowerCase();
+  return name.startsWith('.env')
+    || LOCK_FILE_NAMES.has(name)
+    || IGNORE_FILE_NAMES.has(lowerName)
+    || lowerPath.endsWith('.code-workspace')
+    || lowerPath.endsWith('.log');
 }
 
 function shouldIgnoreDirectory(name) {
   return IGNORE_DIR_NAMES.has(name) || name.startsWith('.env');
+}
+
+function shouldIgnoreDirectoryPath(relativePath) {
+  const normalized = toPosix(relativePath).toLowerCase();
+  if (IGNORE_DIR_PATHS.has(normalized)) return true;
+  for (const ignored of IGNORE_DIR_PATHS) {
+    if (normalized.startsWith(`${ignored}/`)) return true;
+  }
+  return normalized.split('/').some((part) => shouldIgnoreDirectory(part));
+}
+
+async function loadProjectIgnoreRules(currentDir, relativeDir) {
+  const rules = [];
+  for (const ignoreFileName of PROJECT_IGNORE_FILES) {
+    let raw;
+    try {
+      raw = await readFile(path.join(currentDir, ignoreFileName), 'utf8');
+    } catch {
+      continue;
+    }
+    rules.push(...parseProjectIgnoreRules(raw, {
+      baseDir: toPosix(relativeDir)
+    }));
+  }
+  return rules;
+}
+
+function parseProjectIgnoreRules(raw, options = {}) {
+  const baseDir = toPosix(options.baseDir ?? '');
+  const rules = [];
+  for (const rawLine of String(raw ?? '').split(/\r?\n/)) {
+    const trimmed = rawLine.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    let pattern = trimmed;
+    let negated = false;
+    if (pattern.startsWith('!')) {
+      negated = true;
+      pattern = pattern.slice(1).trim();
+    }
+    if (!pattern) continue;
+    if (pattern.startsWith('\\#') || pattern.startsWith('\\!')) pattern = pattern.slice(1);
+    const directoryOnly = pattern.endsWith('/');
+    pattern = toPosix(pattern)
+      .replace(/^\/+/, '')
+      .replace(/^\.\//, '')
+      .replace(/\/+$/, '');
+    if (!pattern) continue;
+    rules.push({
+      baseDir,
+      pattern: pattern.toLowerCase(),
+      negated,
+      directoryOnly,
+      hasSlash: pattern.includes('/'),
+      hasGlob: /[*?\[]/.test(pattern)
+    });
+  }
+  return rules;
+}
+
+function shouldIgnoreByProjectRules(relativePath, isDirectory, rules) {
+  let ignored = false;
+  for (const rule of rules) {
+    if (projectIgnoreRuleMatches(rule, relativePath, isDirectory)) {
+      ignored = !rule.negated;
+    }
+  }
+  return ignored;
+}
+
+function projectIgnoreRuleMatches(rule, relativePath, isDirectory) {
+  const pathInProject = toPosix(relativePath).toLowerCase();
+  const pathInBase = pathRelativeToIgnoreBase(pathInProject, rule.baseDir);
+  if (pathInBase === null || pathInBase === '') return false;
+
+  if (!rule.hasSlash) {
+    return pathInBase.split('/').some((part) => ignorePatternMatches(rule, part, isDirectory));
+  }
+
+  if (rule.directoryOnly && !rule.hasGlob) {
+    return pathInBase === rule.pattern || pathInBase.startsWith(`${rule.pattern}/`);
+  }
+
+  if (!rule.hasGlob) return pathInBase === rule.pattern;
+
+  return globToRegExp(rule.pattern).test(pathInBase);
+}
+
+function pathRelativeToIgnoreBase(relativePath, baseDir) {
+  if (!baseDir) return relativePath;
+  if (relativePath === baseDir) return '';
+  return relativePath.startsWith(`${baseDir}/`)
+    ? relativePath.slice(baseDir.length + 1)
+    : null;
+}
+
+function ignorePatternMatches(rule, value, isDirectory) {
+  if (rule.directoryOnly && !isDirectory) return value === rule.pattern;
+  if (rule.hasGlob) return globToRegExp(rule.pattern).test(value);
+  return value === rule.pattern;
+}
+
+function globToRegExp(pattern) {
+  let source = '';
+  for (let index = 0; index < pattern.length; index += 1) {
+    const char = pattern[index];
+    if (char === '*') {
+      if (pattern[index + 1] === '*') {
+        if (pattern[index + 2] === '/') {
+          source += '(?:.*/)?';
+          index += 2;
+        } else {
+          source += '.*';
+          index += 1;
+        }
+      } else {
+        source += '[^/]*';
+      }
+      continue;
+    }
+    if (char === '?') {
+      source += '[^/]';
+      continue;
+    }
+    source += escapeRegExp(char);
+  }
+  return new RegExp(`^${source}$`, 'i');
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
+}
+
+function toPosix(value) {
+  return String(value).replace(/\\/g, '/');
 }
 
 async function execSafe(command, args = [], options = {}) {
@@ -851,6 +1075,7 @@ function parseArgs(args) {
   const parsed = {
     help: false,
     roots: [],
+    excludeRoots: [],
     out: null,
     tools: 'safe',
     json: false,
@@ -868,6 +1093,8 @@ function parseArgs(args) {
       parsed.help = true;
     } else if (token === '--roots') {
       parsed.roots.push(args[++index]);
+    } else if (token === '--exclude-root') {
+      parsed.excludeRoots.push(args[++index]);
     } else if (token === '--out') {
       parsed.out = args[++index];
     } else if (token === '--tools') {
@@ -897,6 +1124,7 @@ export function getCliUsage() {
     '',
     'Options:',
     '  --roots <dir>         Root directory to discover project profiles from. Repeatable.',
+    '  --exclude-root <dir>  Exclude this root and all nested project profiles. Repeatable.',
     '  --out <dir>           Temp run directory for sanitized copies, tool installs, and JSON output.',
     '  --tools safe          Run the safe optional-context-tool set.',
     '  --json                Emit public JSON summary to stdout.',

@@ -299,7 +299,9 @@ describe('AIFHub wrapper guidance contract', () => {
         'ai-factory aifhub-handoff-gate-summary --change <change-id> --stage review --json'
       ]],
       ['docs/memory-tool-recommendations.md', [
+        'ai-factory aifhub-memory-tools labels --from-project --json',
         'ai-factory aifhub-memory-tools recommend --from-project --json',
+        'ai-factory aifhub-memory-tools recommend --command aif-analyze',
         'ai-factory aifhub-memory-tools status --json',
         'ai-factory aifhub-memory-tools metadata --json'
       ]],

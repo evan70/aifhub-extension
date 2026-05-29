@@ -121,11 +121,14 @@ docs/memory-tools-research/recommendation-metadata.yaml
 Installed-project diagnostics should use the wrapper command:
 
 ```bash
-ai-factory aifhub-memory-tools recommend --from-project --json
-ai-factory aifhub-memory-tools select --from-project --command aif-explore --json
+ai-factory aifhub-memory-tools labels --from-project --json
+ai-factory aifhub-memory-tools recommend --command aif-analyze --shape <project_shape> --language <language> --volume <volume> --complexity <complexity> --repo-shape <repo_shape> --artifact-mode <artifact_mode> --task <task_signal> --json
+ai-factory aifhub-memory-tools select --from-project --command <skill> --json
 ai-factory aifhub-memory-tools status --json
 ai-factory aifhub-memory-tools metadata --json
 ```
+
+`recommend --from-project --json` remains a shortcut for diagnostics and compatibility. `/aif-analyze` itself must use the labels-first flow: call `labels --from-project --json`, inspect `available_labels`, `project_profile`, `selected_labels`, `matched_dimension_signals`, and per-label `evidence`, choose task signals from the request/analysis context, then call `recommend` with explicit labels from `project_profile`.
 
 If metadata is unavailable, skip recommendations with a degraded note and keep `rg` as the baseline tool.
 
@@ -151,9 +154,11 @@ Detect task signals from the user request and analysis context:
 Recommendation rules:
 
 - `rg` remains the baseline for exact file/symbol lookup, small projects, and first-pass literal search.
+- Start from labels, not hidden recommendation classification: first report selected project labels, then explain recommendations and non-recommendations against those labels.
 - Recommend only tools allowed by local metadata.
 - Prefer installed/local tools in recommendations; non-installed tools may be described as optional manual install only when metadata allows.
 - Include enriched recommendation details when metadata provides them: allowed command scopes, forbidden command scopes, command-specific permission, execution guidance, privacy caveat, read scope, purge path, availability, and explicit opt-in install policy.
+- The final analysis response must include a concise optional tool block with `Project labels`, `Recommended tools`, and `Do not use` sections. `Project labels` must include languages, volume, complexity, repo shape, artifact mode, project shape, task signals, and matched dimension signals when present.
 - Ask the user which recommended tools to enable. Write only accepted tool ids to `utilities.context_tools.enabled`; do not enable a tool just because it was recommended.
 - After config is updated, follow-on skills should call `ai-factory aifhub-memory-tools select --from-project --command <skill> --json` and use only `selected_tools`. Do not hard-code provider-specific tool lists into follow-on skills.
 - Never auto-install, run setup, start MCP, register MCP, index source, sync memory, install hooks, start background daemons, or persist provider output.
@@ -415,8 +420,9 @@ openspec init --tools none
 - Report the resolved bootstrap mode.
 - Report the bootstrap mode selection source: existing config, explicit user request, first-bootstrap answer, or autonomous default.
 - Report whether config values were created or preserved.
-- Report optional local tool recommendations from `ai-factory aifhub-memory-tools recommend --from-project --json` when the installed wrapper is available, or from source-tree metadata only when running inside the AIFHub extension repository. Include baseline `rg`, recommended tools with availability/read scope/purge path, and not-recommended tools such as `codex-mem` and `eagle-mem`. Ask which recommendations to enable and write accepted tool ids to `utilities.context_tools.enabled`. If metadata is unavailable, report a degraded note and continue.
-- Report the selected tool view from `ai-factory aifhub-memory-tools select --from-project --command aif-explore --json` after config is updated, including `selected_tools` and any `not_selected_tools`.
+- Report project labels from `ai-factory aifhub-memory-tools labels --from-project --json` first: languages, volume, complexity, repo shape, artifact mode, project shape, task signals, matched dimension signals, and short evidence for the labels that affected recommendations.
+- Report optional local tool recommendations from explicit-label `ai-factory aifhub-memory-tools recommend --command aif-analyze ... --json` output when the installed wrapper is available, or from source-tree metadata only when running inside the AIFHub extension repository. Include baseline `rg`, recommended tools with availability/read scope/purge path/skill usefulness, and not-recommended tools with label-based reasons such as `codex-mem`, `eagle-mem`, tools forbidden for the skill, or tools without exact skill+label evidence. Ask which recommendations to enable and write accepted tool ids to `utilities.context_tools.enabled`. If metadata is unavailable, report a degraded note and continue.
+- Report that follow-on skills select their own usable subset with `ai-factory aifhub-memory-tools select --from-project --command <skill> --json`; enabled config entries are not permission to use a tool unless they appear in `selected_tools`.
 - When the recommender output includes enriched fields, include allowed command scopes, forbidden command scopes, command-specific permission, execution guidance, privacy caveat, and protected validation artifacts in the concise recommendation summary when relevant.
 - Report the backward-compatible Graphify utility setting and `uv` availability only as compatibility context. If `utilities.graphify.enabled` is missing or `false`, Graphify may still be recommended only through local metadata; show manual setup commands only as explicit opt-in guidance: `uv --version`, `uv tool install graphifyy`, `graphify install`, and `graphify .`.
 - If autonomous/subagent mode defaulted to legacy `ai-factory` because the artifact protocol question could not be asked, report OpenSpec-native mode selection as an open question/blocker.

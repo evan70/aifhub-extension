@@ -71,6 +71,20 @@ describe('project discovery', () => {
 
     assert.deepEqual(profiles, []);
   });
+
+  it('excludes a selected root and nested project roots under it', async () => {
+    await writeFixtureFile(path.join('included', 'package.json'), '{}');
+    await writeFixtureFile(path.join('excluded', 'package.json'), '{}');
+    await writeFixtureFile(path.join('excluded', 'nested', 'package.json'), '{}');
+
+    const profiles = await discoverProjectRoots([tmpDir], {
+      maxProfiles: 10,
+      excludeRoots: [path.join(tmpDir, 'excluded')]
+    });
+    const basenames = profiles.map((profile) => path.basename(profile.sourceRoot));
+
+    assert.deepEqual(basenames, ['included']);
+  });
 });
 
 describe('sanitized copies', () => {
@@ -80,6 +94,10 @@ describe('sanitized copies', () => {
     await writeFixtureFile(path.join('source-project', 'src', 'index.js'), 'console.log("ok");');
     await writeFixtureFile(path.join('source-project', '.git', 'config'), 'private git config');
     await writeFixtureFile(path.join('source-project', '.env'), 'TOKEN=secret');
+    await writeFixtureFile(path.join('source-project', '.agents', 'skills', 'aif-build-automation', 'templates', 'magefile.go'), 'package main');
+    await writeFixtureFile(path.join('source-project', '.codex', 'skills', 'aif-build-automation', 'templates', 'magefile.go'), 'package main');
+    await writeFixtureFile(path.join('source-project', '.github', 'skills', 'aif-build-automation', 'templates', 'magefile.go'), 'package main');
+    await writeFixtureFile(path.join('source-project', '.github', 'workflows', 'validate.yml'), 'name: validate\n');
     await writeFixtureFile(path.join('source-project', 'node_modules', 'pkg', 'index.js'), 'dependency');
     await writeFixtureFile(path.join('source-project', 'package-lock.json'), '{}');
     await writeFixtureFile(path.join('source-project', 'dist', 'bundle.js'), 'built');
@@ -94,9 +112,33 @@ describe('sanitized copies', () => {
     assert.equal(await exists(path.join(copy.copyPath, 'src', 'index.js')), true);
     assert.equal(await exists(path.join(copy.copyPath, '.git', 'config')), false);
     assert.equal(await exists(path.join(copy.copyPath, '.env')), false);
+    assert.equal(await exists(path.join(copy.copyPath, '.agents')), false);
+    assert.equal(await exists(path.join(copy.copyPath, '.codex')), false);
+    assert.equal(await exists(path.join(copy.copyPath, '.github', 'skills')), false);
+    assert.equal(await exists(path.join(copy.copyPath, '.github', 'workflows', 'validate.yml')), true);
     assert.equal(await exists(path.join(copy.copyPath, 'node_modules')), false);
     assert.equal(await exists(path.join(copy.copyPath, 'package-lock.json')), false);
     assert.equal(await exists(path.join(copy.copyPath, 'dist')), false);
+  });
+
+  it('treats leading ** slash ignore globs as zero or more directories', async () => {
+    const sourceRoot = path.join(tmpDir, 'source-project');
+    await writeFixtureFile(path.join('source-project', 'package.json'), '{}');
+    await writeFixtureFile(path.join('source-project', '.gitignore'), '**/*.secret\n');
+    await writeFixtureFile(path.join('source-project', 'top.secret'), 'root secret');
+    await writeFixtureFile(path.join('source-project', 'src', 'nested.secret'), 'nested secret');
+    await writeFixtureFile(path.join('source-project', 'src', 'index.js'), 'console.log("ok");');
+
+    const outDir = path.join(tmpDir, 'run-output');
+    await mkdir(outDir, { recursive: true });
+    const copy = await prepareSanitizedCopy({
+      profile: { id: 'field-profile-01', sourceRoot },
+      outDir
+    });
+
+    assert.equal(await exists(path.join(copy.copyPath, 'top.secret')), false);
+    assert.equal(await exists(path.join(copy.copyPath, 'src', 'nested.secret')), false);
+    assert.equal(await exists(path.join(copy.copyPath, 'src', 'index.js')), true);
   });
 });
 
