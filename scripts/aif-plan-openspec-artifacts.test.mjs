@@ -26,6 +26,17 @@ function assertNotIncludes(source, unexpected, label) {
   );
 }
 
+function assertOrder(source, orderedFragments, label) {
+  let cursor = -1;
+
+  for (const fragment of orderedFragments) {
+    const index = source.indexOf(fragment, cursor + 1);
+    assert.notEqual(index, -1, `${label} should include ${JSON.stringify(fragment)} after index ${cursor}`);
+    assert.ok(index > cursor, `${label} should order ${JSON.stringify(fragment)} after previous fragment`);
+    cursor = index;
+  }
+}
+
 function extractSection(markdown, heading) {
   const lines = markdown.split(/\r?\n/);
   let inFence = false;
@@ -120,6 +131,52 @@ describe('aif-plan OpenSpec-native planning contract', () => {
       '#### Scenario: <Scenario name>'
     ]) {
       assertIncludes(openspec, expected, 'OpenSpec-native section');
+    }
+  });
+
+  it('requires task intake normalization before writing OpenSpec artifacts', async () => {
+    const injection = await readRepoFile('injections/core/aif-plan-plan-folder.md');
+    const openspec = extractSection(injection, 'OpenSpec-native mode');
+
+    assertIncludes(openspec, '#### Task Intake Normalization', 'aif-plan OpenSpec-native section');
+    assertOrder(
+      openspec,
+      ['#### Task Intake Normalization', '#### Required artifact shape'],
+      'aif-plan OpenSpec-native section'
+    );
+
+    for (const expected of [
+      'task type',
+      'goal',
+      'non-goals',
+      'constraints',
+      'assumptions',
+      'impacted capabilities',
+      'C4 impact',
+      'ADR candidates',
+      'dependency graph',
+      'acceptance criteria',
+      'open questions',
+      'suggested next command',
+      '`proposal.md` for intent, scope, non-goals, approach, assumptions, risks, and open questions',
+      '`design.md` for technical approach, C4 impact, ADR candidates, dependency graph, integration points, alternatives, and risks',
+      '`tasks.md` for an executable implementation checklist',
+      '`specs/**/spec.md` for behavior-changing requirements and scenarios',
+      'Raw input trace, normalization confidence, and temporary notes are runtime state only',
+      'may be persisted only under `.ai-factory/state/<change-id>/`',
+      'must never be written under `openspec/changes/<change-id>/`'
+    ]) {
+      assertIncludes(openspec, expected, 'aif-plan OpenSpec-native section');
+    }
+
+    for (const expected of [
+      '`/aif-task-prepare`',
+      '`.ai-factory/specs/<task-id>.md`',
+      '`task-prepare.md`',
+      'legacy companion files under `openspec/changes/<change-id>/`',
+      'must not be created'
+    ]) {
+      assertIncludes(openspec, expected, 'aif-plan OpenSpec-native forbidden artifacts');
     }
   });
 

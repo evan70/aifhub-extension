@@ -56,6 +56,19 @@ Refine only these canonical OpenSpec artifacts for the active change:
 
 Legacy companion plan artifacts, including `task.md`, `context.md`, `rules.md`, `verify.md`, and `status.yaml` are not OpenSpec-native refinement targets.
 
+#### Task Quality Refinement
+
+When refining an OpenSpec-native change, audit normalized task quality across the canonical artifacts:
+
+- `proposal.md` for intent, scope, non-goals, assumptions, risks, and open questions
+- `design.md` for C4 impact, ADR candidates, dependency notes, integration points, alternatives, and risks
+- `tasks.md` for an executable checklist
+- `specs/**/spec.md` for behavior deltas
+
+Classify open questions as `blocker`, `warn`, or `info` when useful, without requiring classification in trivial changes or forcing a specific table format.
+
+Patch only affected sections and avoid whole-file regeneration unless structurally unusable.
+
 Preservation rules:
 
 - Read current artifact content before editing.

@@ -31,6 +31,34 @@ Do not create legacy `.ai-factory/plans` plan files or companion folders in this
 
 If the task is docs/tooling-only and does not change product or workflow behavior, a delta spec may be omitted only when the plan explicitly explains why no delta spec is needed.
 
+#### Task Intake Normalization
+
+Before writing canonical OpenSpec artifacts, normalize the raw request into these fields:
+
+- task type
+- goal
+- non-goals
+- constraints
+- assumptions
+- impacted capabilities
+- C4 impact
+- ADR candidates
+- dependency graph
+- acceptance criteria
+- open questions
+- suggested next command
+
+Write the normalized task content into canonical OpenSpec artifacts:
+
+- `proposal.md` for intent, scope, non-goals, approach, assumptions, risks, and open questions
+- `design.md` for technical approach, C4 impact, ADR candidates, dependency graph, integration points, alternatives, and risks
+- `tasks.md` for an executable implementation checklist
+- `specs/**/spec.md` for behavior-changing requirements and scenarios
+
+Do not create a separate task-preparation command or artifact in OpenSpec-native mode. `/aif-task-prepare`, `.ai-factory/specs/<task-id>.md`, `task-prepare.md`, and legacy companion files under `openspec/changes/<change-id>/` must not be created.
+
+Raw input trace, normalization confidence, and temporary notes are runtime state only. They may be persisted only under `.ai-factory/state/<change-id>/` when needed and must never be written under `openspec/changes/<change-id>/`.
+
 #### Enabled optional tool use
 
 - Before using any optional provider, call the installed wrapper when available: `ai-factory aifhub-memory-tools select --from-project --command aif-plan --json`.

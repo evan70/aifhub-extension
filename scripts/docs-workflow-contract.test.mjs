@@ -132,6 +132,69 @@ describe('complete OpenSpec workflow documentation contract', () => {
     ], 'docs/usage.md workflow');
   });
 
+  it('documents task intake normalization inside existing planning and refinement commands', async () => {
+    const usage = await readRepoFile('docs/usage.md');
+    const plan = extractSection(usage, '### `/aif-plan full`');
+    const improve = extractSection(usage, '### `/aif-improve`');
+    const legacy = extractSection(usage, '## Legacy AI Factory-Only Mode');
+
+    for (const expected of [
+      'task intake normalization',
+      'canonical OpenSpec artifacts',
+      '`proposal.md`: intent, scope, non-goals, approach, assumptions, risks, and open questions',
+      '`design.md`: technical approach, C4 impact, ADR candidates, dependency graph, integration points, alternatives, and risks',
+      '`tasks.md`: executable implementation checklist',
+      '`specs/**/spec.md`: behavior-changing requirements and scenarios',
+      'does not create `/aif-task-prepare`',
+      'does not create `.ai-factory/specs/<task-id>.md`',
+      'does not create `task-prepare.md`',
+      '.ai-factory/state/<change-id>/'
+    ]) {
+      assertIncludes(plan, expected, 'docs/usage.md /aif-plan full');
+    }
+
+    for (const expected of [
+      'task quality refinement',
+      'optional and repeatable',
+      'patch-style',
+      'intent, scope, non-goals',
+      'C4 impact',
+      'ADR candidates',
+      'dependency notes',
+      'executable checklist',
+      'behavior deltas',
+      'blocker',
+      'warn',
+      'info'
+    ]) {
+      assertIncludes(improve, expected, 'docs/usage.md /aif-improve');
+    }
+
+    for (const expected of [
+      '.ai-factory/plans/<plan-id>/task.md',
+      '.ai-factory/plans/<plan-id>/context.md',
+      '.ai-factory/plans/<plan-id>/rules.md',
+      '.ai-factory/plans/<plan-id>/verify.md',
+      '.ai-factory/plans/<plan-id>/status.yaml',
+      '.ai-factory/plans/<plan-id>/explore.md',
+      'not the default OpenSpec-native workflow',
+      'No `task-prepare.md` artifact is required for the MVP'
+    ]) {
+      assertIncludes(legacy, expected, 'docs/usage.md Legacy AI Factory-Only Mode');
+    }
+
+    for (const unexpected of [
+      '.ai-factory/plans/<plan-id>/task.md',
+      '.ai-factory/plans/<plan-id>/context.md',
+      '.ai-factory/plans/<plan-id>/rules.md',
+      '.ai-factory/plans/<plan-id>/verify.md',
+      '.ai-factory/plans/<plan-id>/status.yaml'
+    ]) {
+      assertNotIncludes(plan, unexpected, 'docs/usage.md /aif-plan full');
+      assertNotIncludes(improve, unexpected, 'docs/usage.md /aif-improve');
+    }
+  });
+
   it('documents milestone-aware roadmap phase audits', async () => {
     const usage = await readRepoFile('docs/usage.md');
     const contextPolicy = await readRepoFile('docs/context-loading-policy.md');

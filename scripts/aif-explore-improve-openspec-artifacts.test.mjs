@@ -182,6 +182,28 @@ describe('aif-explore and aif-improve OpenSpec-native contracts', () => {
     }
   });
 
+  it('requires task quality refinement across canonical OpenSpec artifacts', async () => {
+    const injection = await readRepoFile('injections/core/aif-improve-plan-folder.md');
+    const openspec = extractSection(injection, 'OpenSpec-native mode');
+
+    for (const expected of [
+      '#### Task Quality Refinement',
+      '`proposal.md` for intent, scope, non-goals, assumptions, risks, and open questions',
+      '`design.md` for C4 impact, ADR candidates, dependency notes, integration points, alternatives, and risks',
+      '`tasks.md` for an executable checklist',
+      '`specs/**/spec.md` for behavior deltas',
+      'blocker',
+      'warn',
+      'info',
+      'when useful',
+      'without requiring classification in trivial changes',
+      'Patch only affected sections',
+      'avoid whole-file regeneration unless structurally unusable'
+    ]) {
+      assertIncludes(openspec, expected, 'aif-improve OpenSpec-native section');
+    }
+  });
+
   it('requires preservation, archived-change handling, runtime-state boundaries, and validation for /aif-improve', async () => {
     const injection = await readRepoFile('injections/core/aif-improve-plan-folder.md');
     const openspec = extractSection(injection, 'OpenSpec-native mode');

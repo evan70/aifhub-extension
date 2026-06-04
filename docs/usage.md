@@ -364,6 +364,15 @@ Does not write in OpenSpec-native mode:
 - `.ai-factory/plans/<id>/task.md`
 - non-OpenSpec helper files under `openspec/changes/<change-id>/`
 
+OpenSpec-native planning includes task intake normalization inside `/aif-plan full`; it is not a separate command or artifact flow. The normalized task maps into canonical OpenSpec artifacts:
+
+- `proposal.md`: intent, scope, non-goals, approach, assumptions, risks, and open questions
+- `design.md`: technical approach, C4 impact, ADR candidates, dependency graph, integration points, alternatives, and risks
+- `tasks.md`: executable implementation checklist
+- `specs/**/spec.md`: behavior-changing requirements and scenarios
+
+`/aif-plan full` does not create `/aif-task-prepare`, does not create `.ai-factory/specs/<task-id>.md`, and does not create `task-prepare.md`. Raw input trace, normalization confidence, and temporary notes belong only under `.ai-factory/state/<change-id>/` when they are persisted.
+
 Docs/tooling-only changes may omit delta specs only when the proposal explains why no product or workflow behavior changes.
 
 When `aifhub.openspec.validateOnPlan` is enabled, planning requests `openspec validate` through the AIFHub OpenSpec runner if a compatible CLI is available. Missing CLI is a degraded warning unless `aifhub.openspec.requireCliForPlan` is true.
@@ -443,6 +452,8 @@ Does not write:
 - `task.md`, `context.md`, `rules.md`, `verify.md`, or `status.yaml` under OpenSpec changes
 - legacy `.ai-factory/plans` artifacts in OpenSpec-native mode
 - archived changes under `openspec/changes/archive/**` unless the user explicitly chooses a supported recovery path
+
+The task quality refinement step is optional and repeatable. It keeps patch-style edits to existing canonical artifacts and audits intent, scope, non-goals, C4 impact, ADR candidates, dependency notes, executable checklist quality, behavior deltas, and open questions. Open questions may be classified as blocker, warn, or info when useful without requiring that structure for trivial changes.
 
 When `aifhub.openspec.validateOnImprove` is enabled, refinement requests OpenSpec validation through the runner after canonical artifact edits. Missing CLI is a degraded warning unless `aifhub.openspec.requireCliForImprove` is true.
 
@@ -756,6 +767,17 @@ Implementation and verification traces stay out of `openspec/changes/add-oauth-l
 ## Legacy AI Factory-Only Mode
 
 Legacy AI Factory-only mode is still supported for compatibility. It is not the normal OpenSpec-native v1 creation path.
+
+Legacy AI Factory-only mode is not the default OpenSpec-native workflow. Its task intake normalization uses the companion plan folder instead of canonical OpenSpec change artifacts:
+
+- `.ai-factory/plans/<plan-id>/task.md`
+- `.ai-factory/plans/<plan-id>/context.md`
+- `.ai-factory/plans/<plan-id>/rules.md`
+- `.ai-factory/plans/<plan-id>/verify.md`
+- `.ai-factory/plans/<plan-id>/status.yaml`
+- `.ai-factory/plans/<plan-id>/explore.md`
+
+No `task-prepare.md` artifact is required for the MVP, and `/aif-task-prepare` is not an active AIFHub path.
 
 Legacy planning writes:
 
