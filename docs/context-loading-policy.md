@@ -201,6 +201,7 @@ GitHub access is non-blocking. If `gh`, connector data, network access, authenti
 | `/aif-review` | no | no |
 | `/aif-security-checklist` | no | no |
 | `/aif-done` | `openspec/specs/**` only through OpenSpec CLI archive | `.ai-factory/qa/<change-id>/`, `.ai-factory/state/<change-id>/final-summary.md` |
+| `/aif-archive` | no | `paths.archive/plans/*.md` and `paths.archive/roadmap/*.md` only in legacy AI Factory-only cleanup |
 | `/aif-commit` | no | git commit only |
 | `/aif-distillation` | no | no |
 | `/aif-evolve` | no | skill-context or evolution artifacts only |
@@ -224,6 +225,8 @@ OpenSpec-native quality gates:
 
 `/aif-done` owns OpenSpec lifecycle finalization. `/aif-commit` owns git commit creation. `/aif-evolve` owns learning/evolution.
 
+Upstream `/aif-archive` is not part of the OpenSpec-native quality/finalization tail. It owns legacy AI Factory-only cleanup from `paths.plans/*.md` to `paths.archive/plans/*.md` and optional roadmap snapshots under `paths.archive/roadmap/*.md`. It must not write `openspec/changes/**`, `openspec/specs/**`, `.ai-factory/qa/**`, `.ai-factory/state/**`, or `.ai-factory/rules/generated/**`, and it must not run `openspec archive <change-id> --yes`.
+
 After `/aif-done`, `/aif-commit` may read finalization evidence, OpenSpec archive/spec mutations, the configured roadmap artifact, and optional GitHub issue/PR/milestone freshness context. It must not mutate OpenSpec lifecycle artifacts, `.ai-factory/ROADMAP.md`, runtime state, QA evidence, generated rules, or GitHub objects manually. If the roadmap is stale, `/aif-commit` reports a read-only freshness warning and hands off to `/aif-roadmap`; it still writes only the git commit after user confirmation.
 
 Generic `## Commit Plan` grouping is parent-owned in AI Factory 2.13+. In OpenSpec-native mode, an active `openspec/changes/<change-id>/tasks.md` may provide that `## Commit Plan` source. AIFHub adds only roadmap/GitHub freshness findings before the commit proposal. If no active change/plan resolves, `/aif-commit` keeps upstream staged-diff behavior and preserves upstream grouping options such as `Follow Commit Plan`, `Commit everything together`, and `Adjust grouping`.
@@ -241,6 +244,19 @@ It writes generated skill packages to the current agent skills directory. Useful
 /aif-distillation docs/context-providers.md --name aifhub-context-providers
 ```
 
+## Upstream Archive Utility
+
+AI Factory 2.14+ includes `/aif-archive` and `paths.archive`. AIFHub treats this as an upstream legacy plan cleanup utility:
+
+- source: completed legacy files under `paths.plans/*.md`
+- destination: `paths.archive/plans/*.md`
+- default archive root: `.ai-factory/archive/`
+- optional roadmap snapshots: `paths.archive/roadmap/*.md`
+
+Archived legacy plans are excluded from active plan discovery and from `workflow.plan_id_format: sequential` numbering. OpenSpec-native canonical changes still use `openspec/changes/<change-id>/` and ignore sequential legacy plan filenames.
+
+`paths.archive` is not an alias for OpenSpec CLI archive/finalization. OpenSpec archive is owned by `/aif-done` through `openspec archive <change-id> --yes`, with evidence under `.ai-factory/qa/<change-id>/` and `.ai-factory/state/<change-id>/`.
+
 ## Legacy Artifact Boundaries
 
 These files are legacy AI Factory-only artifacts or migration input only:
@@ -253,6 +269,8 @@ These files are legacy AI Factory-only artifacts or migration input only:
 - `.ai-factory/plans/<id>/status.yaml`
 - `.ai-factory/plans/<id>/explore.md`
 - `.ai-factory/plans/<id>/fixes/*.md`
+- `paths.archive/plans/*.md`
+- `paths.archive/roadmap/*.md`
 
 OpenSpec-native commands must not require those files and must not create them as part of normal OpenSpec-native execution.
 

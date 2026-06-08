@@ -50,6 +50,14 @@ Use JSON output for automation:
 ai-factory aifhub-migrate-legacy-plans <change-id> --json
 ```
 
+## Upstream Archive Is Not Migration
+
+AI Factory 2.14+ `/aif-archive` is legacy plan cleanup, not OpenSpec migration.
+
+It may move completed legacy `paths.plans/*.md` files into `paths.archive/plans/*.md`, where `paths.archive` defaults to `.ai-factory/archive/`. With `workflow.plan_id_format: sequential`, archived legacy plans are excluded from active plan discovery and from the next sequential number calculation. With `/aif-archive --roadmap`, upstream AI Factory may snapshot closed roadmap milestones under `paths.archive/roadmap/`.
+
+Use `ai-factory aifhub-migrate-legacy-plans ...` when legacy plan content must become canonical OpenSpec-native artifacts under `openspec/changes/<change-id>/`. Use upstream `/aif-archive` only when completed legacy plans should be cleaned out of the active legacy plan set. `/aif-archive` must not modify `openspec/changes/**`, `openspec/specs/**`, `.ai-factory/qa/**`, `.ai-factory/state/**`, or `.ai-factory/rules/generated/**`.
+
 ## Collision Behavior
 
 The default collision mode is `fail`: if `openspec/changes/<change-id>/` already exists, migration stops without overwriting it.

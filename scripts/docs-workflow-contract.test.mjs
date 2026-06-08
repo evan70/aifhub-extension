@@ -360,31 +360,57 @@ describe('complete OpenSpec workflow documentation contract', () => {
     assertNotIncludes(usageBugFixes, '.ai-factory/plans/<id>/task.md', 'docs/usage.md Bug Fix Workflows');
   });
 
-  it('documents the AI Factory 2.13.2 baseline, distillation utility, and Codex runtime split', async () => {
+  it('documents the AI Factory 2.15.0 baseline, archive boundary, distillation utility, and Codex runtime split', async () => {
     const metadata = JSON.parse(await readRepoFile('aifhub-extension.json'));
     const readme = await readRepoFile('README.md');
     const usage = await readRepoFile('docs/usage.md');
     const compatibility = await readRepoFile('docs/openspec-compatibility.md');
     const docsIndex = await readRepoFile('docs/README.md');
     const contextPolicy = await readRepoFile('docs/context-loading-policy.md');
+    const handoff = await readRepoFile('docs/handoff.md');
     const codexAgents = await readRepoFile('docs/codex-agents.md');
-    const combinedDocs = [readme, usage, compatibility, docsIndex, contextPolicy].join('\n');
+    const combinedDocs = [readme, usage, compatibility, docsIndex, contextPolicy, handoff].join('\n');
 
     assert.equal(metadata.compat['ai-factory'], '>=2.11.0 <3.0.0');
-    assert.equal(metadata.sources['ai-factory'].version, '2.13.2');
-    assert.equal(metadata.sources['ai-factory'].baselineVersion, '2.13.2');
-    assert.equal(metadata.sources['ai-factory'].lastSync, '2026-05-24');
-    assertIncludes(metadata.sources['ai-factory'].notes, 'AI Factory 2.13.x', 'aifhub-extension.json');
+    assert.equal(metadata.sources['ai-factory'].version, '2.15.0');
+    assert.equal(metadata.sources['ai-factory'].baselineVersion, '2.15.0');
+    assert.equal(metadata.sources['ai-factory'].lastSync, '2026-06-08');
+    assertIncludes(metadata.sources['ai-factory'].notes, 'upstream 2.15.0', 'aifhub-extension.json');
     assertIncludes(metadata.sources['ai-factory'].notes, 'Commit Plan grouping', 'aifhub-extension.json');
     assertIncludes(metadata.sources['ai-factory'].notes, '/aif-distillation', 'aifhub-extension.json');
+    assertIncludes(metadata.sources['ai-factory'].notes, '/aif-archive', 'aifhub-extension.json');
+    assertIncludes(metadata.sources['ai-factory'].notes, 'paths.archive', 'aifhub-extension.json');
+    assertIncludes(metadata.sources['ai-factory'].notes, 'archive-aware sequential plan behavior', 'aifhub-extension.json');
+    assertIncludes(metadata.sources['ai-factory'].notes, 'managed agent config preservation', 'aifhub-extension.json');
     assertIncludes(metadata.sources['ai-factory'].notes, 'Agent Skills', 'aifhub-extension.json');
 
+    assertNotIncludes(readme, '### AI Factory 2.13 Sync', 'README.md');
     assertIncludes(
       compatibility,
       'AI Factory 2.12+ provides an optional read-only artifact audit command',
       'docs/openspec-compatibility.md'
     );
     for (const expected of [
+      'AI Factory 2.15 Reviewed Baseline',
+      'AI Factory `2.15.0`',
+      '/aif-archive',
+      'paths.archive',
+      '.ai-factory/archive/',
+      'paths.archive/plans/*.md',
+      'paths.archive/roadmap/',
+      'archive-aware sequential plan behavior',
+      'archived legacy plans are excluded from active plan discovery',
+      'archived plans are excluded from active sequential plan numbering and discovery',
+      'must not run `openspec archive <change-id> --yes`',
+      'must not write `openspec/changes/**`',
+      'must not write `openspec/specs/**`',
+      'must not write `.ai-factory/qa/**`',
+      'must not write `.ai-factory/state/**`',
+      'must not write `.ai-factory/rules/generated/**`',
+      'OpenSpec-native finalization remains `/aif-verify <change-id>` followed by `/aif-done <change-id>`',
+      'managed agent config files',
+      'newly available built-in skills',
+      'upstream installer/update behavior only',
       'AI Factory 2.13+',
       '/aif-distillation',
       'upstream utility skill',
@@ -400,7 +426,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
       '/aif-distillation docs/memory-tools-research --name aifhub-memory-tool-selection',
       '/aif-distillation docs/context-providers.md --name aifhub-context-providers'
     ]) {
-      assertIncludes(combinedDocs, expected, '2.13.2 docs sync');
+      assertIncludes(combinedDocs, expected, '2.15.0 docs sync');
     }
     for (const forbiddenClaim of [
       '`/aif-done` creates commits',
@@ -412,6 +438,20 @@ describe('complete OpenSpec workflow documentation contract', () => {
     ]) {
       assertNotIncludes(combinedDocs, forbiddenClaim, 'docs must not claim /aif-done creates commits');
     }
+    for (const forbiddenClaim of [
+      '`/aif-archive` finalizes the OpenSpec lifecycle',
+      '`/aif-archive` runs `openspec archive <change-id> --yes`',
+      '`/aif-archive` writes OpenSpec finalization evidence',
+      '/aif-archive finalizes the OpenSpec lifecycle',
+      '/aif-archive runs openspec archive',
+      '/aif-archive writes OpenSpec finalization evidence'
+    ]) {
+      assertNotIncludes(combinedDocs, forbiddenClaim, 'docs must not assign OpenSpec finalization to /aif-archive');
+    }
+
+    assertIncludes(contextPolicy, '| `/aif-archive` | no | `paths.archive/plans/*.md` and `paths.archive/roadmap/*.md` only in legacy AI Factory-only cleanup |', 'docs/context-loading-policy.md Command Ownership');
+    assertIncludes(handoff, 'legacy-only path и не описывает OpenSpec-native finalization', 'docs/handoff.md');
+    assertIncludes(handoff, 'Не используйте `/aif-archive` для OpenSpec-native Done.', 'docs/handoff.md');
 
     assertIncludes(readme, 'Codex CLI and Claude agent files', 'README.md');
     assertIncludes(readme, 'Namespaced Codex CLI agent files', 'README.md');

@@ -301,6 +301,32 @@ Use `--dry-run` for planned switching or sync writes. Use `--all` or `--change <
 
 For CLI or IDE runtimes, planning commands may recommend an available planning mode for structured questions, but they must not fabricate unavailable tools or client actions. Codex mode switching remains a user action; see [Codex Plan Mode](codex-plan-mode.md).
 
+### `/aif-archive`
+
+`/aif-archive` is an upstream AI Factory 2.14+ legacy plan cleanup command. It is not the OpenSpec-native finalization command.
+
+Reads:
+
+- completed legacy plan files under `paths.plans/*.md`
+- optional roadmap context when `/aif-archive --roadmap` is used
+
+Writes:
+
+- `paths.archive/plans/*.md`
+- `paths.archive/roadmap/*.md` when roadmap snapshotting is requested
+
+`paths.archive` defaults to `.ai-factory/archive/`. In legacy AI Factory-only mode, archived plans under `paths.archive/plans/` are excluded from active plan discovery and from `workflow.plan_id_format: sequential` numbering.
+
+Does not write:
+
+- `openspec/changes/**`
+- `openspec/specs/**`
+- `.ai-factory/qa/**`
+- `.ai-factory/state/**`
+- `.ai-factory/rules/generated/**`
+
+`/aif-archive` must not run `openspec archive <change-id> --yes`. In OpenSpec-native mode, finalize a verified change with `/aif-done <change-id>` after `/aif-verify <change-id>`.
+
 ### `/aif-analyze`
 
 Reads:
@@ -791,6 +817,8 @@ Legacy planning writes:
   status.yaml
   explore.md
 ```
+
+Upstream `/aif-archive` may later move completed legacy plan files from `paths.plans/*.md` to `paths.archive/plans/*.md`. The default `paths.archive` root is `.ai-factory/archive/`. Archived legacy plans are excluded from active sequential plan numbering and discovery; this does not affect OpenSpec-native `openspec/changes/<change-id>/` directories.
 
 Use the explicit migration command when existing legacy artifacts need to enter the OpenSpec-native workflow:
 

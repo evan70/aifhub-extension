@@ -45,6 +45,8 @@ aif-explore -> aif-plan -> aif-improve -> aif-implement -> aif-verify -> aif-don
 `/aif-analyze` остаётся bootstrap/setup step перед этим flow. Он готовит context и rules, но не является первым узлом canonical public command sequence.
 `/aif-done` — AIFHub OpenSpec finalization tail после passing verification. Он не заменяет `/aif-verify`, не является upstream legacy alias и не меняет upstream ownership verification loop.
 
+Upstream `/aif-archive` — отдельная AI Factory 2.14+ legacy cleanup команда для completed `paths.plans/*.md` -> `paths.archive/plans/*.md` и optional roadmap snapshots under `paths.archive/roadmap/`. Она не является Handoff Done stage и не владеет OpenSpec-native archive/finalization.
+
 ## Названия стадий
 
 | Стадия | Что означает | На какой current command ориентироваться | Что не нужно предполагать |
@@ -79,7 +81,8 @@ fail -> /aif-fix -> /aif-verify -> /aif-done
 
 Что делает `/aif-done`:
 - Проверяет, что plan прошёл verify (verdict `pass` или `pass-with-notes`).
-- Архивирует plan folder и companion plan file в `.ai-factory/specs/<plan-id>/`.
+- В OpenSpec-native mode архивирует verified change только через OpenSpec CLI (`openspec archive <change-id> --yes`) и пишет final evidence under `.ai-factory/qa/<change-id>/` плюс `.ai-factory/state/<change-id>/`.
+- В legacy AI Factory-only mode может архивировать plan folder и companion plan file в `.ai-factory/specs/<plan-id>/`; это legacy-only path и не описывает OpenSpec-native finalization.
 - Готовит commit message и PR summary drafts.
 - Применяет roadmap/architecture/rules follow-ups только при plan-backed evidence; если owning update нельзя выполнить в текущем runtime, возвращает exact handoff вместо silent skip.
 - Запускает или предлагает `/aif-evolve` в зависимости от runtime capability и явного user intent.
@@ -89,12 +92,13 @@ fail -> /aif-fix -> /aif-verify -> /aif-done
 - Не auto-создаёт PR — только drafts для review.
 - Не выдумывает governance changes без evidence из плана и не обходит owning path для ROADMAP/RULES/ARCHITECTURE.
 - Не является upstream replacement для `/aif-verify` и не восстанавливает legacy `/aif-done` alias semantics.
+- Не заменяет upstream `/aif-archive`; `/aif-archive` остаётся legacy plan cleanup и не пишет OpenSpec canonical artifacts.
 
 ## Правила интерпретации
 
 - Если handoff говорит `New`, для новой работы используйте `/aif-plan full`.
 - Если handoff говорит `Apply`, ориентируйтесь на `/aif-implement`.
-- Если handoff говорит `Done`, доведите plan до verified state через `/aif-verify`, затем запустите `/aif-done` для AIFHub OpenSpec archive/finalization, commit/PR summaries и evidence-driven final follow-ups.
+- Если handoff говорит `Done`, доведите plan до verified state через `/aif-verify`, затем запустите `/aif-done` для AIFHub OpenSpec archive/finalization, commit/PR summaries и evidence-driven final follow-ups. Не используйте `/aif-archive` для OpenSpec-native Done.
 - Если handoff говорит `Explore / New / Apply / Done`, считайте это naming layer, а не списком обязательных slash commands.
 
 ## Stage Mapping (Future Handoff Orchestration)

@@ -105,13 +105,17 @@ OpenSpec validation overlay:
 
 It does not replace `/aif-commit`. After `/aif-done`, run `/aif-commit` or your normal git workflow to commit implementation changes, OpenSpec archive/spec changes, QA evidence, and final summaries.
 
-### AI Factory 2.13 Sync
+### AI Factory 2.15 Reviewed Baseline
 
 AI Factory 2.13+ owns generic active plan `## Commit Plan` grouping in `/aif-commit`. AIFHub must not duplicate that grouping logic, and `/aif-commit` remains the only commit owner; `/aif-done` finalizes OpenSpec lifecycle evidence but does not create git commits.
 
 The AIFHub `aif-commit` injection is only a read-only roadmap/GitHub freshness overlay. In OpenSpec-native mode, if an active OpenSpec change is available, commit planning should use `openspec/changes/<change-id>/tasks.md` as the source that may contain `## Commit Plan`. If no active change/plan resolves, keep upstream staged-diff behavior.
 
 AI Factory 2.13+ includes `/aif-distillation`. It is an upstream utility skill for turning books, docs, folders, or URLs into reusable Agent Skills. It is not an AIFHub lifecycle stage, does not create OpenSpec changes, and must not write `openspec/changes/**`, `openspec/specs/**`, `.ai-factory/qa/**`, or `.ai-factory/rules/generated/**`. It writes generated skill packages to the current agent skills directory.
+
+AI Factory 2.14+ includes upstream `/aif-archive` and `paths.archive`, with default archive root `.ai-factory/archive/`. That command is legacy AI Factory-only plan cleanup: completed `paths.plans/*.md` files move to `paths.archive/plans/*.md`, optional roadmap snapshots can be written under `paths.archive/roadmap/`, and archived plans are excluded from active sequential plan numbering and discovery. AIFHub does not route `/aif-archive` to `openspec archive`, and `/aif-archive` must not write `openspec/changes/**`, `openspec/specs/**`, `.ai-factory/qa/**`, `.ai-factory/state/**`, or `.ai-factory/rules/generated/**`.
+
+AI Factory 2.15+ preserves managed agent config files during update/init workflows and can offer newly available built-in skills interactively during update. AIFHub documents this as upstream installer/update behavior only; it does not make AIFHub the owner of OpenSpec canonical artifacts, generated rules, or project-specific agent config files.
 
 Useful AIFHub source examples:
 
@@ -317,7 +321,7 @@ Switching to AI Factory-only mode updates the legacy path profile and preserves 
 | [Context Providers](docs/context-providers.md) | Optional Graphify and Context7 provider guidance, reviewed-note paths, degraded behavior, and user-owned setup boundaries |
 | [Memory Tool Recommendations](docs/memory-tool-recommendations.md) | Local metadata-driven optional memory/context tool recommendations and installed wrapper commands |
 | [Context Loading Policy](docs/context-loading-policy.md) | Consumer context, optional provider context, GitHub-aware roadmap evidence, ownership, and legacy boundaries |
-| [OpenSpec Compatibility](docs/openspec-compatibility.md) | Optional CLI adapter policy and capability flags |
+| [OpenSpec Compatibility](docs/openspec-compatibility.md) | Optional CLI adapter policy, AI Factory 2.15 baseline, `/aif-archive` boundary, and capability flags |
 | [OpenSpec Artifact Validation](docs/openspec-validation.md) | Read-only AIFHub contract validator for OpenSpec-native artifacts |
 | [OpenSpec Coverage Matrix](docs/spec-coverage.md) | Requirement-to-code coverage artifact and verify/done policy |
 | [Legacy Plan Migration](docs/legacy-plan-migration.md) | Explicit migration from legacy plans to OpenSpec-native changes |

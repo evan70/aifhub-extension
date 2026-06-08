@@ -127,6 +127,8 @@ utilities:
 
 Секция `utilities` protocol-neutral. Она хранит только optional tool preferences. `utilities.context_tools.enabled` хранит user-accepted provider ids из `/aif-analyze`; follow-on skills вызывают `ai-factory aifhub-memory-tools select --from-project --command <skill> --json` и используют только `selected_tools`. Graphify остается manually installed/activated/run пользователем. CodeGraph остается manual CLI-only и может использоваться `/aif-explore` только когда выбран CLI, с purge перед завершением.
 
+`paths.archive` is an upstream AI Factory legacy plan archive path. AIFHub documents the upstream default `.ai-factory/archive/`, but OpenSpec-native canonical archive/finalization does not use `paths.archive`; it remains under OpenSpec CLI archive behavior, accepted specs in `openspec/specs/**`, and AIFHub evidence under `.ai-factory/qa/<change-id>/` plus `.ai-factory/state/<change-id>/`.
+
 On first bootstrap, `/aif-analyze` may create the OpenSpec marker after asking for the artifact protocol. If `.ai-factory/config.yaml` is missing and the user did not explicitly request OpenSpec-native mode, interactive runtimes ask the user to choose `legacy AI Factory-only` or `OpenSpec-native` before writing the config. Existing configs are preserved without prompting. Autonomous/subagent runs do not ask; they default to legacy AI Factory-only and report OpenSpec-native mode as an open question.
 
 Localization preferences collected before this choice are carried as pending config values and written only after the artifact protocol is resolved.
@@ -140,6 +142,10 @@ The defaults keep planning and verification degraded-friendly while making `/aif
 OpenSpec-native mode uses OpenSpec `change-id` values and ignores AI Factory `workflow.plan_id_format` for canonical artifact names. The active change directory stays `openspec/changes/<change-id>/` whether upstream AI Factory is configured for `slug` or `sequential` legacy plan IDs.
 
 Legacy AI Factory-only mode follows upstream `workflow.plan_id_format`. Use `slug` for slug-named plan files, or `sequential` for upstream sequential filenames under `paths.plans`.
+
+When legacy AI Factory-only mode uses `sequential`, upstream `/aif-archive` excludes archived files under `paths.archive/plans/` from active plan discovery and from the next sequential number calculation. OpenSpec-native `change-id` directories remain non-sequential and are not renamed to `NNNN_` plan files.
+
+In short: archived legacy plans are excluded from active plan discovery, while OpenSpec-native active changes remain `openspec/changes/<change-id>/` directories.
 
 ## AIFHub Wrapper Behavior
 
@@ -181,6 +187,25 @@ Examples:
 /aif-distillation docs/memory-tools-research --name aifhub-memory-tool-selection
 /aif-distillation docs/context-providers.md --name aifhub-context-providers
 ```
+
+## AI Factory 2.15 Reviewed Baseline
+
+The reviewed AI Factory `2.15.0` baseline includes AI Factory `2.14.0` archive behavior and AI Factory `2.15.0` update behavior.
+
+AI Factory 2.14+ includes upstream `/aif-archive` and `paths.archive`. AIFHub treats `/aif-archive` as legacy AI Factory-only cleanup, not as OpenSpec-native finalization:
+
+- completed legacy `paths.plans/*.md` files move to `paths.archive/plans/*.md`;
+- `paths.archive` defaults to `.ai-factory/archive/`;
+- `/aif-archive --roadmap` may snapshot closed roadmap milestones under `paths.archive/roadmap/`;
+- archived legacy plans are excluded from active sequential plan discovery and numbering;
+- `/aif-archive` must not modify `openspec/changes/**`, `openspec/specs/**`, `.ai-factory/qa/**`, `.ai-factory/state/**`, or `.ai-factory/rules/generated/**`;
+- `/aif-archive` must not run `openspec archive <change-id> --yes`.
+
+OpenSpec-native finalization remains `/aif-verify <change-id>` followed by `/aif-done <change-id>`. `/aif-done` owns OpenSpec archive/finalization evidence; `/aif-archive` owns only upstream legacy plan cleanup.
+
+For machine-checkable ownership: `/aif-archive` must not write `openspec/changes/**`, must not write `openspec/specs/**`, must not write `.ai-factory/qa/**`, must not write `.ai-factory/state/**`, and must not write `.ai-factory/rules/generated/**`.
+
+AI Factory 2.15+ preserves managed agent config files during update/init workflows and can offer newly available built-in skills interactively during update. This is upstream installer/update behavior only. It does not make AIFHub the owner of OpenSpec canonical artifacts, generated rules, or project-specific agent config files.
 
 ## Artifact Sync Points
 
