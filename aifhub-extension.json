@@ -13,13 +13,13 @@
     },
     "openspec": {
       "url": "https://github.com/Fission-AI/OpenSpec",
-      "version": "1.3.1",
+      "version": "1.4.1",
       "supportedRange": ">=1.3.1 <2.0.0",
-      "lastSync": "2026-04-25",
+      "lastSync": "2026-06-10",
       "optional": true,
       "requiresNode": ">=20.19.0",
       "mode": "optional-cli-adapter",
-      "notes": "OpenSpec is used as an optional artifact protocol and CLI validation/archive adapter for v1. OpenSpec skills are not installed by this extension."
+      "notes": "Validated against upstream OpenSpec 1.4.1 while keeping the supported CLI range >=1.3.1 <2.0.0. Reviewed baseline includes the 1.4.1 openspec update workspace.yaml fix and the 1.4.0 Kimi CLI, Mistral Vibe, default sync skills, case-insensitive requirement headers, and clearer validation hints. AIFHub remains adapter-only and does not install or manage OpenSpec skills, /opsx:* commands, Kimi/Mistral integrations, workspace beta state, or openspec update."
     }
   }
 }

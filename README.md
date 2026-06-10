@@ -254,6 +254,8 @@ OpenSpec is optional for extension install and AI Factory-only workflows.
 | OpenSpec CLI runtime | Node `>=20.19.0` |
 | OpenSpec skills/commands | Not installed by this extension |
 
+The reviewed OpenSpec baseline is OpenSpec `1.4.1`, while the compatible CLI range remains `>=1.3.1 <2.0.0`. See [OpenSpec Compatibility](docs/openspec-compatibility.md) for the OpenSpec 1.4.1 reviewed baseline, `openspec update` boundary, and adapter-only ownership notes.
+
 When the OpenSpec CLI is missing or unsupported, OpenSpec-aware commands report degraded validate/archive capabilities. Planning and filesystem-based context loading can continue, but archive-required `/aif-done` fails until a compatible CLI is available.
 
 If the OpenSpec CLI is present but outside `>=1.3.1 <2.0.0`, update or reinstall the CLI before relying on validation/archive. The bootstrap still reports this as degraded capability rather than an install failure.
@@ -321,7 +323,7 @@ Switching to AI Factory-only mode updates the legacy path profile and preserves 
 | [Context Providers](docs/context-providers.md) | Optional Graphify and Context7 provider guidance, reviewed-note paths, degraded behavior, and user-owned setup boundaries |
 | [Memory Tool Recommendations](docs/memory-tool-recommendations.md) | Local metadata-driven optional memory/context tool recommendations and installed wrapper commands |
 | [Context Loading Policy](docs/context-loading-policy.md) | Consumer context, optional provider context, GitHub-aware roadmap evidence, ownership, and legacy boundaries |
-| [OpenSpec Compatibility](docs/openspec-compatibility.md) | Optional CLI adapter policy, AI Factory 2.15 baseline, `/aif-archive` boundary, and capability flags |
+| [OpenSpec Compatibility](docs/openspec-compatibility.md) | Optional CLI adapter policy, OpenSpec 1.4.1 reviewed baseline, AI Factory 2.15 baseline, `/aif-archive` boundary, and capability flags |
 | [OpenSpec Artifact Validation](docs/openspec-validation.md) | Read-only AIFHub contract validator for OpenSpec-native artifacts |
 | [OpenSpec Coverage Matrix](docs/spec-coverage.md) | Requirement-to-code coverage artifact and verify/done policy |
 | [Legacy Plan Migration](docs/legacy-plan-migration.md) | Explicit migration from legacy plans to OpenSpec-native changes |

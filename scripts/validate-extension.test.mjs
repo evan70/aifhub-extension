@@ -78,13 +78,13 @@ function validAifhubMetadata(extra = {}) {
       },
       openspec: {
         url: 'https://github.com/Fission-AI/OpenSpec',
-        version: '1.3.1',
+        version: '1.4.1',
         supportedRange: '>=1.3.1 <2.0.0',
-        lastSync: '2026-04-25',
+        lastSync: '2026-06-10',
         optional: true,
         requiresNode: '>=20.19.0',
         mode: 'optional-cli-adapter',
-        notes: 'OpenSpec is used as an optional artifact protocol.'
+        notes: 'Validated against upstream OpenSpec 1.4.1; AIFHub remains adapter-only.'
       }
     },
     ...extra
