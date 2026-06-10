@@ -26,6 +26,20 @@ AI Factory = execution runtime
 
 AI Factory-only workflows follow AI Factory's runtime support. OpenSpec validation/archive follows the OpenSpec CLI runtime requirement.
 
+## OpenSpec 1.4.1 Reviewed Baseline
+
+AIFHub metadata records OpenSpec `1.4.1` as the reviewed upstream baseline while keeping the supported CLI range `>=1.3.1 <2.0.0`.
+
+Reviewed upstream behavior:
+
+- OpenSpec `1.4.1` includes an `openspec update` fix for projects that already have their own `workspace.yaml`.
+- OpenSpec `1.4.0` includes Kimi CLI support, Mistral Vibe support, sync skills by default through `/opsx:sync`, case-insensitive requirement headers, and clearer validation hints.
+- OpenSpec workspace beta view state is OpenSpec-owned and lives under `.openspec-workspace/view.yaml`.
+
+AIFHub remains adapter-only: it does not install or manage OpenSpec skills, `/opsx:*` commands, Kimi CLI or Mistral Vibe integrations, OpenSpec workspace beta state, or `openspec update`. AIFHub does not install or manage Kimi CLI or Mistral Vibe integrations, does not own OpenSpec workspace beta state, and does not run or manage `openspec update`.
+
+`openspec update` is upstream OpenSpec behavior. `/aif-mode sync` compiles AIFHub generated rules and requests OpenSpec validate/status through the adapter when configured and available.
+
 ## Опциональная Инициализация
 
 Projects may initialize OpenSpec without tool integrations:
@@ -158,7 +172,7 @@ In short: archived legacy plans are excluded from active plan discovery, while O
 | `/aif-verify` | `openspec validate`, optional `openspec status` evidence, policy-derived diagnostics, coverage, and final `aif-gate-result` with `"gate": "verify"` |
 | `/aif-rules-check` | Upstream rules gate plus AIFHub generated-rules overlay for OpenSpec specs/deltas |
 | `/aif-done` | AIFHub artifact contract check, then `openspec archive <change> --yes` when archive is required |
-| `/aif-mode sync` | generated-rule compile plus validate/status according to sync flags |
+| `/aif-mode sync` | generated-rule compile plus validate/status according to sync flags; generated-rule compilation may call `openspec show <item> --json` through `scripts/openspec-rules-compiler.mjs` and `showOpenSpecItem()` |
 | `/aif-mode doctor` | CLI, Node, active change, effective policy, generated rules, latest verify gate, rules gate, coverage, AIFHub artifact contract, and archive readiness diagnostics |
 
 Do not route users to OpenSpec slash commands such as `/opsx:propose`, `/opsx:apply`, or `/opsx:archive`.

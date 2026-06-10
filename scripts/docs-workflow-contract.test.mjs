@@ -477,6 +477,58 @@ describe('complete OpenSpec workflow documentation contract', () => {
     }
   });
 
+  it('documents the OpenSpec 1.4.1 reviewed baseline and adapter-only boundaries', async () => {
+    const metadata = JSON.parse(await readRepoFile('aifhub-extension.json'));
+    const readme = await readRepoFile('README.md');
+    const compatibility = await readRepoFile('docs/openspec-compatibility.md');
+    const docsIndex = await readRepoFile('docs/README.md');
+    const openspec = metadata.sources.openspec;
+    const combinedDocs = [readme, compatibility, docsIndex].join('\n');
+
+    assert.equal(openspec.version, '1.4.1');
+    assert.equal(openspec.supportedRange, '>=1.3.1 <2.0.0');
+    assert.equal(openspec.lastSync, '2026-06-10');
+    assertIncludes(openspec.notes, 'upstream OpenSpec 1.4.1', 'aifhub-extension.json');
+    assertIncludes(openspec.notes, 'adapter-only', 'aifhub-extension.json');
+
+    assertIncludes(readme, 'OpenSpec 1.4.1', 'README.md');
+    assertIncludes(docsIndex, 'OpenSpec 1.4.1', 'docs/README.md');
+
+    for (const expected of [
+      'OpenSpec 1.4.1 Reviewed Baseline',
+      'OpenSpec `1.4.1`',
+      '`openspec update`',
+      'Kimi CLI',
+      'Mistral Vibe',
+      'sync skills',
+      'case-insensitive requirement headers',
+      'clearer validation hints',
+      '.openspec-workspace/view.yaml',
+      '/opsx:*',
+      'adapter-only',
+      'does not install or manage OpenSpec skills',
+      'does not install or manage Kimi CLI or Mistral Vibe integrations',
+      'does not own OpenSpec workspace beta state',
+      'does not run or manage `openspec update`',
+      '`openspec show <item> --json`',
+      '`openspec update` is upstream OpenSpec behavior',
+      '`/aif-mode sync` compiles AIFHub generated rules'
+    ]) {
+      assertIncludes(combinedDocs, expected, 'OpenSpec 1.4.1 docs baseline');
+    }
+
+    for (const forbiddenClaim of [
+      'AIFHub installs OpenSpec skills',
+      'AIFHub manages /opsx',
+      'AIFHub manages Kimi',
+      'AIFHub manages Mistral',
+      'AIFHub owns workspace beta state',
+      'AIFHub runs openspec update'
+    ]) {
+      assertNotIncludes(combinedDocs, forbiddenClaim, 'OpenSpec 1.4.1 docs ownership boundaries');
+    }
+  });
+
   it('documents Codex app flows with skill invocations and keeps slash commands runtime-specific', async () => {
     const usage = await readRepoFile('docs/usage.md');
     const planMode = await readRepoFile('docs/codex-plan-mode.md');
