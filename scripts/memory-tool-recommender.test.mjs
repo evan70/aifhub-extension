@@ -63,6 +63,14 @@ describe('recommendation metadata parsing', () => {
     assert.equal(metadata.default_policy.require_explicit_paths, true);
     assert.equal(metadata.default_policy.require_purge_path, true);
     assert.ok(metadata.skill_usage_matrix['aif-analyze']);
+    assert.deepEqual(metadata.skill_usage_matrix['aif-architecture'].allowed, ['rg', 'graphify', 'context7']);
+    assert.deepEqual(metadata.skill_usage_matrix['aif-architecture'].forbidden, [
+      'codex-agent-mem',
+      'context-mode',
+      'codex-mem',
+      'eagle-mem',
+      'codegraph'
+    ]);
     assert.deepEqual(metadata.project_dimensions.languages, ['php', 'go', 'js', 'python', 'rust', 'multi']);
     assert.deepEqual(metadata.project_dimensions.volume, ['mini', 'standard', 'large']);
     assert.deepEqual(metadata.project_dimensions.complexity, ['mini', 'framework', 'legacy', 'integration_heavy']);
@@ -80,6 +88,11 @@ describe('recommendation metadata parsing', () => {
     assert.ok(metadata.evidence_runs.some((run) => run.id === 'codegraph-forced-benchmark-2026-05-26'));
     assert.ok(metadata.evidence_runs.some((run) => run.id === 'codegraph-screening-preinit-nosipout-gpt54mini-2026-05-27'));
     assert.equal(metadata.tool_permissions.graphify['aif-analyze'], 'recommend_only');
+    assert.equal(metadata.tool_permissions.graphify['aif-architecture'], 'read_existing_reviewed_output');
+    assert.equal(metadata.tool_permissions.context7['aif-architecture'], 'read_existing_reviewed_output');
+    assert.equal(metadata.tool_permissions['codex-agent-mem']['aif-architecture'], 'forbidden');
+    assert.equal(metadata.tool_permissions['context-mode']['aif-architecture'], 'forbidden');
+    assert.equal(metadata.tool_permissions.codegraph['aif-architecture'], 'forbidden');
     assert.equal(metadata.availability_probes.graphify[0], 'graphify --version');
     assert.ok(metadata.forbidden_operations.includes('auto_install'));
     assert.ok(metadata.protected_artifacts.includes('aif-gate-result'));
@@ -92,9 +105,12 @@ describe('recommendation metadata parsing', () => {
     assert.equal(metadata.tools['codex-mem'].decision, 'reject_default');
     assert.equal(metadata.tools['eagle-mem'].decision, 'reject_defer');
     assert.equal(metadata.tools.context7.decision, 'optional');
+    assert.ok(metadata.tools.context7.allowed_in.includes('aif-architecture'));
+    assert.ok(metadata.tools.graphify.allowed_in.includes('aif-architecture'));
     assert.equal(metadata.tools.codegraph.decision, 'manual_cli_only');
     assert.equal(metadata.tools.codegraph.screening_policy.default_decision, 'avoid_by_default');
     assert.equal(metadata.tools.codegraph.screening_policy.aggregate.rows_executed, 300);
+    assert.ok(metadata.tools.codegraph.forbidden_in.includes('aif-architecture'));
   });
 });
 
@@ -172,7 +188,7 @@ describe('recommendation results', () => {
     assert.equal(graphify.status, 'manual_quality_experiment_only');
     assert.equal(graphify.install_policy, 'explicit_user_opt_in_only');
     assert.equal(graphify.read_scope, 'explicit_project_path');
-    assert.deepEqual(graphify.allowed_in, ['aif-analyze', 'aif-explore', 'aif-plan', 'aif-review']);
+    assert.deepEqual(graphify.allowed_in, ['aif-analyze', 'aif-explore', 'aif-architecture', 'aif-plan', 'aif-review']);
     assert.ok(graphify.forbidden_in.includes('aif-implement'));
     assert.equal(graphify.permission, 'recommend_only');
     assert.match(graphify.privacy_caveat, /explicit project path/i);
@@ -620,6 +636,86 @@ describe('recommendation results', () => {
     assert.ok(implement.body.not_selected_tools.some((item) => item.tool_id === 'codegraph'));
     assert.ok(implement.body.not_selected_tools.some((item) => item.tool_id === 'graphify'));
     assert.ok(implement.body.not_selected_tools.every((item) => /forbidden|not applicable/i.test(item.reason)));
+  });
+
+  it('selects architecture context providers only through command-specific policy', async () => {
+    await mkdir(path.join(tmpDir, '.ai-factory'), { recursive: true });
+    await writeFile(
+      path.join(tmpDir, '.ai-factory', 'config.yaml'),
+      [
+        'utilities:',
+        '  context_tools:',
+        '    enabled:',
+        '      - codegraph',
+        '      - graphify',
+        '      - context7',
+        '      - codex-agent-mem',
+        '      - context-mode',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const result = await runMemoryToolRecommender([
+      'select',
+      '--shape',
+      'large_framework_app',
+      '--language',
+      'js',
+      '--volume',
+      'large',
+      '--complexity',
+      'framework',
+      '--repo-shape',
+      'single_repo',
+      '--artifact-mode',
+      'openspec_native',
+      '--task',
+      'architecture_or_impact_discovery',
+      '--command',
+      'aif-architecture',
+      '--metadata',
+      REAL_METADATA,
+      '--json'
+    ], {
+      cwd: tmpDir,
+      stdout: [],
+      stderr: [],
+      exit: false,
+      probeRunner: async () => ({ availability: 'installed', command: 'tool --version' })
+    });
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.body.schema, 'aifhub.memory_tools.selection_result.v1');
+    assert.deepEqual(result.body.config.enabled_tools, [
+      'codegraph',
+      'graphify',
+      'context7',
+      'codex-agent-mem',
+      'context-mode'
+    ]);
+
+    const selectedIds = result.body.selected_tools.map((item) => item.tool_id);
+    assert.deepEqual(selectedIds, ['context7']);
+    assert.equal(result.body.selected_tools[0].permission, 'read_existing_reviewed_output');
+    assert.equal(result.body.selected_tools.some((item) => item.permission === 'forbidden'), false);
+
+    for (const toolId of ['codegraph', 'codex-agent-mem', 'context-mode']) {
+      assert.equal(
+        result.body.selected_tools.some((item) => item.tool_id === toolId),
+        false,
+        `${toolId} should not be selected for aif-architecture`
+      );
+      const skipped = result.body.not_selected_tools.find((item) => item.tool_id === toolId);
+      assert.ok(skipped, `${toolId} should appear in not_selected_tools`);
+      assert.equal(skipped.permission, 'forbidden');
+      assert.match(skipped.reason, /forbidden/i, `${toolId} should be skipped by command boundary`);
+    }
+
+    const skippedGraphify = result.body.not_selected_tools.find((item) => item.tool_id === 'graphify');
+    assert.ok(skippedGraphify);
+    assert.equal(skippedGraphify.permission, 'read_existing_reviewed_output');
+    assert.match(skippedGraphify.reason, /not applicable|avoided/i);
   });
 
   it('selects enabled tools from inline YAML config lists', async () => {

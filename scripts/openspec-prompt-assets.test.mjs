@@ -1,6 +1,7 @@
 // openspec-prompt-assets.test.mjs - instruction-level tests for OpenSpec-native prompt assets
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -72,6 +73,7 @@ const SIDECAR_PROMPT_ASSETS = [
 ];
 
 const ROADMAP_PROMPT_ASSET = 'injections/core/aif-roadmap-maturity-audit.md';
+const ARCHITECTURE_PROMPT_ASSET = 'injections/core/aif-architecture-context-boundary.md';
 const COMMIT_PROMPT_ASSET = 'injections/core/aif-commit-roadmap-freshness.md';
 
 const GRAPHIFY_CONTEXT_DOC_ASSETS = [
@@ -359,6 +361,7 @@ describe('OpenSpec-native prompt asset contract', () => {
       SHARED_LANGUAGE_POLICY_ASSET,
       'injections/core/aif-rules-check-openspec-generated-rules.md',
       ROADMAP_PROMPT_ASSET,
+      ARCHITECTURE_PROMPT_ASSET,
       COMMIT_PROMPT_ASSET,
       ...ROADMAP_REFERENCE_ASSETS,
       'injections/core/aif-implement-plan-folder.md',
@@ -384,6 +387,43 @@ describe('OpenSpec-native prompt asset contract', () => {
     assert.equal(injection.position, 'prepend');
     assert.equal(normalizeManifestPath(injection.file), COMMIT_PROMPT_ASSET);
     await readRepoFile(COMMIT_PROMPT_ASSET);
+  });
+
+  it('registers the architecture context boundary injection in the manifest', async () => {
+    const manifest = await loadManifest();
+    const injections = (manifest.injections ?? []).filter((entry) => entry.target === 'aif-architecture');
+
+    assert.equal(injections.length, 1, 'extension.json should include exactly one aif-architecture injection');
+    assert.equal(injections[0].position, 'prepend');
+    assert.equal(normalizeManifestPath(injections[0].file), ARCHITECTURE_PROMPT_ASSET);
+
+    const asset = await readRepoFile(ARCHITECTURE_PROMPT_ASSET);
+    for (const expected of [
+      'upstream `/aif-architecture`',
+      '`skills/shared/LANGUAGE-POLICY.md`',
+      'Do not create or use an extension-owned `skills/aif-architecture/` directory',
+      'OpenSpec-native mode',
+      'paths.architecture',
+      'paths.description',
+      'AGENTS.md',
+      'openspec/changes/**',
+      'openspec/specs/**',
+      '.ai-factory/state/**',
+      '.ai-factory/qa/**',
+      '.ai-factory/rules/generated/**',
+      'ai-factory aifhub-memory-tools select --from-project --command aif-architecture --json',
+      'Graphify',
+      'Context7',
+      'CodeGraph'
+    ]) {
+      assertIncludes(asset, expected, ARCHITECTURE_PROMPT_ASSET);
+    }
+
+    assert.equal(
+      existsSync(join(REPO_ROOT, 'skills', 'aif-architecture')),
+      false,
+      'AIFHub should not copy or own skills/aif-architecture'
+    );
   });
 
   it('requires active prompt assets to reference the shared language policy', async () => {

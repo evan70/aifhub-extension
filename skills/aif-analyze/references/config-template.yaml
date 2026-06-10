@@ -43,6 +43,12 @@ paths:
   plans: .ai-factory/plans
   specs: .ai-factory/specs
 
+  # Upstream AI Factory optional path defaults remain available when omitted.
+  # Examples: paths.docs -> docs/, paths.qa -> .ai-factory/qa,
+  # paths.archive -> .ai-factory/archive.
+  # paths.architecture stays project-level AI Factory context; do not point it
+  # at canonical OpenSpec paths such as openspec/specs or openspec/changes.
+
   # OpenSpec-native mode writes its own path profile only when selected.
   
   # Rules directory (base.md required, area files optional)

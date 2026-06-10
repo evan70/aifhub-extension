@@ -171,6 +171,11 @@
       "file": "./injections/core/aif-roadmap-maturity-audit.md"
     },
     {
+      "target": "aif-architecture",
+      "position": "prepend",
+      "file": "./injections/core/aif-architecture-context-boundary.md"
+    },
+    {
       "target": "aif-commit",
       "position": "prepend",
       "file": "./injections/core/aif-commit-roadmap-freshness.md"

@@ -33,6 +33,18 @@ skill_usage_matrix:
       - codex-mem
       - eagle-mem
     notes: "Read existing reviewed provider output, or use explicitly enabled tools only when metadata grants command-specific permission and purge is defined."
+  aif-architecture:
+    allowed:
+      - rg
+      - graphify
+      - context7
+    forbidden:
+      - codex-agent-mem
+      - context-mode
+      - codex-mem
+      - eagle-mem
+      - codegraph
+    notes: "Project-level architecture context only; optional provider output is supporting reviewed context and must not drive OpenSpec writes."
   aif-plan:
     allowed:
       - rg
@@ -146,6 +158,7 @@ tool_permissions:
   rg:
     aif-analyze: safe_availability_probe
     aif-explore: safe_availability_probe
+    aif-architecture: safe_availability_probe
     aif-plan: safe_availability_probe
     aif-review: safe_availability_probe
     aif-rules-check: safe_availability_probe
@@ -157,6 +170,7 @@ tool_permissions:
   graphify:
     aif-analyze: recommend_only
     aif-explore: read_existing_reviewed_output
+    aif-architecture: read_existing_reviewed_output
     aif-plan: read_existing_reviewed_output
     aif-review: read_existing_reviewed_output
     aif-rules-check: forbidden
@@ -168,6 +182,7 @@ tool_permissions:
   context7:
     aif-analyze: recommend_only
     aif-explore: read_existing_reviewed_output
+    aif-architecture: read_existing_reviewed_output
     aif-plan: read_existing_reviewed_output
     aif-review: read_existing_reviewed_output
     aif-rules-check: read_existing_reviewed_output
@@ -179,6 +194,7 @@ tool_permissions:
   codex-agent-mem:
     aif-analyze: recommend_only
     aif-explore: read_existing_reviewed_output
+    aif-architecture: forbidden
     aif-plan: forbidden
     aif-review: read_existing_reviewed_output
     aif-rules-check: forbidden
@@ -190,6 +206,7 @@ tool_permissions:
   context-mode:
     aif-analyze: recommend_only
     aif-explore: recommend_only
+    aif-architecture: forbidden
     aif-plan: forbidden
     aif-review: forbidden
     aif-rules-check: forbidden
@@ -207,6 +224,7 @@ tool_permissions:
   codegraph:
     aif-analyze: recommend_only
     aif-explore: manual_purged_cli_execution
+    aif-architecture: forbidden
     default: forbidden
 availability_probes:
   rg:
@@ -477,6 +495,7 @@ tools:
     allowed_in:
       - aif-analyze
       - aif-explore
+      - aif-architecture
       - aif-plan
       - aif-review
     forbidden_in:
@@ -548,6 +567,7 @@ tools:
       - aif-explore
       - aif-review
     forbidden_in:
+      - aif-architecture
       - aif-plan
       - aif-rules-check
       - aif-implement
@@ -596,6 +616,7 @@ tools:
       - aif-analyze
       - aif-explore
     forbidden_in:
+      - aif-architecture
       - aif-plan
       - aif-review
       - aif-rules-check
@@ -637,6 +658,7 @@ tools:
     allowed_in:
       - aif-analyze
       - aif-explore
+      - aif-architecture
       - aif-plan
       - aif-review
       - aif-rules-check
@@ -682,6 +704,7 @@ tools:
     forbidden_in:
       - aif-analyze
       - aif-explore
+      - aif-architecture
       - aif-plan
       - aif-review
       - aif-rules-check
@@ -746,6 +769,7 @@ tools:
     forbidden_in:
       - aif-analyze
       - aif-explore
+      - aif-architecture
       - aif-plan
       - aif-review
       - aif-rules-check
@@ -774,6 +798,7 @@ tools:
       - aif-analyze
       - aif-explore
     forbidden_in:
+      - aif-architecture
       - aif-plan
       - aif-review
       - aif-rules-check

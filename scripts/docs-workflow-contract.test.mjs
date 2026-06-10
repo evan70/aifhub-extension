@@ -379,8 +379,12 @@ describe('complete OpenSpec workflow documentation contract', () => {
     assertIncludes(metadata.sources['ai-factory'].notes, 'Commit Plan grouping', 'aifhub-extension.json');
     assertIncludes(metadata.sources['ai-factory'].notes, '/aif-distillation', 'aifhub-extension.json');
     assertIncludes(metadata.sources['ai-factory'].notes, '/aif-archive', 'aifhub-extension.json');
+    assertIncludes(metadata.sources['ai-factory'].notes, '/aif-architecture', 'aifhub-extension.json');
+    assertIncludes(metadata.sources['ai-factory'].notes, '/aif-docs', 'aifhub-extension.json');
+    assertIncludes(metadata.sources['ai-factory'].notes, '/aif-qa', 'aifhub-extension.json');
     assertIncludes(metadata.sources['ai-factory'].notes, 'paths.archive', 'aifhub-extension.json');
     assertIncludes(metadata.sources['ai-factory'].notes, 'archive-aware sequential plan behavior', 'aifhub-extension.json');
+    assertIncludes(metadata.sources['ai-factory'].notes, 'config-aware project utilities', 'aifhub-extension.json');
     assertIncludes(metadata.sources['ai-factory'].notes, 'managed agent config preservation', 'aifhub-extension.json');
     assertIncludes(metadata.sources['ai-factory'].notes, 'Agent Skills', 'aifhub-extension.json');
 
@@ -393,6 +397,19 @@ describe('complete OpenSpec workflow documentation contract', () => {
     for (const expected of [
       'AI Factory 2.15 Reviewed Baseline',
       'AI Factory `2.15.0`',
+      'config-aware project-context utilities',
+      'project-context utilities',
+      '/aif-architecture',
+      '/aif-docs',
+      '/aif-qa',
+      'paths.architecture',
+      'paths.docs',
+      'paths.qa/<branch-slug>/',
+      'not required per-change OpenSpec lifecycle gates',
+      'upstream project-level architecture context',
+      'OpenSpec canonical change/spec generation',
+      'upstream manual QA artifacts',
+      'distinct from AIFHub verification and finalization evidence',
       '/aif-archive',
       'paths.archive',
       '.ai-factory/archive/',
@@ -448,7 +465,27 @@ describe('complete OpenSpec workflow documentation contract', () => {
     ]) {
       assertNotIncludes(combinedDocs, forbiddenClaim, 'docs must not assign OpenSpec finalization to /aif-archive');
     }
+    for (const forbiddenClaim of [
+      '`/aif-architecture` is required per-change',
+      '`/aif-docs` is required per-change',
+      '`/aif-qa` is required per-change',
+      '`/aif-architecture` writes OpenSpec changes',
+      '`/aif-docs` writes OpenSpec changes',
+      '`/aif-qa` writes OpenSpec finalization evidence',
+      '/aif-architecture is required per-change',
+      '/aif-docs is required per-change',
+      '/aif-qa is required per-change',
+      '/aif-architecture writes OpenSpec changes',
+      '/aif-docs writes OpenSpec changes',
+      '/aif-qa writes OpenSpec finalization evidence'
+    ]) {
+      assertNotIncludes(combinedDocs, forbiddenClaim, 'docs must keep project utilities out of required OpenSpec lifecycle gates');
+    }
 
+    assertIncludes(contextPolicy, '| `/aif-architecture` | no | no |', 'docs/context-loading-policy.md Command Ownership');
+    assertIncludes(contextPolicy, '| `/aif-docs` | no | no |', 'docs/context-loading-policy.md Command Ownership');
+    assertIncludes(contextPolicy, '| `/aif-qa` | no | upstream manual QA artifacts under `paths.qa/<branch-slug>/`; not AIFHub `.ai-factory/qa/<change-id>/` evidence |', 'docs/context-loading-policy.md Command Ownership');
+    assertIncludes(contextPolicy, 'Adjacent upstream project-context utilities:', 'docs/context-loading-policy.md Quality Gates and Finalization Tail');
     assertIncludes(contextPolicy, '| `/aif-archive` | no | `paths.archive/plans/*.md` and `paths.archive/roadmap/*.md` only in legacy AI Factory-only cleanup |', 'docs/context-loading-policy.md Command Ownership');
     assertIncludes(handoff, 'legacy-only path и не описывает OpenSpec-native finalization', 'docs/handoff.md');
     assertIncludes(handoff, 'Не используйте `/aif-archive` для OpenSpec-native Done.', 'docs/handoff.md');
