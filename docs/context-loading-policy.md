@@ -190,7 +190,10 @@ GitHub access is non-blocking. If `gh`, connector data, network access, authenti
 |---|---|---|
 | `/aif-mode` | skeleton only; never manual `openspec/specs/**` mutations | mode reports, generated rules, optional migration/export outputs |
 | `/aif-analyze` | Optional `openspec/` skeleton only when configured | capability/config setup |
+| `/aif-architecture` | no | no |
 | `/aif-roadmap` | no | no |
+| `/aif-docs` | no | no |
+| `/aif-qa` | no | upstream manual QA artifacts under `paths.qa/<branch-slug>/`; not AIFHub `.ai-factory/qa/<change-id>/` evidence |
 | `/aif-plan full` | `openspec/changes/<change-id>/proposal.md`, `design.md`, `tasks.md`, `specs/**/spec.md` | optional `.ai-factory/state/<change-id>/` |
 | `/aif-explore` | no | `.ai-factory/RESEARCH.md`, `.ai-factory/state/<change-id>/` |
 | `/aif-improve` | `proposal.md`, `design.md`, `tasks.md`, `specs/**/spec.md` | optional `.ai-factory/state/<change-id>/` |
@@ -206,7 +209,13 @@ GitHub access is non-blocking. If `gh`, connector data, network access, authenti
 | `/aif-distillation` | no | no |
 | `/aif-evolve` | no | skill-context or evolution artifacts only |
 
+`/aif-architecture` writes only project-level architecture context: resolved `paths.architecture`, an architecture pointer in resolved `paths.description`, and an architecture row in root `AGENTS.md`.
+
 `/aif-roadmap` writes only the configured roadmap artifact, `.ai-factory/ROADMAP.md` by default.
+
+`/aif-docs` writes documentation output only: root `README.md`, the resolved `paths.docs` directory, optional `docs-html/` output when explicitly requested, and the Documentation section in `AGENTS.md`.
+
+`/aif-qa` writes upstream manual QA artifacts under `paths.qa/<branch-slug>/`, such as `change-summary.md`, `test-plan.md`, and `test-cases.md`. This is distinct from AIFHub verification and finalization evidence under `.ai-factory/qa/<change-id>/`, which remains owned by `/aif-verify` and `/aif-done`.
 
 ## Quality Gates and Finalization Tail
 
@@ -223,7 +232,15 @@ OpenSpec-native quality gates:
 | `/aif-distillation` | books, docs, folders, or URLs | generated skill packages in the current agent skills directory |
 | `/aif-evolve` | patches, evidence, skill-context inputs | skill-context/evolution artifacts |
 
-`/aif-done` owns OpenSpec lifecycle finalization. `/aif-commit` owns git commit creation. `/aif-evolve` owns learning/evolution.
+`/aif-done` owns OpenSpec lifecycle finalization. `/aif-commit` owns git commit creation. `/aif-evolve` owns learning/evolution. `/aif-architecture`, `/aif-docs`, and `/aif-qa` are upstream project-context utilities, not OpenSpec-native quality/finalization gates.
+
+Adjacent upstream project-context utilities:
+
+| Command | Reads | Writes |
+|---|---|---|
+| `/aif-architecture` | project description, source structure, optional OpenSpec context | project architecture context only |
+| `/aif-docs` | project description, architecture, source/docs | README and docs directory |
+| `/aif-qa` | git diff, description, architecture, source/docs | upstream manual QA artifacts under `paths.qa/<branch-slug>/` |
 
 Upstream `/aif-archive` is not part of the OpenSpec-native quality/finalization tail. It owns legacy AI Factory-only cleanup from `paths.plans/*.md` to `paths.archive/plans/*.md` and optional roadmap snapshots under `paths.archive/roadmap/*.md`. It must not write `openspec/changes/**`, `openspec/specs/**`, `.ai-factory/qa/**`, `.ai-factory/state/**`, or `.ai-factory/rules/generated/**`, and it must not run `openspec archive <change-id> --yes`.
 

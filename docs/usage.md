@@ -45,6 +45,8 @@ finalization:
 
 OpenSpec-native mode uses OpenSpec artifacts as canonical planning/spec artifacts and AI Factory paths for runtime state, QA evidence, and generated rules in user projects.
 
+Upstream project-context utilities such as `/aif-architecture`, `/aif-roadmap`, `/aif-docs`, `/aif-qa`, `/aif-archive`, and `/aif-distillation` remain available with AIFHub guardrails. They are not required per-change OpenSpec lifecycle gates.
+
 The `aifhub-extension` package repository stays artifact-light: root `openspec/`, `.ai-factory/state/`, `.ai-factory/qa/`, `.ai-factory/plans/`, and `.ai-factory/rules/generated/` are not extension package source. Root `.ai-factory/rules/generated/` is derived in user projects and safe to regenerate. OpenSpec examples may be committed only under fixture paths such as `test/fixtures/` or `scripts/fixtures/`.
 
 AIFHub commands request OpenSpec validation, status, instructions, and archive through `scripts/openspec-runner.mjs` when the CLI is available. Slash-command runtimes should keep using `/aif-*` commands. Codex app uses `$aif-*` skill invocations, as shown in the Recommended Codex App Flow. This extension does not install or rely on OpenSpec slash commands.
@@ -366,6 +368,92 @@ If localization questions run first, `/aif-analyze` carries those answers forwar
 The selected artifact protocol owns its config profile. Legacy `artifactProtocol: ai-factory` configs do not include `aifhub.openspec` settings or OpenSpec runtime path defaults; OpenSpec-native `artifactProtocol: openspec` configs include those settings and paths explicitly.
 
 Shared protocol-neutral settings such as `utilities.context_tools.enabled`, `utilities.graphify.enabled`, and `utilities.codegraph.enabled` may appear in either profile. They record optional tooling preferences and do not make that tool an AIFHub dependency. Optional memory/context tool recommendations are resolved from local installed metadata with `ai-factory aifhub-memory-tools recommend --from-project --json`; runtime tool selection uses `ai-factory aifhub-memory-tools select --from-project --command <skill> --json`. Missing metadata is degraded context and leaves `rg` as the baseline.
+
+### `/aif-architecture`
+
+`/aif-architecture` is an upstream project-level architecture context utility. It is not an OpenSpec canonical change/spec generation command.
+
+Reads:
+
+- `.ai-factory/config.yaml`
+- resolved `paths.description`
+- project files and source structure
+- `.ai-factory/skill-context/aif-architecture/SKILL.md` when present
+- optional OpenSpec context, generated rules, runtime state, and QA evidence as read-only supporting evidence
+- selected optional provider context only when command-specific metadata allows it
+
+Writes:
+
+- resolved `paths.architecture`, `.ai-factory/ARCHITECTURE.md` by default
+- an architecture pointer in resolved `paths.description`
+- an architecture row in root `AGENTS.md`
+
+Does not write:
+
+- `openspec/changes/**`
+- `openspec/specs/**`
+- `.ai-factory/state/**`
+- `.ai-factory/qa/**`
+- `.ai-factory/rules/generated/**`
+- provider notes, MCP config, provider config, or provider setup files
+
+When architecture work would change product or workflow behavior, capture it through `/aif-plan full <request>` instead of writing OpenSpec deltas from `/aif-architecture`.
+
+### `/aif-docs`
+
+`/aif-docs` is an upstream documentation utility. It is not an OpenSpec lifecycle gate.
+
+Reads:
+
+- `.ai-factory/config.yaml`
+- resolved `paths.description`
+- resolved `paths.architecture`
+- current README, docs, source files, comments, routes, and APIs
+- `.ai-factory/skill-context/aif-docs/SKILL.md` when present
+
+Writes:
+
+- root `README.md`
+- the resolved `paths.docs` directory, `docs/` by default
+- optional `docs-html/` when the user explicitly requests web docs
+- the Documentation section in `AGENTS.md`
+
+Does not write:
+
+- `openspec/changes/**`
+- `openspec/specs/**`
+- `.ai-factory/state/**`
+- `.ai-factory/qa/**`
+- `.ai-factory/rules/generated/**`
+
+### `/aif-qa`
+
+`/aif-qa` is an upstream manual QA artifact utility. It is distinct from AIFHub `/aif-verify` and `/aif-done` evidence.
+
+Reads:
+
+- git diff and changed files
+- resolved `paths.description`
+- resolved `paths.architecture`
+- source files, docs, and existing QA context
+- `.ai-factory/skill-context/aif-qa/SKILL.md` when present
+
+Writes:
+
+- upstream manual QA artifacts under `paths.qa/<branch-slug>/`
+- `change-summary.md`
+- `test-plan.md`
+- `test-cases.md`
+
+Does not write:
+
+- `openspec/changes/**`
+- `openspec/specs/**`
+- `.ai-factory/state/**`
+- `.ai-factory/rules/generated/**`
+- AIFHub verification or finalization evidence under `.ai-factory/qa/<change-id>/`
+
+In OpenSpec-native mode, use `/aif-verify <change-id>` for authoritative verification evidence and `/aif-done <change-id>` for finalization evidence.
 
 ### `/aif-plan full`
 

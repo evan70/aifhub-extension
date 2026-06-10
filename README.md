@@ -17,6 +17,7 @@ AI Factory UX + OpenSpec artifact protocol
 - Preserves legacy AI Factory-only plan folders as compatibility and migration input only.
 - Publishes namespaced Codex CLI and Claude agent files through the extension manifest for explicit user or orchestrator invocation.
 - Publishes an optional `aifhub` MCP server whose settings are rendered by AI Factory per runtime.
+- Documents upstream project-context utilities such as `/aif-architecture`, `/aif-roadmap`, `/aif-docs`, `/aif-qa`, `/aif-archive`, and `/aif-distillation` with AIFHub write-boundary guardrails.
 - Does not install OpenSpec skills or slash commands.
 
 ## Quick Start
@@ -112,6 +113,8 @@ AI Factory 2.13+ owns generic active plan `## Commit Plan` grouping in `/aif-com
 The AIFHub `aif-commit` injection is only a read-only roadmap/GitHub freshness overlay. In OpenSpec-native mode, if an active OpenSpec change is available, commit planning should use `openspec/changes/<change-id>/tasks.md` as the source that may contain `## Commit Plan`. If no active change/plan resolves, keep upstream staged-diff behavior.
 
 AI Factory 2.13+ includes `/aif-distillation`. It is an upstream utility skill for turning books, docs, folders, or URLs into reusable Agent Skills. It is not an AIFHub lifecycle stage, does not create OpenSpec changes, and must not write `openspec/changes/**`, `openspec/specs/**`, `.ai-factory/qa/**`, or `.ai-factory/rules/generated/**`. It writes generated skill packages to the current agent skills directory.
+
+Upstream project-context utilities remain available with AIFHub guardrails. `/aif-architecture` writes project-level architecture context at `paths.architecture` plus limited pointers in `paths.description` and root `AGENTS.md`. `/aif-docs` writes the root `README.md`, the configured `paths.docs` directory, and documentation entries in `AGENTS.md`. `/aif-qa` writes upstream manual QA artifacts under `paths.qa/<branch-slug>/`, distinct from AIFHub verification/finalization evidence under `.ai-factory/qa/<change-id>/`. These commands are not required per-change OpenSpec lifecycle gates and must not create canonical OpenSpec changes/specs, generated rules, or AIFHub runtime evidence.
 
 AI Factory 2.14+ includes upstream `/aif-archive` and `paths.archive`, with default archive root `.ai-factory/archive/`. That command is legacy AI Factory-only plan cleanup: completed `paths.plans/*.md` files move to `paths.archive/plans/*.md`, optional roadmap snapshots can be written under `paths.archive/roadmap/`, and archived plans are excluded from active sequential plan numbering and discovery. AIFHub does not route `/aif-archive` to `openspec archive`, and `/aif-archive` must not write `openspec/changes/**`, `openspec/specs/**`, `.ai-factory/qa/**`, `.ai-factory/state/**`, or `.ai-factory/rules/generated/**`.
 
@@ -319,11 +322,11 @@ Switching to AI Factory-only mode updates the legacy path profile and preserves 
 | Guide | Description |
 |---|---|
 | [Documentation Index](docs/README.md) | Reading order and docs map |
-| [Usage](docs/usage.md) | Full command flow, read/write boundaries, examples, and troubleshooting |
+| [Usage](docs/usage.md) | Full command flow, read/write boundaries, upstream project-context utilities, examples, and troubleshooting |
 | [Context Providers](docs/context-providers.md) | Optional Graphify and Context7 provider guidance, reviewed-note paths, degraded behavior, and user-owned setup boundaries |
 | [Memory Tool Recommendations](docs/memory-tool-recommendations.md) | Local metadata-driven optional memory/context tool recommendations and installed wrapper commands |
-| [Context Loading Policy](docs/context-loading-policy.md) | Consumer context, optional provider context, GitHub-aware roadmap evidence, ownership, and legacy boundaries |
-| [OpenSpec Compatibility](docs/openspec-compatibility.md) | Optional CLI adapter policy, OpenSpec 1.4.1 reviewed baseline, AI Factory 2.15 baseline, `/aif-archive` boundary, and capability flags |
+| [Context Loading Policy](docs/context-loading-policy.md) | Consumer context, optional provider context, GitHub-aware roadmap evidence, command ownership, upstream utility boundaries, and legacy boundaries |
+| [OpenSpec Compatibility](docs/openspec-compatibility.md) | Optional CLI adapter policy, OpenSpec 1.4.1 reviewed baseline, AI Factory 2.15 baseline, upstream project-context utility boundaries, `/aif-archive` boundary, and capability flags |
 | [OpenSpec Artifact Validation](docs/openspec-validation.md) | Read-only AIFHub contract validator for OpenSpec-native artifacts |
 | [OpenSpec Coverage Matrix](docs/spec-coverage.md) | Requirement-to-code coverage artifact and verify/done policy |
 | [Legacy Plan Migration](docs/legacy-plan-migration.md) | Explicit migration from legacy plans to OpenSpec-native changes |

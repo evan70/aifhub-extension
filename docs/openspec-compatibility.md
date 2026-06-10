@@ -202,9 +202,20 @@ Examples:
 /aif-distillation docs/context-providers.md --name aifhub-context-providers
 ```
 
+## Upstream Project-Context Utilities
+
+Upstream `/aif-architecture`, `/aif-docs`, `/aif-qa`, and `/aif-roadmap` remain project-context utilities with AIFHub guardrails. They are not required per-change OpenSpec lifecycle gates.
+
+- `/aif-architecture` owns project-level architecture context generation at `paths.architecture`, plus the architecture pointer in resolved `paths.description` and the architecture row in root `AGENTS.md`.
+- `/aif-docs` owns the root `README.md`, the resolved `paths.docs` directory, generated docs site output when explicitly requested, and the Documentation section in `AGENTS.md`.
+- `/aif-qa` owns upstream manual QA artifacts under `paths.qa/<branch-slug>/`, including `change-summary.md`, `test-plan.md`, and `test-cases.md`.
+- `/aif-roadmap` owns only the configured roadmap artifact, `.ai-factory/ROADMAP.md` by default.
+
+These utilities must not create or mutate `openspec/changes/**`, `openspec/specs/**`, `.ai-factory/state/**`, `.ai-factory/rules/generated/**`, or AIFHub verification/finalization evidence under `.ai-factory/qa/<change-id>/`. `/aif-qa` may use the same configured `paths.qa` root as AIFHub, but upstream manual QA artifacts use branch slugs while `/aif-verify` and `/aif-done` evidence use OpenSpec `change-id` directories.
+
 ## AI Factory 2.15 Reviewed Baseline
 
-The reviewed AI Factory `2.15.0` baseline includes AI Factory `2.14.0` archive behavior and AI Factory `2.15.0` update behavior.
+The reviewed AI Factory `2.15.0` baseline includes AI Factory `2.14.0` archive behavior, config-aware project-context utilities, and AI Factory `2.15.0` update behavior.
 
 AI Factory 2.14+ includes upstream `/aif-archive` and `paths.archive`. AIFHub treats `/aif-archive` as legacy AI Factory-only cleanup, not as OpenSpec-native finalization:
 
