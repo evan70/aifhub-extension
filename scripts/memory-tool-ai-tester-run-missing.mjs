@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // memory-tool-ai-tester-run-missing.mjs - resumable executor for missing ai-tester matrix rows
 import { spawn } from 'node:child_process';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -49,6 +49,7 @@ export async function runMemoryToolAiTesterMissing(args = [], options = {}) {
 
   const logDir = path.resolve(cwd, parsed.logDir ?? path.join(matrixDir, 'run-missing-logs'));
   await mkdir(logDir, { recursive: true });
+  const runtimeEnv = await buildRuntimeEnv({ matrixDir });
 
   const startedAt = Date.now();
   const deadlineAt = parsed.deadlineMs ? startedAt + parsed.deadlineMs : null;
@@ -59,6 +60,7 @@ export async function runMemoryToolAiTesterMissing(args = [], options = {}) {
       cwd,
       scenarioPath: item.scenarioPath,
       timeoutMs: parsed.timeoutMs,
+      env: runtimeEnv,
       runCommand: options.runCommand
     });
     const logPath = path.join(logDir, `${safeFileName(item.case.id)}.log`);
@@ -130,9 +132,10 @@ export function buildMissingRunPlan({
 export function scenarioPathForCase({ scenarioDir, matrixCase }) {
   const optionalToolId = matrixCase.optional_tool_id ?? matrixCase.tool_id;
   const suffix = matrixCase.tool_id === 'rg' ? '__baseline_rg' : '';
+  const scenarioSegment = matrixCase.scenario_id ? `__${matrixCase.scenario_id}` : '';
   return path.join(
     scenarioDir,
-    `${matrixCase.profile_id}__${matrixCase.skill}__${optionalToolId}__${matrixCase.task_scenario}${suffix}.yaml`
+    `${matrixCase.profile_id}__${matrixCase.skill}__${optionalToolId}__${matrixCase.task_scenario}${scenarioSegment}${suffix}.yaml`
   );
 }
 
@@ -160,13 +163,14 @@ function collectTraceIndex(runsDir) {
   return runsDir ? collectAiTesterTraceIndex({ runsDir }) : collectAiTesterTraceIndex();
 }
 
-async function runScenario({ cwd, scenarioPath, timeoutMs = DEFAULT_TIMEOUT_MS, runCommand = null }) {
-  if (runCommand) return runCommand({ cwd, scenarioPath, timeoutMs });
+async function runScenario({ cwd, scenarioPath, timeoutMs = DEFAULT_TIMEOUT_MS, env = process.env, runCommand = null }) {
+  if (runCommand) return runCommand({ cwd, scenarioPath, timeoutMs, env });
   const startedAt = Date.now();
   return new Promise((resolve) => {
     const { command, args } = buildAiTesterCommand(scenarioPath);
     const child = spawn(command, args, {
       cwd,
+      env,
       windowsHide: true
     });
     let stdout = '';
@@ -212,6 +216,24 @@ async function runScenario({ cwd, scenarioPath, timeoutMs = DEFAULT_TIMEOUT_MS, 
       });
     });
   });
+}
+
+export async function buildRuntimeEnv({ matrixDir }) {
+  const env = { ...process.env };
+  if (process.platform !== 'win32') return env;
+  const shimDir = path.join(matrixDir, '.runner-bin');
+  await mkdir(shimDir, { recursive: true });
+  await writeFile(
+    path.join(shimDir, 'which.cmd'),
+    '@echo off\r\nwhere.exe %*\r\n',
+    'utf8'
+  );
+  const whereExe = path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'where.exe');
+  await copyFile(whereExe, path.join(shimDir, 'which.exe')).catch(() => {});
+  const currentPath = env.Path ?? env.PATH ?? '';
+  env.Path = `${shimDir}${path.delimiter}${currentPath}`;
+  env.PATH = env.Path;
+  return env;
 }
 
 function buildAiTesterCommand(scenarioPath) {

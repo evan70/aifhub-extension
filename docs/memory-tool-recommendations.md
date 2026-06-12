@@ -48,6 +48,7 @@ Recommender только советует:
 - Follow-on skills вызывают `select` для своей команды и используют только `selected_tools`; изменение списка tools должно требовать metadata/config changes, а не prompt rewrites.
 - Recommender учитывает language, volume, complexity, repo shape, artifact mode и legacy `project_shape`. Если rich dimensions недоступны, сохраняется fallback на `project_shape`.
 - Любой optional tool сравнивается с `rg`: сначала baseline search на том же task/profile, затем tool run только если selector и permissions разрешают его.
+- `proven_label_evidence` может включить optional tool только при exact match по tool, skill, task, accepted run class и всем project labels; `known_avoid_cases` и command-specific forbidden scopes остаются сильнее.
 
 Protected validation artifacts:
 
@@ -68,7 +69,7 @@ Protected validation artifacts:
 - `context-mode`: manual temporary index для explicit generated output или large command output.
 - Context7: optional docs provider для version-sensitive library/API questions.
 - `agent-memory`: manual notes только когда пользователь явно просит durable notes.
-- CodeGraph: `manual_cli_only` + `avoid_by_default`; CLI scoped read и purge прошли explicit real-root testing. Selector может рекомендовать его только при exact `screening_policy` match по skill + project labels; broad repo graph question, language или multirepo label сами по себе недостаточны. Уже готовый индекс можно переиспользовать только после `rg` и только если `files/query/context` дает полезную непустую выборку.
+- CodeGraph: `manual_cli_only` + `avoid_by_default`; CLI scoped read и purge прошли explicit real-root testing. Selector может рекомендовать его только при exact `screening_policy` или `proven_label_evidence` match по skill + task + project labels; broad repo graph question, language или multirepo label сами по себе недостаточны. Уже готовый индекс можно переиспользовать только после `rg` и только если `files/query/context` дает полезную непустую выборку.
 
 Не рекомендовать по умолчанию:
 
@@ -93,7 +94,7 @@ project_dimensions:
 Практический смысл:
 
 - mini или exact lookup: оставить `rg`, избегать on-demand CodeGraph/Graphify/context-mode setup; уже готовый CodeGraph index не является default-рекомендацией.
-- large framework или multirepo broad discovery: предлагать Graphify условно после `rg`; CodeGraph только при exact skill+labels screening match.
+- large framework или multirepo broad discovery: предлагать Graphify условно после `rg`; CodeGraph только при exact skill+task+labels screening/proven match.
 - legacy integration-heavy: рекомендовать только conditional tools с явным объяснением noise/time tradeoff.
 - Go service: Go label не дает CodeGraph recommendation; для repo graph оставлять Graphify/`rg`, пока нет exact screening match.
 - docs/version tasks: Context7 только для version-sensitive library/API вопросов.
@@ -120,7 +121,7 @@ Decision mapping из matrix:
 - `ctx7 --version` или `npx --no-install ctx7 --help` только когда передан `--check-docs-provider`
 - `codegraph --version`, `codegraph --help` или `codegraph status` только как availability probes
 
-Эти probes не должны install packages, run setup, register MCP servers, write hooks или start background processes. `codegraph init/index/query/uninit` разрешен только когда `select --command aif-explore --json` возвращает CodeGraph в `selected_tools` из-за exact screening match, с `manual_purged_cli_execution`, explicit project path и purge через `codegraph uninit --force <project>`.
+Эти probes не должны install packages, run setup, register MCP servers, write hooks или start background processes. `codegraph init/index/query/uninit` разрешен только когда `select --command aif-explore --json` возвращает CodeGraph в `selected_tools` из-за exact screening/proven match, с `manual_purged_cli_execution`, explicit project path и purge через `codegraph uninit --force <project>`.
 
 ## Выбор Через Config
 

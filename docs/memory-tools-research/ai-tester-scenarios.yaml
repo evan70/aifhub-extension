@@ -1,0 +1,135 @@
+schema: aifhub.memory_tools.ai_tester_scenario_catalog.v1
+defaults:
+  baseline: rg
+  candidate_mode: direct_tool_run_after_rg
+  min_pass_pairs: 2
+scenarios:
+  - id: architecture-impact-discovery
+    title: "Architecture and impact discovery"
+    task_signal: architecture_or_impact_discovery
+    run_class: accepted_evidence
+    skills: [aif-analyze, aif-explore, aif-plan]
+    tools: [codegraph, graphify]
+    fixture_requirements:
+      labels_any:
+        - [js, standard, framework, single_repo, openspec_native, large_framework_app]
+        - [js, standard, framework, monorepo, legacy_ai_factory_only, multirepo]
+        - [php, js, standard, framework, single_repo, legacy_ai_factory_only, large_framework_app]
+        - [php, standard, framework, single_repo, none, large_framework_app]
+    paired_runs:
+      baseline: rg
+      candidate_mode: direct_tool_run_after_rg
+    baseline_assertions: [tool_called:rg, no_optional_tools, no_path_escape]
+    candidate_assertions: [tool_call_sequence:rg_then_candidate, output_contains:tool_run, no_path_escape, purge_if_indexed]
+    promotion_policy:
+      eligible_for_metadata: true
+      min_pass_pairs: 2
+      require_exact_labels: true
+      accepted_run_class: accepted_evidence
+      allowed_decisions: [recommend, conditional, avoid, forbid]
+  - id: exact-file-symbol-lookup
+    title: "Exact file or symbol lookup"
+    task_signal: exact_file_or_symbol_lookup
+    run_class: screening
+    skills: [aif-explore, aif-review, aif-fix]
+    tools: [codegraph, graphify, context-mode]
+    fixture_requirements:
+      labels_any:
+        - [js, mini, framework, single_repo, none, small_microservice]
+        - [rust, mini, framework, single_repo, none, small_microservice]
+    paired_runs:
+      baseline: rg
+      candidate_mode: direct_tool_run_after_rg
+    baseline_assertions: [tool_called:rg, no_optional_tools, no_path_escape]
+    candidate_assertions: [tool_call_sequence:rg_then_candidate, output_contains:tool_run, no_path_escape]
+    promotion_policy:
+      eligible_for_metadata: true
+      min_pass_pairs: 2
+      require_exact_labels: true
+      accepted_run_class: accepted_evidence
+      allowed_decisions: [avoid, forbid]
+  - id: multirepo-surface-mapping
+    title: "Multirepo surface mapping"
+    task_signal: multirepo_surface_mapping
+    run_class: accepted_evidence
+    skills: [aif-analyze, aif-explore, aif-review]
+    tools: [codegraph, graphify]
+    fixture_requirements:
+      labels_any:
+        - [js, standard, framework, monorepo, legacy_ai_factory_only, multirepo]
+        - [js, php, standard, framework, multirepo, openspec_native]
+        - [php, js, standard, framework, multirepo, legacy_ai_factory_only]
+    paired_runs:
+      baseline: rg
+      candidate_mode: direct_tool_run_after_rg
+    baseline_assertions: [tool_called:rg, no_optional_tools, no_path_escape]
+    candidate_assertions: [tool_call_sequence:rg_then_candidate, output_contains:tool_run, no_path_escape, purge_if_indexed]
+    promotion_policy:
+      eligible_for_metadata: true
+      min_pass_pairs: 2
+      require_exact_labels: true
+      accepted_run_class: accepted_evidence
+      allowed_decisions: [recommend, conditional, avoid, forbid]
+  - id: version-sensitive-library-docs
+    title: "Version-sensitive library docs"
+    task_signal: version_sensitive_library_docs
+    run_class: accepted_evidence
+    skills: [aif-plan, aif-rules-check, aif-review]
+    tools: [context7]
+    fixture_requirements:
+      labels_any:
+        - [js, standard, framework, single_repo, openspec_native, large_framework_app]
+        - [php, js, standard, framework, single_repo, legacy_ai_factory_only, large_framework_app]
+        - [php, standard, framework, single_repo, none, large_framework_app]
+    paired_runs:
+      baseline: rg
+      candidate_mode: direct_tool_run_after_rg
+    baseline_assertions: [tool_called:rg, no_optional_tools, no_path_escape]
+    candidate_assertions: [tool_call_sequence:rg_then_candidate, output_contains:tool_run, no_path_escape]
+    promotion_policy:
+      eligible_for_metadata: true
+      min_pass_pairs: 2
+      require_exact_labels: true
+      accepted_run_class: accepted_evidence
+      allowed_decisions: [conditional, avoid, forbid]
+  - id: resume-previous-work
+    title: "Resume previous work"
+    task_signal: resume_previous_work
+    run_class: focused
+    skills: [aif-explore, aif-review]
+    tools: [codex-agent-mem]
+    fixture_requirements:
+      labels_any:
+        - [js, standard, framework, single_repo, openspec_native, large_framework_app]
+        - [no-primary-language, mini, mini, single_repo, none, small_microservice]
+    paired_runs:
+      baseline: rg
+      candidate_mode: selector_expected_tool_run
+    baseline_assertions: [tool_called:rg, no_optional_tools, no_path_escape]
+    candidate_assertions: [tool_call_sequence:rg_then_candidate, output_contains:tool_run, no_path_escape]
+    promotion_policy:
+      eligible_for_metadata: false
+      min_pass_pairs: 2
+      require_exact_labels: true
+      allowed_decisions: [conditional, avoid, forbid]
+  - id: generated-output-compression
+    title: "Generated output compression"
+    task_signal: large_command_output_compression
+    run_class: focused
+    skills: [aif-analyze, aif-explore]
+    tools: [context-mode]
+    fixture_requirements:
+      labels_any:
+        - [js, standard, framework, monorepo, legacy_ai_factory_only, multirepo]
+        - [js, standard, framework, single_repo, openspec_native, large_framework_app]
+        - [php, js, standard, framework, single_repo, legacy_ai_factory_only, large_framework_app]
+    paired_runs:
+      baseline: rg
+      candidate_mode: direct_tool_run_after_rg
+    baseline_assertions: [tool_called:rg, no_optional_tools, no_path_escape]
+    candidate_assertions: [tool_call_sequence:rg_then_candidate, output_contains:tool_run, no_path_escape, purge_if_indexed]
+    promotion_policy:
+      eligible_for_metadata: false
+      min_pass_pairs: 2
+      require_exact_labels: true
+      allowed_decisions: [conditional, avoid, forbid]

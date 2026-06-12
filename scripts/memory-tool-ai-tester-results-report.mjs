@@ -145,6 +145,10 @@ export function buildAiTesterResultsReport({
       tags: asArray(profile.tags),
       pair_id: matrixCase.pair_id ?? null,
       task_scenario: matrixCase.task_scenario ?? null,
+      scenario_id: matrixCase.scenario_id ?? null,
+      run_class: matrixCase.run_class ?? null,
+      promotion_policy: matrixCase.promotion_policy ?? null,
+      expectation: matrixCase.expectation ?? null,
       run: formatRunName(matrixCase),
       tool_id: matrixCase.tool_id,
       optional_tool_id: matrixCase.optional_tool_id ?? null,
@@ -213,32 +217,33 @@ export function renderAiTesterResultsMarkdown(report) {
 
   if (report.paired_comparison?.pair_count > 0) {
     const comparison = report.paired_comparison;
-    lines.push('## Paired Rg Vs CodeGraph', '');
-    lines.push('| Metric | rg | CodeGraph | CodeGraph delta |');
+    const candidateName = formatToolDisplayName(comparison.candidate_tool_id ?? 'candidate');
+    lines.push(`## Paired Rg Vs ${candidateName}`, '');
+    lines.push(`| Metric | rg | ${candidateName} | ${candidateName} delta |`);
     lines.push('|---|---:|---:|---:|');
     lines.push(`| Paired rows | ${formatNumber(comparison.pair_count)} | ${formatNumber(comparison.pair_count)} |  |`);
-    lines.push(`| PASS rows | ${formatNumber(comparison.rg.pass_rows)} | ${formatNumber(comparison.codegraph.pass_rows)} | ${formatPercentDelta(comparison.deltas.pass_rows_percent)} |`);
-    lines.push(`| FAIL rows | ${formatNumber(comparison.rg.fail_rows)} | ${formatNumber(comparison.codegraph.fail_rows)} | ${formatPercentDelta(comparison.deltas.fail_rows_percent)} |`);
-    lines.push(`| Duration seconds | ${formatNumberRounded(comparison.rg.duration_seconds)} | ${formatNumberRounded(comparison.codegraph.duration_seconds)} | ${formatPercentDelta(comparison.deltas.duration_percent)} |`);
-    lines.push(`| Tool calls | ${formatNumber(comparison.rg.tool_calls)} | ${formatNumber(comparison.codegraph.tool_calls)} | ${formatPercentDelta(comparison.deltas.tool_calls_percent)} |`);
-    lines.push(`| Total tokens | ${formatNumber(comparison.rg.total_tokens)} | ${formatNumber(comparison.codegraph.total_tokens)} | ${formatPercentDelta(comparison.deltas.total_tokens_percent)} |`);
-    lines.push(`| Input tokens | ${formatNumber(comparison.rg.input_tokens)} | ${formatNumber(comparison.codegraph.input_tokens)} | ${formatPercentDelta(comparison.deltas.input_tokens_percent)} |`);
-    lines.push(`| Output tokens | ${formatNumber(comparison.rg.output_tokens)} | ${formatNumber(comparison.codegraph.output_tokens)} | ${formatPercentDelta(comparison.deltas.output_tokens_percent)} |`);
-    lines.push(`| Input+output tokens | ${formatNumber(comparison.rg.input_output_tokens)} | ${formatNumber(comparison.codegraph.input_output_tokens)} | ${formatPercentDelta(comparison.deltas.input_output_tokens_percent)} |`);
+    lines.push(`| PASS rows | ${formatNumber(comparison.rg.pass_rows)} | ${formatNumber(comparison.candidate.pass_rows)} | ${formatPercentDelta(comparison.deltas.pass_rows_percent)} |`);
+    lines.push(`| FAIL rows | ${formatNumber(comparison.rg.fail_rows)} | ${formatNumber(comparison.candidate.fail_rows)} | ${formatPercentDelta(comparison.deltas.fail_rows_percent)} |`);
+    lines.push(`| Duration seconds | ${formatNumberRounded(comparison.rg.duration_seconds)} | ${formatNumberRounded(comparison.candidate.duration_seconds)} | ${formatPercentDelta(comparison.deltas.duration_percent)} |`);
+    lines.push(`| Tool calls | ${formatNumber(comparison.rg.tool_calls)} | ${formatNumber(comparison.candidate.tool_calls)} | ${formatPercentDelta(comparison.deltas.tool_calls_percent)} |`);
+    lines.push(`| Total tokens | ${formatNumber(comparison.rg.total_tokens)} | ${formatNumber(comparison.candidate.total_tokens)} | ${formatPercentDelta(comparison.deltas.total_tokens_percent)} |`);
+    lines.push(`| Input tokens | ${formatNumber(comparison.rg.input_tokens)} | ${formatNumber(comparison.candidate.input_tokens)} | ${formatPercentDelta(comparison.deltas.input_tokens_percent)} |`);
+    lines.push(`| Output tokens | ${formatNumber(comparison.rg.output_tokens)} | ${formatNumber(comparison.candidate.output_tokens)} | ${formatPercentDelta(comparison.deltas.output_tokens_percent)} |`);
+    lines.push(`| Input+output tokens | ${formatNumber(comparison.rg.input_output_tokens)} | ${formatNumber(comparison.candidate.input_output_tokens)} | ${formatPercentDelta(comparison.deltas.input_output_tokens_percent)} |`);
     lines.push('');
     lines.push(`| PASS/PASS paired rows used for useful-case counts | ${formatNumber(comparison.pass_pair_count)} | ${formatPercent(percentOf(comparison.pass_pair_count, comparison.pair_count))} |`);
     lines.push('');
     lines.push('| Better case count | Count | Percent of PASS/PASS pairs |');
     lines.push('|---|---:|---:|');
-    lines.push(`| CodeGraph lower total tokens | ${formatNumber(comparison.better_counts.codegraph_lower_total_tokens)} | ${formatPercent(comparison.better_counts.codegraph_lower_total_tokens_percent)} |`);
-    lines.push(`| CodeGraph lower input+output tokens | ${formatNumber(comparison.better_counts.codegraph_lower_input_output_tokens)} | ${formatPercent(comparison.better_counts.codegraph_lower_input_output_tokens_percent)} |`);
-    lines.push(`| CodeGraph faster | ${formatNumber(comparison.better_counts.codegraph_faster)} | ${formatPercent(comparison.better_counts.codegraph_faster_percent)} |`);
-    lines.push(`| CodeGraph fewer tool calls | ${formatNumber(comparison.better_counts.codegraph_fewer_tool_calls)} | ${formatPercent(comparison.better_counts.codegraph_fewer_tool_calls_percent)} |`);
+    lines.push(`| ${candidateName} lower total tokens | ${formatNumber(comparison.better_counts.candidate_lower_total_tokens)} | ${formatPercent(comparison.better_counts.candidate_lower_total_tokens_percent)} |`);
+    lines.push(`| ${candidateName} lower input+output tokens | ${formatNumber(comparison.better_counts.candidate_lower_input_output_tokens)} | ${formatPercent(comparison.better_counts.candidate_lower_input_output_tokens_percent)} |`);
+    lines.push(`| ${candidateName} faster | ${formatNumber(comparison.better_counts.candidate_faster)} | ${formatPercent(comparison.better_counts.candidate_faster_percent)} |`);
+    lines.push(`| ${candidateName} fewer tool calls | ${formatNumber(comparison.better_counts.candidate_fewer_tool_calls)} | ${formatPercent(comparison.better_counts.candidate_fewer_tool_calls_percent)} |`);
     lines.push('');
 
     if (comparison.useful_cases.length > 0) {
-      lines.push('## CodeGraph Useful Cases', '');
-      lines.push('| skill | project | task | labels | useful signal | total tokens delta | input+output delta | duration delta | tool calls delta | rg total tokens | CodeGraph total tokens |');
+      lines.push(`## ${candidateName} Useful Cases`, '');
+      lines.push(`| skill | project | task | labels | useful signal | total tokens delta | input+output delta | duration delta | tool calls delta | rg total tokens | ${candidateName} total tokens |`);
       lines.push('|---|---|---|---|---|---:|---:|---:|---:|---:|---:|');
       for (const usefulCase of comparison.useful_cases) {
         lines.push([
@@ -252,14 +257,14 @@ export function renderAiTesterResultsMarkdown(report) {
           md(formatPercentDelta(usefulCase.duration_delta_percent)),
           md(formatPercentDelta(usefulCase.tool_calls_delta_percent)),
           mdNum(usefulCase.rg_total_tokens),
-          mdNum(usefulCase.codegraph_total_tokens)
+          mdNum(usefulCase.candidate_total_tokens)
         ].join(' | ').replace(/^/, '| ').replace(/$/, ' |'));
       }
       lines.push('');
     }
 
     if (comparison.skill_signals.length > 0) {
-      lines.push('## CodeGraph Signals By Skill', '');
+      lines.push(`## ${candidateName} Signals By Skill`, '');
       lines.push('| skill | pairs | lower total tokens | lower input+output | faster | fewer tool calls | avg total delta | avg input+output delta | decision |');
       lines.push('|---|---:|---:|---:|---:|---:|---:|---:|---|');
       for (const signal of comparison.skill_signals) {
@@ -279,7 +284,7 @@ export function renderAiTesterResultsMarkdown(report) {
     }
 
     if (comparison.label_signals.length > 0) {
-      lines.push('## CodeGraph Signals By Label', '');
+      lines.push(`## ${candidateName} Signals By Label`, '');
       lines.push('| label | pairs | lower total tokens | lower input+output | faster | fewer tool calls | avg total delta | avg input+output delta | decision |');
       lines.push('|---|---:|---:|---:|---:|---:|---:|---:|---|');
       for (const signal of comparison.label_signals) {
@@ -308,7 +313,9 @@ export function renderAiTesterResultsMarkdown(report) {
     lines.push(`| PASS rows | ${formatNumber(skill.pass_rows)} |`);
     lines.push(`| NOT_RUN rows | ${formatNumber(skill.not_run_rows)} |`);
     lines.push(`| rg executed | ${formatNumber(skill.rg_executed_rows)} |`);
-    lines.push(`| CodeGraph executed | ${formatNumber(skill.codegraph_executed_rows)} |`);
+    for (const [toolId, count] of Object.entries(skill.candidate_executed_rows_by_tool)) {
+      lines.push(`| ${formatToolDisplayName(toolId)} executed | ${formatNumber(count)} |`);
+    }
     lines.push('');
     lines.push('| project | task | labels | run | status | duration | tool calls | total tokens | input tokens | output tokens | input+output tokens | cache-read tokens |');
     lines.push('|---|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|');
@@ -346,54 +353,72 @@ function buildPairedComparison(rows) {
     if (!byPair.has(key)) byPair.set(key, {});
     const pair = byPair.get(key);
     if (row.tool_id === 'rg') pair.rg = row;
-    if (row.tool_id === 'codegraph') pair.codegraph = row;
+    if (row.tool_id !== 'rg') pair.candidate = row;
   }
 
-  const pairs = [...byPair.values()].filter((pair) => pair.rg && pair.codegraph);
-  const passPairs = pairs.filter((pair) => pair.rg.status === 'PASS' && pair.codegraph.status === 'PASS');
+  const pairs = [...byPair.values()].filter((pair) => pair.rg && pair.candidate);
+  const passPairs = pairs.filter((pair) => pair.rg.status === 'PASS' && pair.candidate.status === 'PASS');
   const rg = summarizeMetricRows(pairs.map((pair) => pair.rg));
-  const codegraph = summarizeMetricRows(pairs.map((pair) => pair.codegraph));
+  const candidate = summarizeMetricRows(pairs.map((pair) => pair.candidate));
+  const candidateToolIds = unique(pairs.map((pair) => pair.candidate.tool_id).filter(Boolean));
+  const candidateToolId = candidateToolIds.length === 1 ? candidateToolIds[0] : 'mixed';
+  const passUsefulCases = passPairs.map(pairToUsefulCase);
   const betterCounts = {
-    codegraph_lower_total_tokens: passPairs.filter((pair) => pair.codegraph.total_tokens < pair.rg.total_tokens).length,
-    codegraph_lower_input_output_tokens: passPairs.filter((pair) => pair.codegraph.input_output_tokens < pair.rg.input_output_tokens).length,
-    codegraph_faster: passPairs.filter((pair) => pair.codegraph.duration_seconds < pair.rg.duration_seconds).length,
-    codegraph_fewer_tool_calls: passPairs.filter((pair) => pair.codegraph.tool_calls < pair.rg.tool_calls).length
+    candidate_lower_total_tokens: passUsefulCases.filter((item) => item.lower_total_tokens).length,
+    candidate_lower_input_output_tokens: passUsefulCases.filter((item) => item.lower_input_output_tokens).length,
+    candidate_faster: passUsefulCases.filter((item) => item.faster).length,
+    candidate_fewer_tool_calls: passUsefulCases.filter((item) => item.fewer_tool_calls).length
   };
 
-  return {
+  const result = {
     pair_count: pairs.length,
     pass_pair_count: passPairs.length,
+    candidate_tool_id: candidateToolId,
+    candidate_tool_ids: candidateToolIds,
     rg,
-    codegraph,
+    candidate,
     ratios: {
-      duration: ratio(codegraph.duration_seconds, rg.duration_seconds),
-      tool_calls: ratio(codegraph.tool_calls, rg.tool_calls),
-      total_tokens: ratio(codegraph.total_tokens, rg.total_tokens),
-      input_tokens: ratio(codegraph.input_tokens, rg.input_tokens),
-      output_tokens: ratio(codegraph.output_tokens, rg.output_tokens),
-      input_output_tokens: ratio(codegraph.input_output_tokens, rg.input_output_tokens)
+      duration: ratio(candidate.duration_seconds, rg.duration_seconds),
+      tool_calls: ratio(candidate.tool_calls, rg.tool_calls),
+      total_tokens: ratio(candidate.total_tokens, rg.total_tokens),
+      input_tokens: ratio(candidate.input_tokens, rg.input_tokens),
+      output_tokens: ratio(candidate.output_tokens, rg.output_tokens),
+      input_output_tokens: ratio(candidate.input_output_tokens, rg.input_output_tokens)
     },
     deltas: {
-      duration_percent: percentDelta(codegraph.duration_seconds, rg.duration_seconds),
-      tool_calls_percent: percentDelta(codegraph.tool_calls, rg.tool_calls),
-      total_tokens_percent: percentDelta(codegraph.total_tokens, rg.total_tokens),
-      input_tokens_percent: percentDelta(codegraph.input_tokens, rg.input_tokens),
-      output_tokens_percent: percentDelta(codegraph.output_tokens, rg.output_tokens),
-      input_output_tokens_percent: percentDelta(codegraph.input_output_tokens, rg.input_output_tokens),
-      pass_rows_percent: percentDelta(codegraph.pass_rows, rg.pass_rows),
-      fail_rows_percent: percentDelta(codegraph.fail_rows, rg.fail_rows)
+      duration_percent: percentDelta(candidate.duration_seconds, rg.duration_seconds),
+      tool_calls_percent: percentDelta(candidate.tool_calls, rg.tool_calls),
+      total_tokens_percent: percentDelta(candidate.total_tokens, rg.total_tokens),
+      input_tokens_percent: percentDelta(candidate.input_tokens, rg.input_tokens),
+      output_tokens_percent: percentDelta(candidate.output_tokens, rg.output_tokens),
+      input_output_tokens_percent: percentDelta(candidate.input_output_tokens, rg.input_output_tokens),
+      pass_rows_percent: percentDelta(candidate.pass_rows, rg.pass_rows),
+      fail_rows_percent: percentDelta(candidate.fail_rows, rg.fail_rows)
     },
     better_counts: {
       ...betterCounts,
-      codegraph_lower_total_tokens_percent: percentOf(betterCounts.codegraph_lower_total_tokens, passPairs.length),
-      codegraph_lower_input_output_tokens_percent: percentOf(betterCounts.codegraph_lower_input_output_tokens, passPairs.length),
-      codegraph_faster_percent: percentOf(betterCounts.codegraph_faster, passPairs.length),
-      codegraph_fewer_tool_calls_percent: percentOf(betterCounts.codegraph_fewer_tool_calls, passPairs.length)
+      candidate_lower_total_tokens_percent: percentOf(betterCounts.candidate_lower_total_tokens, passPairs.length),
+      candidate_lower_input_output_tokens_percent: percentOf(betterCounts.candidate_lower_input_output_tokens, passPairs.length),
+      candidate_faster_percent: percentOf(betterCounts.candidate_faster, passPairs.length),
+      candidate_fewer_tool_calls_percent: percentOf(betterCounts.candidate_fewer_tool_calls, passPairs.length)
     },
     useful_cases: buildUsefulCases(passPairs),
+    pair_decisions: buildPairDecisions(pairs),
     skill_signals: buildSignalSummaries(passPairs, (pair) => [pair.rg.skill]),
     label_signals: buildSignalSummaries(passPairs, (pair) => unique(asArray(pair.rg.tags)))
   };
+  if (candidateToolId === 'codegraph') {
+    result.codegraph = candidate;
+    result.better_counts.codegraph_lower_total_tokens = betterCounts.candidate_lower_total_tokens;
+    result.better_counts.codegraph_lower_input_output_tokens = betterCounts.candidate_lower_input_output_tokens;
+    result.better_counts.codegraph_faster = betterCounts.candidate_faster;
+    result.better_counts.codegraph_fewer_tool_calls = betterCounts.candidate_fewer_tool_calls;
+    result.better_counts.codegraph_lower_total_tokens_percent = result.better_counts.candidate_lower_total_tokens_percent;
+    result.better_counts.codegraph_lower_input_output_tokens_percent = result.better_counts.candidate_lower_input_output_tokens_percent;
+    result.better_counts.codegraph_faster_percent = result.better_counts.candidate_faster_percent;
+    result.better_counts.codegraph_fewer_tool_calls_percent = result.better_counts.candidate_fewer_tool_calls_percent;
+  }
+  return result;
 }
 
 function buildUsefulCases(pairs) {
@@ -416,31 +441,94 @@ function buildUsefulCases(pairs) {
 
 function pairToUsefulCase(pair) {
   const rg = pair.rg;
-  const codegraph = pair.codegraph;
+  const candidate = pair.candidate;
   return {
+    candidate_tool_id: candidate.tool_id,
     skill: rg.skill,
     project: rg.project,
     pair_id: rg.pair_id ?? null,
     task_scenario: rg.task_scenario ?? null,
+    scenario_id: rg.scenario_id ?? candidate.scenario_id ?? null,
+    run_class: rg.run_class ?? candidate.run_class ?? null,
+    promotion_policy: rg.promotion_policy ?? candidate.promotion_policy ?? null,
+    candidate_expectation: candidate.expectation ?? null,
     label: rg.label,
     tags: asArray(rg.tags),
     rg_total_tokens: rg.total_tokens,
-    codegraph_total_tokens: codegraph.total_tokens,
+    candidate_total_tokens: candidate.total_tokens,
+    codegraph_total_tokens: candidate.total_tokens,
     rg_input_output_tokens: rg.input_output_tokens,
-    codegraph_input_output_tokens: codegraph.input_output_tokens,
+    candidate_input_output_tokens: candidate.input_output_tokens,
+    codegraph_input_output_tokens: candidate.input_output_tokens,
     rg_duration_seconds: rg.duration_seconds,
-    codegraph_duration_seconds: codegraph.duration_seconds,
+    candidate_duration_seconds: candidate.duration_seconds,
+    codegraph_duration_seconds: candidate.duration_seconds,
     rg_tool_calls: rg.tool_calls,
-    codegraph_tool_calls: codegraph.tool_calls,
-    total_tokens_delta_percent: percentDelta(codegraph.total_tokens, rg.total_tokens),
-    input_output_tokens_delta_percent: percentDelta(codegraph.input_output_tokens, rg.input_output_tokens),
-    duration_delta_percent: percentDelta(codegraph.duration_seconds, rg.duration_seconds),
-    tool_calls_delta_percent: percentDelta(codegraph.tool_calls, rg.tool_calls),
-    lower_total_tokens: codegraph.total_tokens < rg.total_tokens,
-    lower_input_output_tokens: codegraph.input_output_tokens < rg.input_output_tokens,
-    faster: codegraph.duration_seconds < rg.duration_seconds,
-    fewer_tool_calls: codegraph.tool_calls < rg.tool_calls
+    candidate_tool_calls: candidate.tool_calls,
+    codegraph_tool_calls: candidate.tool_calls,
+    total_tokens_delta_percent: percentDelta(candidate.total_tokens, rg.total_tokens),
+    input_output_tokens_delta_percent: percentDelta(candidate.input_output_tokens, rg.input_output_tokens),
+    duration_delta_percent: percentDelta(candidate.duration_seconds, rg.duration_seconds),
+    tool_calls_delta_percent: percentDelta(candidate.tool_calls, rg.tool_calls),
+    lower_total_tokens: isPositiveCandidateExpectation(candidate.expectation) && candidate.total_tokens < rg.total_tokens,
+    lower_input_output_tokens: isPositiveCandidateExpectation(candidate.expectation) && candidate.input_output_tokens < rg.input_output_tokens,
+    faster: isPositiveCandidateExpectation(candidate.expectation) && candidate.duration_seconds < rg.duration_seconds,
+    fewer_tool_calls: isPositiveCandidateExpectation(candidate.expectation) && candidate.tool_calls < rg.tool_calls
   };
+}
+
+function buildPairDecisions(pairs) {
+  return pairs.map((pair) => {
+    const usefulCase = pairToUsefulCase(pair);
+    const passPair = pair.rg.status === 'PASS' && pair.candidate.status === 'PASS';
+    return {
+      pair_id: pair.rg.pair_id ?? pair.candidate.pair_id ?? null,
+      tool_id: pair.candidate.tool_id,
+      skill: pair.rg.skill,
+      project: pair.rg.project,
+      task_scenario: pair.rg.task_scenario ?? pair.candidate.task_scenario ?? null,
+      scenario_id: pair.rg.scenario_id ?? pair.candidate.scenario_id ?? null,
+      labels: asArray(pair.rg.tags),
+      label: pair.rg.label,
+      run_class: pair.rg.run_class ?? pair.candidate.run_class ?? null,
+      promotion_policy: pair.rg.promotion_policy ?? pair.candidate.promotion_policy ?? null,
+      candidate_expectation: pair.candidate.expectation ?? null,
+      rg_status: pair.rg.status,
+      candidate_status: pair.candidate.status,
+      pass_pair: passPair,
+      useful: passPair && (
+        usefulCase.lower_total_tokens
+        || usefulCase.lower_input_output_tokens
+        || usefulCase.faster
+        || usefulCase.fewer_tool_calls
+      ),
+      deltas: {
+        total_tokens_percent: usefulCase.total_tokens_delta_percent,
+        input_output_tokens_percent: usefulCase.input_output_tokens_delta_percent,
+        duration_percent: usefulCase.duration_delta_percent,
+        tool_calls_percent: usefulCase.tool_calls_delta_percent
+      },
+      decision: classifyPairDecision({ passPair, usefulCase })
+    };
+  });
+}
+
+function classifyPairDecision({ passPair, usefulCase }) {
+  if (!passPair) return 'avoid';
+  if (!isPositiveCandidateExpectation(usefulCase.candidate_expectation)) return 'avoid';
+  const wins = [
+    usefulCase.lower_total_tokens,
+    usefulCase.lower_input_output_tokens,
+    usefulCase.faster,
+    usefulCase.fewer_tool_calls
+  ].filter(Boolean).length;
+  if (wins >= 3) return 'recommend';
+  if (wins > 0) return 'conditional';
+  return 'avoid';
+}
+
+function isPositiveCandidateExpectation(expectation) {
+  return expectation === 'positive';
 }
 
 function buildSignalSummaries(pairs, groupSelector) {
@@ -592,12 +680,20 @@ function buildSkillSummaries(rows) {
   }
   return [...bySkill.entries()]
     .sort(([left], [right]) => left.localeCompare(right))
-    .map(([skill, skillRows]) => ({
-      skill,
-      ...summarizeRows(skillRows),
-      rg_executed_rows: skillRows.filter((row) => row.tool_id === 'rg' && row.status !== 'NOT_RUN').length,
-      codegraph_executed_rows: skillRows.filter((row) => row.tool_id === 'codegraph' && row.status !== 'NOT_RUN').length
-    }));
+    .map(([skill, skillRows]) => {
+      const candidateExecutedRowsByTool = {};
+      for (const row of skillRows) {
+        if (row.tool_id === 'rg' || row.status === 'NOT_RUN') continue;
+        candidateExecutedRowsByTool[row.tool_id] = (candidateExecutedRowsByTool[row.tool_id] ?? 0) + 1;
+      }
+      return {
+        skill,
+        ...summarizeRows(skillRows),
+        rg_executed_rows: skillRows.filter((row) => row.tool_id === 'rg' && row.status !== 'NOT_RUN').length,
+        candidate_executed_rows_by_tool: candidateExecutedRowsByTool,
+        codegraph_executed_rows: candidateExecutedRowsByTool.codegraph ?? 0
+      };
+    });
 }
 
 function summarizeRows(rows) {
@@ -630,6 +726,16 @@ function compareTraceFreshness(left, right) {
 function formatRunName(matrixCase) {
   if (matrixCase.tool_id === 'rg') return 'rg baseline';
   return `${matrixCase.tool_id} tool_run`;
+}
+
+function formatToolDisplayName(toolId) {
+  if (toolId === 'codegraph') return 'CodeGraph';
+  if (toolId === 'graphify') return 'Graphify';
+  if (toolId === 'context7') return 'Context7';
+  if (toolId === 'context-mode') return 'context-mode';
+  if (toolId === 'codex-agent-mem') return 'codex-agent-mem';
+  if (toolId === 'mixed') return 'Candidate Tools';
+  return String(toolId ?? 'candidate');
 }
 
 function formatDuration(ms) {

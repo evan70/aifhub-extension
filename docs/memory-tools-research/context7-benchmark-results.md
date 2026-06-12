@@ -101,6 +101,30 @@ Labels: `python`, `standard`, `framework`, `single_repo`, `openspec_native`, `la
 
 Вывод: Context7 корректно не выбирается по Python/framework/OpenSpec labels без explicit library/API/version вопроса. Эти строки подтверждают selector policy; они не являются evidence, что Context7 ускоряет source discovery.
 
+## AI Tester Anonymous Version Docs 2026-06-11
+
+Raw artifact: `.ai-factory/state/ai-tester-tool-evaluations/anonymous-context7-none-single-nopreinit-20260611/ai-tester-token-matrices.json`.
+
+Labels: `framework`, `js`, `large_framework_app`, `none`, `php`, `single_repo`, `standard`. Task: `version_sensitive_library_docs`. Skill: `aif-plan`.
+
+| run mode | rows | pass/pass pairs | total tokens | input+output tokens | duration | decision |
+|---|---:|---:|---:|---:|---:|---|
+| no preinit | 2 executed, 1 FAIL | 0/1 | +106.1% | +122.7% | +78.4% | no promotion |
+
+Preinitialized Context7 runs were attempted three times, but the ai-tester setup executor failed on Windows while running the npm prefix install command. Manual npm install on the copied fixture worked, so this batch records a harness/setup blocker rather than a Context7 recommendation. The no-preinit pair also failed because `ctx7` was not called during `tool_run`.
+
+## AI Tester Path-Hash Version Docs 2026-06-11
+
+Raw artifact: `.ai-factory/state/ai-tester-tool-evaluations/context7-project-9f839f3c998a-version-docs-plan-review-20260611t1830z/ai-tester-token-matrices.json`.
+
+Project id: `project-9f839f3c998a`. Labels: `framework`, `js`, `large_framework_app`, `openspec_native`, `php`, `single_repo`, `standard`. Task: `version_sensitive_library_docs`. Skills: `aif-plan`, `aif-review`.
+
+| rows | pass/pass pairs | total tokens | input+output tokens | duration | decision |
+|---:|---:|---:|---:|---:|---|
+| 4 executed, 2 FAIL | 0/2 | +511.2% | +499.2% | +317.3% | no promotion |
+
+Both tool-run rows failed assertions because `ctx7` was not called after `rg`. Promotion skipped both rows as `pair_not_pass_pass`, so this does not become proven label evidence.
+
 ## Safety Field Run 2026-05-24
 
 Прогон выполнялся через `scripts/memory-tool-field-run.mjs` на 55 sanitized temp profiles. `ctx7` устанавливался только во временный npm prefix внутри temp run dir.

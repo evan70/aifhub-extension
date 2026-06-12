@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // memory-tool-ai-tester-matrix.mjs - paired rg baseline + optional-tool ai-tester matrix generator
+import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -15,8 +16,14 @@ import {
 } from './memory-tool-field-run.mjs';
 import {
   classifyProjectProfile,
-  loadRecommendationMetadata
+  loadRecommendationMetadata,
+  provenLabelAllowsRequest
 } from './memory-tool-recommender.mjs';
+import {
+  filterScenarioCatalogEntries,
+  loadAiTesterScenarioCatalog,
+  scenarioMatchesProfileLabels
+} from './lib/memory-tool-ai-tester-scenario-catalog.mjs';
 
 export const AI_TESTER_MATRIX_SCHEMA = 'aifhub.memory_tools.ai_tester_matrix.v1';
 export const DEFAULT_MATRIX_SIZE = 'screening';
@@ -196,12 +203,18 @@ export async function runMemoryToolAiTesterMatrix(args = [], options = {}) {
     metadataPath: parsed.metadata,
     cwd
   });
+  const scenarioCatalog = await loadAiTesterScenarioCatalog({
+    catalogPath: parsed.scenarioCatalog,
+    metadata,
+    cwd
+  });
   const matrixStrategy = resolveMatrixStrategy({ parsed, metadata });
   const rootInputs = parsed.roots.length > 0 ? parsed.roots : [cwd];
   const profiles = await discoverMatrixProfiles(rootInputs, {
     maxProfiles: matrixStrategy.max_profiles,
     stratified: matrixStrategy.stratified,
-    excludeRoots: parsed.excludeRoots
+    excludeRoots: parsed.excludeRoots,
+    profileIdMode: parsed.profileIdMode
   });
   const copies = [];
 
@@ -213,6 +226,7 @@ export async function runMemoryToolAiTesterMatrix(args = [], options = {}) {
 
   const manifest = buildAiTesterMatrixManifest({
     metadata,
+    scenarioCatalog,
     profiles,
     skills: matrixStrategy.skills,
     tools: parsed.tools.length > 0 ? parsed.tools : OPTIONAL_TOOLS,
@@ -221,7 +235,11 @@ export async function runMemoryToolAiTesterMatrix(args = [], options = {}) {
     selectorMode: parsed.selectorMode,
     model: parsed.model ?? DEFAULT_CODEX_MODEL,
     matrixStrategy,
-    scenarioPrefix: parsed.scenarioPrefix
+    profileIdMode: parsed.profileIdMode,
+    scenarioPrefix: parsed.scenarioPrefix,
+    scenarioIds: parsed.scenarioIds,
+    runClasses: parsed.runClasses,
+    requiredLabels: parsed.labels
   });
 
   if (!parsed.dryRun) {
@@ -272,7 +290,7 @@ export async function discoverMatrixProfiles(rootInputs, options = {}) {
     }));
     profiles.push({
       ...classified,
-      id: `matrix-profile-${String(index + 1).padStart(2, '0')}`,
+      id: buildProfileId(source.sourceRoot, index, options.profileIdMode),
       project_label: buildProjectLabel(classified),
       tags: buildProjectTags(classified),
       sourceRoot: source.sourceRoot,
@@ -282,6 +300,23 @@ export async function discoverMatrixProfiles(rootInputs, options = {}) {
   return options.stratified
     ? selectStratifiedProfiles(profiles, options.maxProfiles)
     : profiles;
+}
+
+function buildProfileId(sourceRoot, index, mode = 'ordinal') {
+  if (mode === 'path-hash') {
+    const hash = createHash('sha256')
+      .update(normalizePathForHash(sourceRoot))
+      .digest('hex')
+      .slice(0, 12);
+    return `project-${hash}`;
+  }
+  return `matrix-profile-${String(index + 1).padStart(2, '0')}`;
+}
+
+function normalizePathForHash(sourceRoot) {
+  return path.resolve(String(sourceRoot ?? ''))
+    .replaceAll(path.sep, '/')
+    .toLowerCase();
 }
 
 export function selectStratifiedProfiles(profiles = [], maxProfiles = null) {
@@ -320,6 +355,7 @@ export function selectStratifiedProfiles(profiles = [], maxProfiles = null) {
 
 export function buildAiTesterMatrixManifest(options = {}) {
   const metadata = options.metadata ?? {};
+  const scenarioCatalog = options.scenarioCatalog ?? null;
   const profiles = asArray(options.profiles).map(sanitizeProfile);
   const skills = asArray(options.skills).length > 0 ? asArray(options.skills) : DEFAULT_SKILLS;
   const tools = asArray(options.tools).length > 0 ? asArray(options.tools) : OPTIONAL_TOOLS;
@@ -329,41 +365,39 @@ export function buildAiTesterMatrixManifest(options = {}) {
     : DEFAULT_TASK_SCENARIOS;
   const selectorMode = normalizeSelectorMode(options.selectorMode);
   const scenarioPrefix = safeScenarioPrefix(options.scenarioPrefix);
-  const cases = [];
+  const cases = scenarioCatalog
+    ? buildCatalogMatrixCases({
+      metadata,
+      scenarioCatalog,
+      profiles,
+      skills,
+      tools,
+      taskScenarios,
+      preinitializeTools,
+      selectorMode,
+      scenarioPrefix,
+      scenarioIds: options.scenarioIds,
+      runClasses: options.runClasses,
+      requiredLabels: options.requiredLabels
+    })
+    : [];
 
-  for (const profile of profiles) {
-    for (const skill of skills) {
-      for (const taskScenario of taskScenarios) {
-        for (const toolId of tools.filter((tool) => tool !== 'rg')) {
-          const pairIdBase = `${profile.id}__${skill}__${toolId}__${taskScenario}`;
-          const pairId = scenarioPrefix ? `${scenarioPrefix}__${pairIdBase}` : pairIdBase;
-          cases.push({
-            id: `${pairId}__baseline_rg`,
-            pair_id: pairId,
-            suite: 'baseline',
-            expectation: 'baseline_rg',
-            skill,
-            tool_id: 'rg',
-            optional_tool_id: toolId,
-            preinitialized_tool_ids: preinitializeTools.includes(toolId) ? [toolId] : [],
-            profile_id: profile.id,
-            task_scenario: taskScenario,
-            selector_mode: selectorMode
-          });
-          const expectation = expectedToolBehavior({ metadata, profile, skill, toolId, taskScenario });
-          cases.push({
-            id: `${pairId}__tool_run`,
-            pair_id: pairId,
-            suite: suiteForExpectation(expectation, toolId),
-            expectation,
-            skill,
-            tool_id: toolId,
-            optional_tool_id: toolId,
-            preinitialized_tool_ids: preinitializeTools.includes(toolId) ? [toolId] : [],
-            profile_id: profile.id,
-            task_scenario: taskScenario,
-            selector_mode: selectorMode
-          });
+  if (!scenarioCatalog) {
+    for (const profile of profiles) {
+      for (const skill of skills) {
+        for (const taskScenario of taskScenarios) {
+          for (const toolId of tools.filter((tool) => tool !== 'rg')) {
+            cases.push(...buildPairedCases({
+              metadata,
+              profile,
+              skill,
+              toolId,
+              taskScenario,
+              preinitializeTools,
+              selectorMode,
+              scenarioPrefix
+            }));
+          }
         }
       }
     }
@@ -383,13 +417,117 @@ export function buildAiTesterMatrixManifest(options = {}) {
       permission_mode: 'bypassPermissions'
     },
     matrix_strategy: options.matrixStrategy ?? null,
+    profile_id_mode: options.profileIdMode ?? 'ordinal',
     scenario_prefix: scenarioPrefix,
+    scenario_catalog: scenarioCatalog ? {
+      schema: scenarioCatalog.schema,
+      source_path: scenarioCatalog.source_path,
+      scenario_count: scenarioCatalog.scenarios.length,
+      selected_scenario_count: unique(cases.map((item) => item.scenario_id).filter(Boolean)).length
+    } : null,
     skill_groups: sanitizeSkillGroups(defaultSkillGroups(metadata)),
     preinitialized_tools: preinitializeTools,
     suites: buildSuiteDefinitions(),
     profiles,
     cases
   };
+}
+
+function buildCatalogMatrixCases({
+  metadata,
+  scenarioCatalog,
+  profiles,
+  skills,
+  tools,
+  taskScenarios,
+  preinitializeTools,
+  selectorMode,
+  scenarioPrefix,
+  scenarioIds = [],
+  runClasses = [],
+  requiredLabels = []
+} = {}) {
+  const entries = filterScenarioCatalogEntries(scenarioCatalog, {
+    scenarioIds,
+    runClasses,
+    skills,
+    tools,
+    taskScenarios
+  });
+  const requiredLabelSet = new Set(asArray(requiredLabels).map(String));
+  const cases = [];
+  for (const scenario of entries) {
+    const scenarioSkills = asArray(scenario.skills).filter((skill) => skills.includes(skill));
+    const scenarioTools = asArray(scenario.tools).filter((tool) => tools.includes(tool));
+    if (!taskScenarios.includes(scenario.task_signal)) continue;
+    for (const profile of profiles) {
+      const labels = profileLabels(profile);
+      if (!scenarioMatchesProfileLabels(scenario, labels)) continue;
+      if ([...requiredLabelSet].some((label) => !labels.has(label))) continue;
+      for (const skill of scenarioSkills) {
+        for (const toolId of scenarioTools) {
+          cases.push(...buildPairedCases({
+            metadata,
+            profile,
+            skill,
+            toolId,
+            taskScenario: scenario.task_signal,
+            preinitializeTools,
+            selectorMode,
+            scenarioPrefix,
+            scenario
+          }));
+        }
+      }
+    }
+  }
+  return cases;
+}
+
+function buildPairedCases({
+  metadata,
+  profile,
+  skill,
+  toolId,
+  taskScenario,
+  preinitializeTools = [],
+  selectorMode = 'installed',
+  scenarioPrefix = '',
+  scenario = null
+} = {}) {
+  const scenarioSegment = scenario?.id ? `__${scenario.id}` : '';
+  const pairIdBase = `${profile.id}__${skill}__${toolId}__${taskScenario}${scenarioSegment}`;
+  const pairId = scenarioPrefix ? `${scenarioPrefix}__${pairIdBase}` : pairIdBase;
+  const preinitialized = preinitializeTools.includes(toolId) ? [toolId] : [];
+  const expectation = expectedToolBehavior({ metadata, profile, skill, toolId, taskScenario });
+  const common = {
+    pair_id: pairId,
+    skill,
+    optional_tool_id: toolId,
+    preinitialized_tool_ids: preinitialized,
+    profile_id: profile.id,
+    task_scenario: taskScenario,
+    selector_mode: selectorMode,
+    scenario_id: scenario?.id ?? null,
+    run_class: scenario?.run_class ?? null,
+    promotion_policy: scenario?.promotion_policy ?? null
+  };
+  return [
+    {
+      ...common,
+      id: `${pairId}__baseline_rg`,
+      suite: 'baseline',
+      expectation: 'baseline_rg',
+      tool_id: 'rg'
+    },
+    {
+      ...common,
+      id: `${pairId}__tool_run`,
+      suite: suiteForExpectation(expectation, toolId),
+      expectation,
+      tool_id: toolId
+    }
+  ];
 }
 
 export function renderAiTesterScenario(input = {}) {
@@ -401,11 +539,17 @@ export function renderAiTesterScenario(input = {}) {
   const isToolPrepared = preinitializedToolIds.includes(input.tool_id);
   const lines = [
     `scenario: ${input.id}`,
-    `description: "suite=${input.suite ?? suiteForExpectation(input.expectation, input.tool_id)} expectation=${input.expectation}"`,
+    `description: "suite=${input.suite ?? suiteForExpectation(input.expectation, input.tool_id)} expectation=${input.expectation}${input.scenario_id ? ` scenario=${input.scenario_id}` : ''}${input.run_class ? ` run_class=${input.run_class}` : ''}"`,
     `system_prompt_file: ${quoteYaml(promptFile)}`,
     'user_prompt: |',
     `  Run rg first for ${input.task_scenario ?? 'architecture_or_impact_discovery'} on the copied project fixture.`
   ];
+  if (input.scenario_id) {
+    lines.push(`  Scenario catalog id: ${input.scenario_id}.`);
+  }
+  if (input.run_class) {
+    lines.push(`  Run class: ${input.run_class}.`);
+  }
 
   if (input.expectation === 'baseline_rg') {
     lines.push(
@@ -677,7 +821,9 @@ export function buildPublicMatrixSummary({
     selector: manifest?.selector ?? null,
     runner: manifest?.runner ?? null,
     matrix_strategy: manifest?.matrix_strategy ?? null,
+    profile_id_mode: manifest?.profile_id_mode ?? 'ordinal',
     scenario_prefix: manifest?.scenario_prefix ?? null,
+    scenario_catalog: manifest?.scenario_catalog ?? null,
     skill_groups: manifest?.skill_groups ?? [],
     preinitialized_tools: manifest?.preinitialized_tools ?? [],
     profiles,
@@ -698,7 +844,10 @@ export function buildPublicMatrixSummary({
       preinitialized_tool_ids: item.preinitialized_tool_ids ?? [],
       profile_id: item.profile_id,
       task_scenario: item.task_scenario,
-      selector_mode: item.selector_mode
+      selector_mode: item.selector_mode,
+      scenario_id: item.scenario_id ?? null,
+      run_class: item.run_class ?? null,
+      promotion_policy: item.promotion_policy ?? null
     }))
   };
 }
@@ -745,7 +894,8 @@ async function writeScenarioFiles({ outDir, manifest, copies = [], selectorMode 
   for (const item of manifest.cases) {
     const optionalToolId = item.optional_tool_id ?? item.tool_id;
     const suffix = item.expectation === 'baseline_rg' ? '__baseline_rg' : '';
-    const fileName = `${item.profile_id}__${item.skill}__${optionalToolId}__${item.task_scenario}${suffix}.yaml`;
+    const scenarioSegment = item.scenario_id ? `__${item.scenario_id}` : '';
+    const fileName = `${item.profile_id}__${item.skill}__${optionalToolId}__${item.task_scenario}${scenarioSegment}${suffix}.yaml`;
     const targetPath = path.join(scenarioDir, fileName);
     assertWithinDirectory(outDir, targetPath, 'scenario file');
     const scenario = renderAiTesterScenario({
@@ -769,7 +919,8 @@ function expectedToolBehavior({ metadata, profile, skill, toolId, taskScenario }
   if (allowedIn.length > 0 && !allowedIn.includes(skill)) return 'negative';
 
   if (screeningPolicyAvoidsRequest(tool, profile, taskScenario, skill)) return 'negative';
-  const screeningMatch = screeningPolicyAllowsRequest(tool, profile, taskScenario, skill);
+  const provenMatch = provenLabelAllowsRequest(metadata, toolId, profile, [taskScenario], skill);
+  const screeningMatch = provenMatch || screeningPolicyAllowsRequest(tool, profile, taskScenario, skill);
   if (tool.screening_policy?.default_decision === 'avoid_by_default') {
     return screeningMatch ? 'positive' : 'negative';
   }
@@ -1047,14 +1198,14 @@ function setupCommandsForTools(toolIds = []) {
     commands.push('cd project && codegraph index --quiet .');
   }
   if (toolIds.includes('graphify')) {
-    commands.push('cd project && py -3 -m venv .ai-tester-tools\\graphify-venv');
-    commands.push('cd project && .ai-tester-tools\\graphify-venv\\Scripts\\python.exe -m pip install --disable-pip-version-check graphifyy');
+    commands.push('cd project && py -3 -m venv .ai-tester-tools/graphify-venv');
+    commands.push('cd project && .ai-tester-tools/graphify-venv/Scripts/python.exe -m pip install --disable-pip-version-check graphifyy');
   }
   if (toolIds.includes('context7')) {
-    commands.push('cd project && npm install --prefix .ai-tester-tools\\context7 ctx7');
+    commands.push('cmd.exe /c "cd project && npm install --prefix .ai-tester-tools/context7 ctx7"');
   }
   if (toolIds.includes('context-mode')) {
-    commands.push('cd project && npm install --prefix .ai-tester-tools\\context-mode context-mode');
+    commands.push('cmd.exe /c "cd project && npm install --prefix .ai-tester-tools/context-mode context-mode"');
   }
   return commands;
 }
@@ -1199,7 +1350,12 @@ function parseArgs(args) {
     matrixSize: DEFAULT_MATRIX_SIZE,
     skillSet: null,
     taskSet: null,
-    scenarioPrefix: ''
+    scenarioPrefix: '',
+    profileIdMode: 'ordinal',
+    scenarioCatalog: null,
+    scenarioIds: [],
+    runClasses: [],
+    labels: []
   };
 
   for (let index = 0; index < args.length; index += 1) {
@@ -1214,6 +1370,14 @@ function parseArgs(args) {
       parsed.out = args[++index];
     } else if (token === '--metadata') {
       parsed.metadata = args[++index];
+    } else if (token === '--scenario-catalog') {
+      parsed.scenarioCatalog = args[++index];
+    } else if (token === '--scenario-id') {
+      parsed.scenarioIds.push(args[++index]);
+    } else if (token === '--run-class') {
+      parsed.runClasses.push(args[++index]);
+    } else if (token === '--label') {
+      parsed.labels.push(args[++index]);
     } else if (token === '--skill') {
       parsed.skills.push(args[++index]);
     } else if (token === '--tool') {
@@ -1244,9 +1408,15 @@ function parseArgs(args) {
       parsed.taskSet = args[++index];
     } else if (token === '--scenario-prefix') {
       parsed.scenarioPrefix = args[++index];
+    } else if (token === '--profile-id-mode') {
+      parsed.profileIdMode = normalizeProfileIdMode(args[++index]);
     }
   }
   return parsed;
+}
+
+function normalizeProfileIdMode(value) {
+  return value === 'path-hash' ? 'path-hash' : 'ordinal';
 }
 
 function getCliUsage() {
@@ -1258,6 +1428,10 @@ function getCliUsage() {
     '  --exclude-root <dir>       Exclude a root and all nested project profiles. Repeatable.',
     '  --out <dir>                Run directory for sanitized fixtures, scenarios, and public JSON.',
     '  --metadata <file>          Recommendation metadata YAML.',
+    '  --scenario-catalog <file>  Authored ai-tester scenario catalog YAML.',
+    '  --scenario-id <id>         Limit catalog-driven matrix to a scenario id. Repeatable.',
+    '  --run-class <class>        Limit catalog-driven matrix to a run class. Repeatable.',
+    '  --label <label>            Require a project label in catalog-driven profile matching. Repeatable.',
     '  --skill <aif-skill>        Limit generated matrix to a skill. Repeatable.',
     '  --tool <tool-id>           Limit generated matrix to an optional tool. Repeatable.',
     '  --task <task-signal>       Limit generated matrix to a task scenario. Repeatable.',
@@ -1271,6 +1445,8 @@ function getCliUsage() {
     '                              Skill selection mode; explicit --skill overrides it.',
     '  --task-set primary|all      Task scenario selection mode; explicit --task overrides it.',
     '  --scenario-prefix <id>      Prefix scenario ids to avoid collisions with previous ai-tester traces.',
+    '  --profile-id-mode ordinal|path-hash',
+    '                              Public project id mode. path-hash uses project-<sha256(path)>.',
     '  --max-profiles <n>         Limit discovered profiles.',
     '  --stratified               Pick a spread of project dimensions before truncating.',
     '  --no-write-json            Do not write matrix-summary.json under --out.',

@@ -195,6 +195,30 @@ Labels: `python`, `standard`, `framework`, `single_repo`, `openspec_native`, `la
 - один timeout на 55 temp profiles;
 - graph output требует source validation.
 
+## AI Tester Anonymous Negative Policy 2026-06-11
+
+Raw artifact: `.ai-factory/state/ai-tester-tool-evaluations/anonymous-graphify-none-single-20260611/ai-tester-token-matrices.json`.
+
+Labels: `framework`, `js`, `large_framework_app`, `none`, `php`, `single_repo`, `standard`. Task: `architecture_or_impact_discovery`. Skills: `aif-analyze`, `aif-explore`, `aif-plan`.
+
+| rows | pass/pass pairs | useful pairs | average pair total tokens | aggregate total tokens | decision |
+|---:|---:|---:|---:|---:|---|
+| 6 PASS | 3 | 0 | -11.5% | -12.5% | avoid |
+
+Важно: tool rows были negative policy checks (`no-graphify` / `mentions-forbidden`), поэтому lower token totals не считаются доказанной пользой Graphify. Этот run обновляет exact `avoid` evidence, но не меняет quality-only статус инструмента.
+
+## AI Tester Path-Hash Legacy Framework 2026-06-11
+
+Raw artifact: `.ai-factory/state/ai-tester-tool-evaluations/graphify-project-8d97432e6d7a-architecture-explore-plan-20260611t1821z/ai-tester-token-matrices.json`.
+
+Project id: `project-8d97432e6d7a`. Labels: `framework`, `js`, `large_framework_app`, `legacy_ai_factory_only`, `php`, `single_repo`, `standard`. Task: `architecture_or_impact_discovery`. Skills: `aif-explore`, `aif-plan`.
+
+| rows | pass/pass pairs | useful pairs | average pair total tokens | aggregate total tokens | decision |
+|---:|---:|---:|---:|---:|---|
+| 4 PASS | 2 | 0 | +94.7% | +70.7% | avoid |
+
+Вывод: для legacy-AI-Factory single-repo large framework labels Graphify не подтвердил пользу. Entry добавлен в `proven_label_evidence` как exact `avoid`.
+
 ## Итог
 
 Graphify не является token/time saver по текущим ai-tester данным: проиграл `rg` на mini, large framework и multirepo targeted rows. Оставлять только как explicit quality experiment для graph-shaped обзора после `rg`; не выбирать автоматически по labels `large_framework_app` или `multirepo`.

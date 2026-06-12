@@ -20,9 +20,16 @@ import {
 } from './memory-tool-ai-tester-matrix.mjs';
 import { hasSensitivePathLeak } from './memory-tool-field-run.mjs';
 import { loadRecommendationMetadata } from './memory-tool-recommender.mjs';
+import {
+  AI_TESTER_SCENARIO_CATALOG_SCHEMA,
+  filterScenarioCatalogEntries,
+  parseAiTesterScenarioCatalog,
+  scenarioMatchesProfileLabels
+} from './lib/memory-tool-ai-tester-scenario-catalog.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REAL_METADATA = path.join(REPO_ROOT, 'docs', 'memory-tools-research', 'recommendation-metadata.yaml');
+const REAL_CATALOG = path.join(REPO_ROOT, 'docs', 'memory-tools-research', 'ai-tester-scenarios.yaml');
 
 let tmpDir;
 
@@ -40,6 +47,72 @@ async function writeFixtureFile(relativePath, content = 'fixture') {
   await writeFile(target, content, 'utf8');
   return target;
 }
+
+describe('ai-tester scenario catalog', () => {
+  it('parses the authored catalog with nested label sets and promotion policies', async () => {
+    const metadata = await loadRecommendationMetadata({ metadataPath: REAL_METADATA });
+    const catalog = parseAiTesterScenarioCatalog(await readFile(REAL_CATALOG, 'utf8'), {
+      metadata,
+      sourcePath: 'docs/memory-tools-research/ai-tester-scenarios.yaml'
+    });
+
+    assert.equal(catalog.schema, AI_TESTER_SCENARIO_CATALOG_SCHEMA);
+    assert.equal(catalog.scenarios.length, 6);
+    assert.equal(catalog.scenarios[0].id, 'architecture-impact-discovery');
+    assert.equal(catalog.scenarios[0].fixture_requirements.labels_any.length, 4);
+    assert.deepEqual(catalog.scenarios[0].fixture_requirements.labels_any[0], [
+      'js',
+      'standard',
+      'framework',
+      'single_repo',
+      'openspec_native',
+      'large_framework_app'
+    ]);
+    assert.equal(catalog.scenarios[0].promotion_policy.eligible_for_metadata, true);
+    assert.equal(catalog.scenarios[4].promotion_policy.eligible_for_metadata, false);
+  });
+
+  it('filters by scenario, run class, skill, tool, task, and profile labels', async () => {
+    const metadata = await loadRecommendationMetadata({ metadataPath: REAL_METADATA });
+    const catalog = parseAiTesterScenarioCatalog(await readFile(REAL_CATALOG, 'utf8'), { metadata });
+    const entries = filterScenarioCatalogEntries(catalog, {
+      scenarioIds: ['architecture-impact-discovery'],
+      runClasses: ['accepted_evidence'],
+      skills: ['aif-explore'],
+      tools: ['codegraph'],
+      taskScenarios: ['architecture_or_impact_discovery']
+    });
+
+    assert.equal(entries.length, 1);
+    assert.equal(
+      scenarioMatchesProfileLabels(entries[0], new Set(['js', 'standard', 'framework', 'single_repo', 'openspec_native', 'large_framework_app'])),
+      true
+    );
+    assert.equal(
+      scenarioMatchesProfileLabels(entries[0], new Set(['go', 'mini', 'mini', 'single_repo', 'none', 'go_service'])),
+      false
+    );
+  });
+
+  it('rejects unsafe or non-candidate tool declarations', () => {
+    assert.throws(() => parseAiTesterScenarioCatalog([
+      `schema: ${AI_TESTER_SCENARIO_CATALOG_SCHEMA}`,
+      'scenarios:',
+      '  - id: bad',
+      '    task_signal: architecture_or_impact_discovery',
+      '    run_class: accepted_evidence',
+      '    skills: [aif-explore]',
+      '    tools: [rg]',
+      '    paired_runs:',
+      '      baseline: rg',
+      '      candidate_mode: direct_tool_run_after_rg',
+      '    promotion_policy:',
+      '      eligible_for_metadata: true',
+      '      min_pass_pairs: 2',
+      ''
+    ].join('\n')), /tools must list candidate tools/);
+  });
+});
 
 describe('ai-tester matrix manifest', () => {
   it('uses reduced screening strategy instead of exhaustive all-skill runs by default', async () => {
@@ -128,6 +201,50 @@ describe('ai-tester matrix manifest', () => {
       assert.ok(baseline, `missing rg baseline for ${toolCase.id}`);
       assert.ok(manifest.cases.indexOf(baseline) < manifest.cases.indexOf(toolCase));
     }
+  });
+
+  it('generates catalog-driven accepted-evidence pairs with scenario metadata', async () => {
+    const metadata = await loadRecommendationMetadata({ metadataPath: REAL_METADATA });
+    const scenarioCatalog = parseAiTesterScenarioCatalog(await readFile(REAL_CATALOG, 'utf8'), { metadata });
+    const manifest = buildAiTesterMatrixManifest({
+      metadata,
+      scenarioCatalog,
+      profiles: [{
+        id: 'matrix-profile-01',
+        sourceRoot: path.join(tmpDir, 'fixture-project'),
+        project_shape: 'large_framework_app',
+        languages: ['js'],
+        volume: 'standard',
+        complexity: 'framework',
+        repo_shape: 'single_repo',
+        artifact_mode: 'openspec_native'
+      }],
+      skills: ['aif-explore'],
+      tools: ['codegraph'],
+      taskScenarios: ['architecture_or_impact_discovery'],
+      scenarioIds: ['architecture-impact-discovery'],
+      runClasses: ['accepted_evidence']
+    });
+
+    assert.equal(manifest.scenario_catalog.schema, 'aifhub.memory_tools.ai_tester_scenario_catalog.v1');
+    assert.equal(manifest.scenario_catalog.selected_scenario_count, 1);
+    assert.equal(manifest.cases.length, 2);
+    assert.deepEqual(manifest.cases.map((item) => item.scenario_id), [
+      'architecture-impact-discovery',
+      'architecture-impact-discovery'
+    ]);
+    assert.deepEqual(manifest.cases.map((item) => item.run_class), ['accepted_evidence', 'accepted_evidence']);
+    assert.equal(manifest.cases[0].promotion_policy.eligible_for_metadata, true);
+
+    const summary = buildPublicMatrixSummary({
+      manifest,
+      rootInputs: [tmpDir],
+      outDir: path.join(tmpDir, 'out')
+    });
+    assert.equal(summary.scenario_catalog.selected_scenario_count, 1);
+    assert.equal(summary.cases[0].scenario_id, 'architecture-impact-discovery');
+    assert.equal(summary.cases[0].run_class, 'accepted_evidence');
+    assert.equal(summary.cases[0].promotion_policy.min_pass_pairs, 2);
   });
 
   it('prefixes scenario ids so separate matrix runs do not reuse old ai-tester traces', async () => {
@@ -290,6 +407,25 @@ describe('ai-tester matrix manifest', () => {
     assert.match(preinitializedScenario, /id: codegraph-purge-called/);
     assert.match(preinitializedScenario, /id: no-codegraph-init-during-turn/);
     assert.match(preinitializedScenario, /id: no-codegraph-index-during-turn/);
+
+    const portableSetupScenario = renderAiTesterScenario({
+      id: 'case-portable-preinitialized',
+      suite: 'positive',
+      expectation: 'positive',
+      skill: 'aif-explore',
+      tool_id: 'context7',
+      preinitialized_tool_ids: ['graphify', 'context7', 'context-mode'],
+      profile_id: 'matrix-profile-04',
+      fixture_path: '<sanitized-fixture>',
+      task_scenario: 'version_sensitive_library_docs',
+      selector_mode: 'source-fallback'
+    });
+
+    assert.match(portableSetupScenario, /py -3 -m venv \.ai-tester-tools\/graphify-venv/);
+    assert.match(portableSetupScenario, /\.ai-tester-tools\/graphify-venv\/Scripts\/python\.exe/);
+    assert.match(portableSetupScenario, /cmd\.exe \/c \\"cd project && npm install --prefix \.ai-tester-tools\/context7 ctx7\\"/);
+    assert.match(portableSetupScenario, /cmd\.exe \/c \\"cd project && npm install --prefix \.ai-tester-tools\/context-mode context-mode\\"/);
+    assert.doesNotMatch(portableSetupScenario, /\.ai-tester-tools\\/);
   });
 
   it('matches tool invocations without treating rg search terms as tool calls', () => {
@@ -341,6 +477,28 @@ describe('ai-tester matrix manifest', () => {
     assert.equal(JSON.stringify(result.body).includes('secret-product'), false);
     assert.equal(JSON.stringify(result.body).includes('.env'), false);
     assert.equal(hasSensitivePathLeak(result.body, [tmpDir]), false);
+
+    const hashResult = await runMemoryToolAiTesterMatrix([
+      '--roots',
+      sourceRoot,
+      '--out',
+      path.join(tmpDir, 'matrix-output-hash'),
+      '--max-profiles',
+      '1',
+      '--profile-id-mode',
+      'path-hash',
+      '--dry-run',
+      '--json'
+    ], {
+      cwd: REPO_ROOT,
+      stdout: [],
+      exit: false
+    });
+    const hashProfileId = hashResult.body.profiles[0].id;
+    assert.match(hashProfileId, /^project-[a-f0-9]{12}$/);
+    assert.equal(hashResult.body.profile_id_mode, 'path-hash');
+    assert.equal(hashResult.body.cases.every((item) => item.profile_id === hashProfileId), true);
+    assert.equal(JSON.stringify(hashResult.body).includes('secret-product'), false);
 
     const writeResult = await runMemoryToolAiTesterMatrix([
       '--roots',
