@@ -14,6 +14,7 @@ import {
   isWindowsShellCommandNotFound,
   loadRecommendationMetadata,
   parseRecommendationMetadata,
+  provenLabelAvoidsRequest,
   provenLabelAllowsRequest,
   resolveMetadataPath,
   runMemoryToolRecommender
@@ -483,6 +484,34 @@ describe('recommendation results', () => {
     assert.equal(forbidden.recommendations.some((item) => item.tool_id === 'graphify'), false);
   });
 
+  it('honors negative proven label evidence before screening-policy allow cases', async () => {
+    const metadata = parseRecommendationMetadata(makeNegativeProvenLabelMetadataYaml());
+    const result = await buildRecommendationResult({
+      metadata,
+      projectProfile: {
+        project_shape: 'large_framework_app',
+        languages: ['js'],
+        volume: 'standard',
+        complexity: 'framework',
+        repo_shape: 'single_repo',
+        artifact_mode: 'openspec_native'
+      },
+      taskSignals: ['architecture_or_impact_discovery'],
+      command: 'aif-explore',
+      probeRunner: async () => ({ availability: 'installed', command: 'graphify --version' })
+    });
+
+    assert.equal(
+      provenLabelAvoidsRequest(metadata, 'graphify', result.project_profile, ['architecture_or_impact_discovery'], 'aif-explore'),
+      true
+    );
+    assert.equal(result.recommendations.some((item) => item.tool_id === 'graphify'), false);
+    assert.ok(result.do_not_recommend.some((item) => (
+      item.tool_id === 'graphify'
+      && /exact avoid evidence/.test(item.reason)
+    )));
+  });
+
   it('uses dimension signals without bypassing command-specific permissions', async () => {
     const metadata = await loadRecommendationMetadata({ metadataPath: REAL_METADATA });
     const analyzeResult = await buildRecommendationResult({
@@ -921,6 +950,53 @@ function makeProvenLabelMetadataYaml() {
     '      pass_pass: 2',
     '      useful: 2',
     '    decision: conditional',
+    ''
+  ].join('\n');
+}
+
+function makeNegativeProvenLabelMetadataYaml() {
+  return [
+    'schema: aifhub.memory_tools.recommendation.v1',
+    'default_policy:',
+    '  baseline_tool: rg',
+    '  install_policy: explicit_user_opt_in_only',
+    'tools:',
+    '  graphify:',
+    '    display_name: Graphify',
+    '    decision: manual_quality_experiment_only',
+    '    allowed_in: [aif-explore]',
+    '    read_scope: explicit_project_path',
+    '    purge_path: delete graphify-out/',
+    '    screening_policy:',
+    '      default_decision: avoid_by_default',
+    '      conditional_cases:',
+    '        - id: old-positive-screening-case',
+    '          skills: [aif-explore]',
+    '          tasks: [architecture_or_impact_discovery]',
+    '          required_labels: [js, standard, framework, single_repo, openspec_native, large_framework_app]',
+    'skill_usage_matrix:',
+    '  aif-explore:',
+    '    allowed: [rg, graphify]',
+    'tool_permissions:',
+    '  graphify:',
+    '    aif-explore: recommend_only',
+    'task_signals:',
+    '  architecture_or_impact_discovery:',
+    '    conditional: []',
+    'proven_label_evidence:',
+    '  - id: graphify-negative-js-standard',
+    '    source_evidence: synthetic-ai-tester-negative',
+    '    scenario_id: architecture-impact-discovery',
+    '    run_class: accepted_evidence',
+    '    tool_id: graphify',
+    '    task_scenario: architecture_or_impact_discovery',
+    '    skills: [aif-explore]',
+    '    required_labels: [js, standard, framework, single_repo, openspec_native, large_framework_app]',
+    '    pairs:',
+    '      total: 2',
+    '      pass_pass: 2',
+    '      useful: 0',
+    '    decision: avoid',
     ''
   ].join('\n');
 }

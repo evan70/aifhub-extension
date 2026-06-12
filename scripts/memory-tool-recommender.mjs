@@ -737,6 +737,10 @@ function isAllowedForRequest(toolId, tool, projectShape, taskSignals, metadata, 
     return false;
   }
 
+  if (provenLabelAvoidsRequest(metadata, toolId, projectProfile, taskSignals, command)) {
+    return false;
+  }
+
   if (screeningPolicyAvoidsRequest(tool, projectProfile, taskSignals, command)) {
     return false;
   }
@@ -774,21 +778,32 @@ function screeningPolicyAllowsRequest(tool, projectProfile, taskSignals, command
 }
 
 export function provenLabelAllowsRequest(metadata, toolId, projectProfile, taskSignals, command) {
-  return provenLabelEvidenceMatches(metadata, toolId, projectProfile, taskSignals, command)
+  return provenLabelEvidenceMatches(metadata, toolId, projectProfile, taskSignals, command, ['recommend', 'conditional'])
     .some((entry) => ['recommend', 'conditional'].includes(String(entry.decision)));
 }
 
-function provenLabelEvidenceMatches(metadata, toolId, projectProfile, taskSignals, command) {
+export function provenLabelAvoidsRequest(metadata, toolId, projectProfile, taskSignals, command) {
+  return provenLabelEvidenceMatches(metadata, toolId, projectProfile, taskSignals, command, ['avoid', 'forbid'])
+    .some((entry) => ['avoid', 'forbid'].includes(String(entry.decision)));
+}
+
+function provenLabelEvidenceMatches(metadata, toolId, projectProfile, taskSignals, command, decisions = []) {
   const profile = normalizeProjectProfile(projectProfile);
   const labels = profileLabels(profile);
+  const acceptedDecisions = new Set(asArray(decisions).map(String));
   return asArray(metadata?.proven_label_evidence).filter((entry) => {
     if (String(entry.tool_id ?? '') !== toolId) return false;
     if (String(entry.run_class ?? '') !== 'accepted_evidence') return false;
     if (!asArray(entry.skills).includes(command)) return false;
     if (!taskSignals.includes(String(entry.task_scenario ?? ''))) return false;
-    if (!['recommend', 'conditional'].includes(String(entry.decision))) return false;
-    if (Number(entry.pairs?.pass_pass ?? 0) < 2) return false;
-    if (Number(entry.pairs?.useful ?? 0) < 1) return false;
+    const decision = String(entry.decision ?? '');
+    if (acceptedDecisions.size > 0 && !acceptedDecisions.has(decision)) return false;
+    if (decision === 'forbid') {
+      if (Number(entry.pairs?.total ?? 0) < 2) return false;
+    } else if (Number(entry.pairs?.pass_pass ?? 0) < 2) {
+      return false;
+    }
+    if (['recommend', 'conditional'].includes(decision) && Number(entry.pairs?.useful ?? 0) < 1) return false;
     return asArray(entry.required_labels).every((label) => labels.has(String(label)));
   });
 }
@@ -898,6 +913,25 @@ function nextStepForTool(toolId, tool) {
 
 function buildDoNotRecommend(metadata, projectShape, taskSignals, projectProfile = null, dimensionMatches = null, command = DEFAULT_COMMAND) {
   const entries = new Map();
+
+  for (const [toolId, tool] of Object.entries(metadata.tools ?? {})) {
+    const negativeEvidence = provenLabelEvidenceMatches(
+      metadata,
+      toolId,
+      projectProfile,
+      taskSignals,
+      command,
+      ['avoid', 'forbid']
+    );
+    if (negativeEvidence.length > 0) {
+      const decision = String(negativeEvidence[0].decision ?? 'avoid');
+      entries.set(toolId, {
+        tool_id: toolId,
+        reason: `${tool.display_name ?? toolId} has exact ${decision} evidence for this skill, task, and project labels.`,
+        source_evidence: negativeEvidence[0].source_evidence ?? negativeEvidence[0].id ?? null
+      });
+    }
+  }
 
   for (const [toolId, tool] of Object.entries(metadata.tools ?? {})) {
     if (isRejectedTool(toolId, tool)) {
