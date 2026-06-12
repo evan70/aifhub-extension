@@ -7,6 +7,7 @@
 Связанные артефакты:
 
 - [recommendation-metadata.yaml](recommendation-metadata.yaml) - machine-readable dimensions, suites, decision actions и aggregate evidence id.
+- [ai-tester-scenarios.yaml](ai-tester-scenarios.yaml) - authored scenario catalog для repeatable task/skill/tool runs и metadata promotion gates.
 - [README.md](README.md) - итоговые таблицы по форматам проектов.
 
 ## Запуск
@@ -26,6 +27,9 @@ node scripts/memory-tool-recommender.mjs select --from-project --command aif-exp
 Генератор матрицы:
 
 ```bash
+node scripts/memory-tool-ai-tester-evaluate-tool.mjs --tool codegraph --root <project-dir> --preinitialize --json
+node scripts/memory-tool-ai-tester-evaluate-tool.mjs --tool graphify --root <project-dir> --scenario-id architecture-impact-discovery --no-run --json
+node scripts/memory-tool-ai-tester-evaluate-tool.mjs --tool graphify --root <project-dir> --scenario-id architecture-impact-discovery --task architecture_or_impact_discovery --profile-id-mode path-hash --scenario-prefix gf-p<hash>-arch --json
 node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --out <temp-run-dir> --max-profiles 5 --json
 node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --out <temp-run-dir> --dry-run --json
 node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --tool codegraph --matrix-size screening --preinitialize-tool codegraph --scenario-prefix screening-codegraph --json
@@ -39,6 +43,13 @@ node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --tool con
 node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --tool context-mode --skill aif-explore --task large_command_output_compression --preinitialize-tool context-mode --json
 ```
 
+Catalog-driven matrix:
+
+```bash
+node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --out <run-dir> --scenario-catalog docs/memory-tools-research/ai-tester-scenarios.yaml --run-class accepted_evidence --tool codegraph --tool graphify --scenario-prefix proven-labels-20260611 --json
+node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --out <run-dir> --scenario-catalog docs/memory-tools-research/ai-tester-scenarios.yaml --scenario-id architecture-impact-discovery --label js --label standard --json
+```
+
 Reduced cross examples:
 
 ```bash
@@ -49,7 +60,11 @@ node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --exclude-
 
 `--roots` может указывать на один проект или каталог с проектами. Durable docs не должны содержать этот путь; public output хранит только anonymous profile ids.
 
-Используйте `--scenario-prefix <id>` для каждого нового большого прогона. `ai-tester` хранит traces глобально по scenario id; prefix предотвращает случайное переиспользование старых traces с такими же `matrix-profile-01` ids.
+Для локальных подтверждающих runs используйте `--profile-id-mode path-hash`. Тогда профиль получает stable public id `project-<12 hex>`, рассчитанный из normalized absolute path, и этот id используется в scenario names, fixture folders, reports и promotion proposal. Durable docs должны ссылаться на `project-<hash>`, labels и relative report path, но не на реальный root.
+
+`memory-tool-ai-tester-evaluate-tool.mjs` является one-shot wrapper для одного tool и одного project root. Он выполняет pipeline: scenario matrix -> missing `ai-tester` runs -> JSON/Markdown report -> metadata promotion proposal. По умолчанию он пишет результаты в `.ai-factory/state/ai-tester-tool-evaluations/<tool>-<timestamp>/` и не меняет `recommendation-metadata.yaml`. Для записи proven labels в metadata нужен явный `--apply`; без него создается только proposal.
+
+Используйте `--scenario-prefix <id>` для каждого нового большого прогона. `ai-tester` хранит traces глобально по scenario id; prefix предотвращает случайное переиспользование старых traces с такими же `matrix-profile-01` ids. Prefix должен быть коротким: длинные scenario ids могут превысить Windows path limits в global `ai-tester/runs` directory. Практичный формат: `<tool>-p<hash8>-<scenario>-<skills>-<hhmm>`.
 
 По умолчанию генератор использует `--matrix-size screening`, а не exhaustive matrix. Цель первого прогона - найти условия, где tool может быть выгоден по tokens/time/result, а не оплатить все комбинации заранее.
 
@@ -77,7 +92,19 @@ Skill groups покрывают все AI Factory skills через representati
 | `commit_finalization` | `aif-commit` | `aif-commit` |
 | `guidance_only` | none by default | `aif-best-practices`, `aif-evolve` |
 
-Windows note: runner должен уметь выполнять `fixtures.setup_commands` через Windows shell. В локальном прогоне `ai-tester 0.5.0` был patched to use `cmd.exe` for setup commands instead of hard-coded `/bin/sh`.
+Windows note: runner должен уметь выполнять `fixtures.setup_commands` через Windows shell. В локальном прогоне `ai-tester 0.5.0` был patched to use `cmd.exe` for setup commands instead of hard-coded `/bin/sh`. Для Codex runtime preflight `ai-tester 0.5.0` вызывает `which codex`; `memory-tool-ai-tester-run-missing.mjs` на Windows добавляет локальный `.runner-bin/which.exe` shim внутри run dir, который не переносится в durable docs.
+
+## Scenario Catalog
+
+`ai-tester-scenarios.yaml` задает stable scenarios отдельно от generator code. Каждый scenario содержит:
+
+- `task_signal`: normalized task label, например `architecture_or_impact_discovery`;
+- `run_class`: `accepted_evidence` для metadata-grade runs, `focused`/`screening`/`smoke` для диагностических прогонов;
+- `skills` и `tools`: какие AIF skills и candidate tools проверяются против `rg`;
+- `fixture_requirements.labels_any`: exact project label sets, на которых scenario допустим;
+- `promotion_policy`: можно ли переносить результат в `proven_label_evidence` и какой минимум PASS/PASS пар нужен.
+
+Только `run_class: accepted_evidence` и `promotion_policy.eligible_for_metadata: true` могут попасть в metadata. Focused/smoke runs остаются research context и не меняют selector behavior.
 
 ## Контракт Сценария
 
@@ -121,6 +148,19 @@ Rejected tools (`codex-mem`, `eagle-mem`) не получают positive tool_ru
 | `conditional` | Tool полезен только для broad discovery, docs lookup, continuity или compression. | Оставить conditional recommendation с task/profile filter. |
 | `avoid` | Tool медленнее, дороже, шумнее или хуже `rg` для profile/task. | Добавить в `avoid_tools` или `do_not_recommend_for`. |
 | `forbid` | Tool нарушает safety, scope или purge. | Запретить для соответствующих skills/profiles. |
+
+## Promotion To Metadata
+
+После прогона `ai-tester` сначала нормализуйте отчет, затем создайте proposal:
+
+```bash
+node scripts/memory-tool-ai-tester-results-report.mjs --matrix-dir <run-dir> --runs-dir <ai-tester-runs-dir> --json
+node scripts/memory-tool-ai-tester-promote-metadata.mjs --report <run-dir>/ai-tester-token-matrices.json --scenario-catalog docs/memory-tools-research/ai-tester-scenarios.yaml --run-id <evidence-run-id> --json
+```
+
+По умолчанию promotion script пишет только proposal в `.ai-factory/state/ai-tester-proven-label-scenarios/`. `recommendation-metadata.yaml` изменяется только с `--apply`. Proposal проходит leak check: absolute paths, raw transcripts, private temp paths и secret-like strings не допускаются.
+
+Promoted entries попадают в `proven_label_evidence`. Selector использует их как exact allow только когда совпали `tool_id`, `skill`, `task_scenario`, `run_class: accepted_evidence`, минимум PASS/PASS пар, useful signal и все required project labels. `known_avoid_cases`, command-specific `forbidden`, protected artifacts и no-auto-install policy остаются сильнее promoted labels.
 
 Provider output остается supporting benchmark evidence only. Raw transcripts, snippets, local paths, temp paths, credentials и private profile names не сохраняются в docs, metadata, OpenSpec specs, generated rules или QA evidence.
 

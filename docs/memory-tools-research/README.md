@@ -17,7 +17,26 @@
 
 Эта meta не разрешает auto-install. Любой инструмент из списка должен предлагаться пользователю только как explicit opt-in с объяснением read scope, purge path и privacy tradeoff.
 
-Новая матрица описана в [AI Tester Matrix Для Memory Tools](ai-tester-matrix.md). Она делает paired прогон: `baseline_rg` на том же profile/task/skill, затем optional `tool_run`, затем decision `recommend`, `conditional`, `avoid` или `forbid`. Для индексируемых инструментов есть warm mode: `setup_commands` инициализируют индекс до model turn, а сам тест проверяет пользу уже готового индекса. Чтобы не запускать 2726 сценариев на первом проходе, генератор по умолчанию использует `--matrix-size screening`: 15 stratified profiles, representative skill groups и primary task. Финальный CodeGraph screening report находится в [AI Tester Token Matrices: Screening CodeGraph](ai-tester-token-matrices-screening-codegraph.md): 300/300 rows, +55.7% total tokens против `rg`, но 46/132 PASS/PASS token-saving rows. В metadata теперь используются dimensions: language, volume, complexity, repo shape, artifact mode и старый `project_shape` как compatibility fallback; CodeGraph selector требует exact `skill + labels` match.
+Новая матрица описана в [AI Tester Matrix Для Memory Tools](ai-tester-matrix.md). Она делает paired прогон: `baseline_rg` на том же profile/task/skill, затем optional `tool_run`, затем decision `recommend`, `conditional`, `avoid` или `forbid`. Для индексируемых инструментов есть warm mode: `setup_commands` инициализируют индекс до model turn, а сам тест проверяет пользу уже готового индекса. Чтобы не запускать 2726 сценариев на первом проходе, генератор по умолчанию использует `--matrix-size screening`: 15 stratified profiles, representative skill groups и primary task. Authored сценарии живут в [ai-tester-scenarios.yaml](ai-tester-scenarios.yaml): только `run_class: accepted_evidence` плюс `promotion_policy.eligible_for_metadata` могут попасть в `proven_label_evidence`. Финальный CodeGraph screening report находится в [AI Tester Token Matrices: Screening CodeGraph](ai-tester-token-matrices-screening-codegraph.md): 300/300 rows, +55.7% total tokens против `rg`, но 46/132 PASS/PASS token-saving rows. В metadata теперь используются dimensions: language, volume, complexity, repo shape, artifact mode и старый `project_shape` как compatibility fallback; CodeGraph selector требует exact `skill + task + labels` match.
+
+Promotion в metadata делается proposal-first:
+
+```bash
+node scripts/memory-tool-ai-tester-evaluate-tool.mjs --tool codegraph --root <project-dir> --preinitialize --json
+node scripts/memory-tool-ai-tester-promote-metadata.mjs --report <run-dir>/ai-tester-token-matrices.json --scenario-catalog docs/memory-tools-research/ai-tester-scenarios.yaml --run-id <evidence-run-id> --json
+```
+
+One-shot `evaluate-tool` принимает tool и project root, пишет `matrix-summary.json`, `ai-tester-token-matrices.json`, `ai-tester-token-matrices.md` и promotion proposal в runtime state. Без `--apply` metadata не меняется. Отдельный `promote-metadata` нужен, если report уже был получен ранее. Selector читает `proven_label_evidence` как exact allow и не обходит `known_avoid_cases`, command-specific forbidden scopes, no-auto-install policy или protected artifacts.
+
+CLI entrypoints не дублируют один и тот же шаг:
+
+| Script | Role |
+| --- | --- |
+| `memory-tool-ai-tester-evaluate-tool.mjs` | Рекомендуемый one-shot wrapper для одного tool/project root. |
+| `memory-tool-ai-tester-matrix.mjs` | Только генерация matrix, sanitized fixtures и scenario YAML. |
+| `memory-tool-ai-tester-run-missing.mjs` | Только resumable запуск недостающих `ai-tester` rows. |
+| `memory-tool-ai-tester-results-report.mjs` | Только JSON/Markdown report из matrix + traces. |
+| `memory-tool-ai-tester-promote-metadata.mjs` | Только proposal/apply для `proven_label_evidence` из готового report. |
 
 Дополнительный cross run на Python/OpenSpec profile находится в [AI Tester Token Matrices: Python OpenSpec All Tools](ai-tester-token-matrices-python-openspec-all-tools.md): 100/100 rows, 10 representative skills x 5 optional tools x `rg/tool_run`. Для labels `python`, `standard`, `framework`, `single_repo`, `openspec_native`, `large_framework_app` ни один optional tool не стал recommendation для `architecture_or_impact_discovery`; CodeGraph positive rows проиграли `rg`, остальные инструменты прошли только negative/not-applicable policy checks.
 
@@ -67,6 +86,7 @@
    - В файл инструмента добавить новую секцию `Локальный Прогон На Anonymous Profiles (<date>)`.
    - Не перетирать старые таблицы: будущие прогоны добавлять новой датированной секцией.
    - В `recommendation-metadata.yaml` добавить или обновить `evidence_runs`, если новый прогон меняет recommendation logic.
+   - Если прогон был catalog-driven accepted evidence, сначала создать promotion proposal и только потом переносить entries в `proven_label_evidence`.
 
 9. Проверить и очистить.
    - Выполнить `npm run validate`.
@@ -78,24 +98,33 @@
 
 README содержит только общую сводку и итоговую рекомендацию. У каждого инструмента есть два файла: описание инструмента и отдельный файл с результатами тестов, labels и выводами по применимости.
 
-Правило benchmark: выводы о выгоде инструмента строятся только по paired `ai-tester` runs `rg baseline` vs `<tool> tool_run`. Field/smoke runs в result-файлах считаются только safety/availability evidence.
+Правило benchmark: выводы о выгоде инструмента строятся только по paired `ai-tester` runs `rg baseline` vs `<tool> tool_run`. Field/smoke/focused runs в result-файлах считаются только safety/availability/research evidence и не должны попадать в `proven_label_evidence`.
 
 ## AI Tester Evidence
 
-Raw `ai-tester` artifacts лежат локально в `.ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/<run>/ai-tester-token-matrices.json`. В docs ниже перенесены только anonymous labels и агрегированные метрики.
+Raw `ai-tester` artifacts лежат локально в `.ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/<run>/ai-tester-token-matrices.json` и `.ai-factory/state/ai-tester-tool-evaluations/<run>/ai-tester-token-matrices.json`. В docs ниже перенесены только anonymous labels и агрегированные метрики.
 
 | Tool | ai-tester run | Rows | Где смотреть | Вывод |
 |---|---|---:|---|---|
 | All optional tools | `model-gen-all-tools-grouped-clean-20260528-212755` | 100 executed | [ai-tester-token-matrices-python-openspec-all-tools.md](ai-tester-token-matrices-python-openspec-all-tools.md), `.ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/model-gen-all-tools-grouped-clean-20260528-212755/ai-tester-token-matrices.json` | Python/OpenSpec large framework labels: `rg` only; CodeGraph positive rows worse, other tools not selected. |
 | CodeGraph | `screening-codegraph-preinit-nosipout-gpt54mini` | 300 executed, 150 pairs | [ai-tester-token-matrices-screening-codegraph.md](ai-tester-token-matrices-screening-codegraph.md), `.ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/screening-codegraph-preinit-nosipout-gpt54mini/ai-tester-token-matrices.json` | +55.7% total tokens, +21.0% time; useful only in exact skill+label cases. |
+| CodeGraph | `anonymous-codegraph-openspec-single-20260611` | 6 executed, 3 pairs | `.ai-factory/state/ai-tester-tool-evaluations/anonymous-codegraph-openspec-single-20260611/ai-tester-token-matrices.json` | OpenSpec single-repo framework labels: `avoid`, useful=0; average pair delta +78.1% total tokens. |
+| CodeGraph | `anonymous-codegraph-openspec-multirepo-20260611` | 6 executed, 3 pairs | `.ai-factory/state/ai-tester-tool-evaluations/anonymous-codegraph-openspec-multirepo-20260611/ai-tester-token-matrices.json` | OpenSpec multirepo framework labels: `avoid`, useful=0; average pair delta +309.3% total tokens. |
+| CodeGraph | `anonymous-codegraph-none-single-20260611` | 6 executed, 3 pairs | `.ai-factory/state/ai-tester-tool-evaluations/anonymous-codegraph-none-single-20260611/ai-tester-token-matrices.json` | No-artifact single-repo framework labels: `avoid`, useful=0; average pair delta +500.4% total tokens. |
+| CodeGraph | `codegraph-project-906f08554613-multirepo-analyze-review-20260611t1811z` | 4 executed, 2 pairs | `.ai-factory/state/ai-tester-tool-evaluations/codegraph-project-906f08554613-multirepo-analyze-review-20260611t1811z/ai-tester-token-matrices.json` | `project-906f08554613`, OpenSpec multirepo framework labels, `aif-analyze/aif-review`: `avoid`, useful=0; average pair delta +323.1% total tokens. |
 | Graphify | `screening-graphify-ai-tester-pilot` | 2 executed, 1 pair | [graphify-benchmark-results.md](graphify-benchmark-results.md#ai-tester-pilot-2026-05-28), `.ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/screening-graphify-ai-tester-pilot/ai-tester-token-matrices.json` | mini/small profile: +397.9% total tokens. |
 | Graphify | `targeted-graphify-ai-tester` | 4 executed, 2 pairs | [graphify-benchmark-results.md](graphify-benchmark-results.md#ai-tester-targeted-run-2026-05-28), `.ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/targeted-graphify-ai-tester/ai-tester-token-matrices.json` | large framework +82.9%, multirepo +127.8% total tokens. |
 | Graphify | `cross-graphify-ai-tester` | 8 executed, 4 pairs | [graphify-benchmark-results.md](graphify-benchmark-results.md#ai-tester-cross-screening-2026-05-28), `.ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/cross-graphify-ai-tester/ai-tester-token-matrices.json` | `aif-analyze/aif-explore` x large framework/multirepo: +315.5% to +1668.8% total tokens. |
+| Graphify | `anonymous-graphify-none-single-20260611` | 6 executed, 3 pairs | `.ai-factory/state/ai-tester-tool-evaluations/anonymous-graphify-none-single-20260611/ai-tester-token-matrices.json` | No-artifact single-repo framework labels: `avoid`, useful=0; average pair delta -11.5% total tokens, but candidate rows were negative policy checks and Graphify was not called. |
+| Graphify | `graphify-project-8d97432e6d7a-architecture-explore-plan-20260611t1821z` | 4 executed, 2 pairs | `.ai-factory/state/ai-tester-tool-evaluations/graphify-project-8d97432e6d7a-architecture-explore-plan-20260611t1821z/ai-tester-token-matrices.json` | `project-8d97432e6d7a`, legacy-AI-Factory single-repo framework labels, `aif-explore/aif-plan`: `avoid`, useful=0; average pair delta +94.7% total tokens. |
 | Context7 | `screening-context7-ai-tester-pilot-v2` | 2 executed, 1 pair | [context7-benchmark-results.md](context7-benchmark-results.md#ai-tester-pilot-2026-05-28), `.ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/screening-context7-ai-tester-pilot-v2/ai-tester-token-matrices.json` | mini/no dependency signal: +1903.9% total tokens. |
 | Context7 | `targeted-context7-ai-tester` | 4 executed, 2 pairs | [context7-benchmark-results.md](context7-benchmark-results.md#ai-tester-targeted-run-2026-05-28), `.ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/targeted-context7-ai-tester/ai-tester-token-matrices.json` | language/framework labels alone: +761.9% to +1019.5% total tokens. |
 | Context7 | `cross-context7-ai-tester` | 8 executed, 4 pairs | [context7-benchmark-results.md](context7-benchmark-results.md#ai-tester-cross-screening-2026-05-28), `.ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/cross-context7-ai-tester/ai-tester-token-matrices.json` | `aif-plan/aif-rules-check` x large framework/multirepo: +403.2% to +1850.8% total tokens. |
+| Context7 | `anonymous-context7-none-single-nopreinit-20260611` | 2 executed, 1 pair | `.ai-factory/state/ai-tester-tool-evaluations/anonymous-context7-none-single-nopreinit-20260611/ai-tester-token-matrices.json` | No-preinit positive pair failed because `ctx7` was not called; +106.1% total tokens; no promotion. |
+| Context7 | `context7-project-9f839f3c998a-version-docs-plan-review-20260611t1830z` | 4 executed, 2 failed pairs | `.ai-factory/state/ai-tester-tool-evaluations/context7-project-9f839f3c998a-version-docs-plan-review-20260611t1830z/ai-tester-token-matrices.json` | `project-9f839f3c998a`, OpenSpec single-repo framework labels, `aif-plan/aif-review`: tool_run did not call `ctx7`; +511.2% total tokens; no promotion. |
 | context-mode | `screening-context-mode-ai-tester-pilot-v2` | 2 executed, 1 pair | [context-mode-benchmark-results.md](context-mode-benchmark-results.md#ai-tester-pilot-2026-05-28), `.ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/screening-context-mode-ai-tester-pilot-v2/ai-tester-token-matrices.json` | tool_run failed useful assertion and spent +6804.0% total tokens. |
 | context-mode | `cross-context-mode-ai-tester` | 3 executed, 1 completed pair + 1 timeout | [context-mode-benchmark-results.md](context-mode-benchmark-results.md#ai-tester-cross-screening-2026-05-28), `.ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/cross-context-mode-ai-tester/ai-tester-token-matrices.json` | `aif-analyze` x multirepo failed with +651.8% total tokens; large framework tool_run timed out. |
+| context-mode | `cm-p8d97432e-out-ae-1851` | 4 executed, 2 failed pairs | `.ai-factory/state/ai-tester-tool-evaluations/cm-p8d97432e-out-ae-1851/ai-tester-token-matrices.json` | `project-8d97432e6d7a`, generated-output compression, `aif-analyze/aif-explore`: tool_run failed useful assertions; +487.6% total tokens; no promotion. |
 
 No paired positive source-retrieval `ai-tester` benchmark is recorded yet for `codex-agent-mem` and `agent-memory`, because they are not source retrieval tools. The Python/OpenSpec matrix includes negative/not-applicable selector rows for `codex-agent-mem`, but these validate policy only. `codex-mem` and `eagle-mem` are rejected before positive benchmark because scoped read/purge/default privacy safety is not acceptable; they should only get negative/forbidden selector scenarios.
 

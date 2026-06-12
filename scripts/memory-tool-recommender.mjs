@@ -561,6 +561,7 @@ function metadataSummary(metadata) {
     skill_usage_matrix: metadata.skill_usage_matrix ?? {},
     tool_permissions: metadata.tool_permissions ?? {},
     availability_probes: metadata.availability_probes ?? {},
+    proven_label_evidence: asArray(metadata.proven_label_evidence),
     forbidden_operations: asArray(metadata.forbidden_operations),
     protected_artifacts: asArray(metadata.protected_artifacts),
     project_shape_signals: Object.keys(metadata.project_shape_signals ?? {}),
@@ -707,7 +708,10 @@ function collectCandidateTools(metadata, projectShape, taskSignals, projectProfi
   }
 
   for (const [toolId, tool] of Object.entries(metadata.tools ?? {})) {
-    if (screeningPolicyAllowsRequest(tool, projectProfile, taskSignals, command)) {
+    if (
+      screeningPolicyAllowsRequest(tool, projectProfile, taskSignals, command)
+      || provenLabelAllowsRequest(metadata, toolId, projectProfile, taskSignals, command)
+    ) {
       candidates.add(toolId);
     }
   }
@@ -737,7 +741,8 @@ function isAllowedForRequest(toolId, tool, projectShape, taskSignals, metadata, 
     return false;
   }
 
-  const screeningMatch = screeningPolicyAllowsRequest(tool, projectProfile, taskSignals, command);
+  const provenMatch = provenLabelAllowsRequest(metadata, toolId, projectProfile, taskSignals, command);
+  const screeningMatch = provenMatch || screeningPolicyAllowsRequest(tool, projectProfile, taskSignals, command);
   if (tool.screening_policy?.default_decision === 'avoid_by_default' && !screeningMatch) {
     return false;
   }
@@ -766,6 +771,26 @@ function screeningPolicyAllowsRequest(tool, projectProfile, taskSignals, command
   const profile = normalizeProjectProfile(projectProfile);
 
   return asArray(policy.conditional_cases).some((item) => screeningPolicyCaseMatches(item, profile, taskSignals, command));
+}
+
+export function provenLabelAllowsRequest(metadata, toolId, projectProfile, taskSignals, command) {
+  return provenLabelEvidenceMatches(metadata, toolId, projectProfile, taskSignals, command)
+    .some((entry) => ['recommend', 'conditional'].includes(String(entry.decision)));
+}
+
+function provenLabelEvidenceMatches(metadata, toolId, projectProfile, taskSignals, command) {
+  const profile = normalizeProjectProfile(projectProfile);
+  const labels = profileLabels(profile);
+  return asArray(metadata?.proven_label_evidence).filter((entry) => {
+    if (String(entry.tool_id ?? '') !== toolId) return false;
+    if (String(entry.run_class ?? '') !== 'accepted_evidence') return false;
+    if (!asArray(entry.skills).includes(command)) return false;
+    if (!taskSignals.includes(String(entry.task_scenario ?? ''))) return false;
+    if (!['recommend', 'conditional'].includes(String(entry.decision))) return false;
+    if (Number(entry.pairs?.pass_pass ?? 0) < 2) return false;
+    if (Number(entry.pairs?.useful ?? 0) < 1) return false;
+    return asArray(entry.required_labels).every((label) => labels.has(String(label)));
+  });
 }
 
 function screeningPolicyAvoidsRequest(tool, projectProfile, taskSignals, command) {
@@ -886,7 +911,10 @@ function buildDoNotRecommend(metadata, projectShape, taskSignals, projectProfile
   const shape = metadata.project_shape_signals?.[projectShape] ?? {};
   for (const toolId of asArray(shape.avoid_tools)) {
     const tool = metadata.tools?.[toolId] ?? {};
-    if (screeningPolicyAllowsRequest(tool, projectProfile, taskSignals, command)) continue;
+    if (
+      screeningPolicyAllowsRequest(tool, projectProfile, taskSignals, command)
+      || provenLabelAllowsRequest(metadata, toolId, projectProfile, taskSignals, command)
+    ) continue;
     entries.set(toolId, {
       tool_id: toolId,
       reason: tool.avoid_reason ?? `${tool.display_name ?? toolId} is avoided for ${projectShape}.`
@@ -897,7 +925,10 @@ function buildDoNotRecommend(metadata, projectShape, taskSignals, projectProfile
   for (const match of matches) {
     for (const toolId of asArray(match.avoid_tools)) {
       const tool = metadata.tools?.[toolId] ?? {};
-      if (screeningPolicyAllowsRequest(tool, projectProfile, taskSignals, command)) continue;
+      if (
+        screeningPolicyAllowsRequest(tool, projectProfile, taskSignals, command)
+        || provenLabelAllowsRequest(metadata, toolId, projectProfile, taskSignals, command)
+      ) continue;
       entries.set(toolId, {
         tool_id: toolId,
         reason: tool.avoid_reason ?? `${tool.display_name ?? toolId} is avoided for ${match.id}.`,

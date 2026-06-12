@@ -122,6 +122,33 @@ describe('ai-tester results report', () => {
     assert.match(markdown, /matrix-profile-01/);
   });
 
+  it('renders paired comparisons for non-CodeGraph candidate tools without hard-coded labels', () => {
+    const matrixSummary = makeMatrixSummaryForTool('graphify');
+    const report = buildAiTesterResultsReport({
+      matrixSummary,
+      traceIndex: {
+        latest_by_scenario: {
+          [matrixSummary.cases[0].id]: makeTraceResult({ totalTokens: 100, inputTokens: 80, outputTokens: 10, durationSeconds: 10, toolCalls: 3 }),
+          [matrixSummary.cases[1].id]: makeTraceResult({ totalTokens: 70, inputTokens: 50, outputTokens: 8, durationSeconds: 7, toolCalls: 2 })
+        }
+      },
+      generatedAt: '2026-05-26T03:00:00.000Z'
+    });
+
+    const markdown = renderAiTesterResultsMarkdown(report);
+
+    assert.equal(report.paired_comparison.candidate_tool_id, 'graphify');
+    assert.equal(report.paired_comparison.candidate.total_tokens, 70);
+    assert.equal(report.paired_comparison.codegraph, undefined);
+    assert.equal(report.paired_comparison.better_counts.candidate_lower_total_tokens, 1);
+    assert.equal(report.paired_comparison.pair_decisions[0].tool_id, 'graphify');
+    assert.equal(report.paired_comparison.pair_decisions[0].scenario_id, 'architecture-impact-discovery');
+    assert.equal(report.paired_comparison.pair_decisions[0].run_class, 'accepted_evidence');
+    assert.match(markdown, /## Paired Rg Vs Graphify/);
+    assert.match(markdown, /\| Graphify lower total tokens \| 1 \| 100\.0% \|/);
+    assert.doesNotMatch(markdown, /CodeGraph lower total tokens/);
+  });
+
   it('keeps paired comparisons separate by task scenario', () => {
     const matrixSummary = makeMultiTaskMatrixSummary();
     const report = buildAiTesterResultsReport({
@@ -179,6 +206,29 @@ describe('ai-tester results report', () => {
     assert.match(markdown, /\| PASS\/PASS paired rows used for useful-case counts \| 1 \| 50\.0% \|/);
     assert.match(markdown, /## CodeGraph Useful Cases/);
     assert.match(markdown, /\| aif-explore \| matrix-profile-01 \|  \| js ; mini ; framework ; single_repo ; none ; small_microservice \| total tokens, input\+output, duration, tool calls \| -50\.0% \| -55\.6% \| -50\.0% \| -50\.0% \| 1,000 \| 500 \|/);
+  });
+
+  it('does not classify negative candidate rows as useful even when their metrics are lower', () => {
+    const matrixSummary = makeMatrixSummary();
+    matrixSummary.cases[1].expectation = 'negative';
+    const report = buildAiTesterResultsReport({
+      matrixSummary,
+      traceIndex: {
+        latest_by_scenario: {
+          [matrixSummary.cases[0].id]: makeTraceResult({ totalTokens: 1000, inputTokens: 800, outputTokens: 100, durationSeconds: 20, toolCalls: 10 }),
+          [matrixSummary.cases[1].id]: makeTraceResult({ totalTokens: 500, inputTokens: 350, outputTokens: 50, durationSeconds: 10, toolCalls: 5 })
+        }
+      },
+      generatedAt: '2026-05-26T03:00:00.000Z'
+    });
+
+    assert.equal(report.paired_comparison.pass_pair_count, 1);
+    assert.equal(report.paired_comparison.better_counts.codegraph_lower_total_tokens, 0);
+    assert.equal(report.paired_comparison.better_counts.codegraph_faster, 0);
+    assert.equal(report.paired_comparison.useful_cases.length, 0);
+    assert.equal(report.paired_comparison.pair_decisions[0].candidate_expectation, 'negative');
+    assert.equal(report.paired_comparison.pair_decisions[0].useful, false);
+    assert.equal(report.paired_comparison.pair_decisions[0].decision, 'avoid');
   });
 
   it('writes JSON and Markdown outputs from the CLI wrapper', async () => {
@@ -260,6 +310,7 @@ function makeMatrixSummary() {
         skill: 'aif-explore',
         tool_id: 'rg',
         optional_tool_id: 'codegraph',
+        expectation: 'baseline_rg',
         profile_id: 'matrix-profile-01'
       },
       {
@@ -267,10 +318,33 @@ function makeMatrixSummary() {
         skill: 'aif-explore',
         tool_id: 'codegraph',
         optional_tool_id: 'codegraph',
+        expectation: 'positive',
         profile_id: 'matrix-profile-01'
       }
     ]
   };
+}
+
+function makeMatrixSummaryForTool(toolId) {
+  const summary = makeMatrixSummary();
+  summary.cases = summary.cases.map((item) => ({
+    ...item,
+    id: item.id.replaceAll('codegraph', toolId),
+    pair_id: `pair-${toolId}`,
+    task_scenario: 'architecture_or_impact_discovery',
+    scenario_id: 'architecture-impact-discovery',
+    run_class: 'accepted_evidence',
+    promotion_policy: {
+      eligible_for_metadata: true,
+      min_pass_pairs: 2,
+      require_exact_labels: true,
+      accepted_run_class: 'accepted_evidence',
+      allowed_decisions: ['recommend', 'conditional', 'avoid', 'forbid']
+    },
+    optional_tool_id: toolId,
+    tool_id: item.tool_id === 'rg' ? 'rg' : toolId
+  }));
+  return summary;
 }
 
 function makeTwoPairMatrixSummary() {
@@ -295,6 +369,7 @@ function makeTwoPairMatrixSummary() {
         skill: 'aif-explore',
         tool_id: 'rg',
         optional_tool_id: 'codegraph',
+        expectation: 'baseline_rg',
         profile_id: 'matrix-profile-01'
       },
       {
@@ -302,6 +377,7 @@ function makeTwoPairMatrixSummary() {
         skill: 'aif-explore',
         tool_id: 'codegraph',
         optional_tool_id: 'codegraph',
+        expectation: 'positive',
         profile_id: 'matrix-profile-01'
       },
       {
@@ -309,6 +385,7 @@ function makeTwoPairMatrixSummary() {
         skill: 'aif-explore',
         tool_id: 'rg',
         optional_tool_id: 'codegraph',
+        expectation: 'baseline_rg',
         profile_id: 'matrix-profile-02'
       },
       {
@@ -316,6 +393,7 @@ function makeTwoPairMatrixSummary() {
         skill: 'aif-explore',
         tool_id: 'codegraph',
         optional_tool_id: 'codegraph',
+        expectation: 'positive',
         profile_id: 'matrix-profile-02'
       }
     ]
@@ -339,6 +417,7 @@ function makeMultiTaskMatrixSummary() {
         skill: 'aif-explore',
         tool_id: 'rg',
         optional_tool_id: 'codegraph',
+        expectation: 'baseline_rg',
         profile_id: 'matrix-profile-01'
       },
       {
@@ -348,6 +427,7 @@ function makeMultiTaskMatrixSummary() {
         skill: 'aif-explore',
         tool_id: 'codegraph',
         optional_tool_id: 'codegraph',
+        expectation: 'positive',
         profile_id: 'matrix-profile-01'
       },
       {
@@ -357,6 +437,7 @@ function makeMultiTaskMatrixSummary() {
         skill: 'aif-explore',
         tool_id: 'rg',
         optional_tool_id: 'codegraph',
+        expectation: 'baseline_rg',
         profile_id: 'matrix-profile-01'
       },
       {
@@ -366,6 +447,7 @@ function makeMultiTaskMatrixSummary() {
         skill: 'aif-explore',
         tool_id: 'codegraph',
         optional_tool_id: 'codegraph',
+        expectation: 'positive',
         profile_id: 'matrix-profile-01'
       }
     ]

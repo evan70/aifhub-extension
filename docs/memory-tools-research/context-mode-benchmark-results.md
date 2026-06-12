@@ -121,6 +121,18 @@ Labels: `python`, `standard`, `framework`, `single_repo`, `openspec_native`, `la
 | Source indexing | no |
 | Hooks/setup/MCP registration | no |
 
+## AI Tester Path-Hash Generated Output 2026-06-11
+
+Raw artifact: `.ai-factory/state/ai-tester-tool-evaluations/cm-p8d97432e-out-ae-1851/ai-tester-token-matrices.json`.
+
+Project id: `project-8d97432e6d7a`. Labels: `framework`, `js`, `large_framework_app`, `legacy_ai_factory_only`, `php`, `single_repo`, `standard`. Task: `large_command_output_compression`. Skills: `aif-analyze`, `aif-explore`.
+
+| rows | pass/pass pairs | total tokens | input+output tokens | duration | decision |
+|---:|---:|---:|---:|---:|---|
+| 4 executed, 2 FAIL | 0/2 | +487.6% | +449.6% | +206.0% | no promotion |
+
+Tool-run rows did not produce a valid useful `context-mode` data call: one run stopped at `context-mode --help`, the other did not call `context-mode`. This focused scenario remains manual-helper evidence only and is not eligible for `proven_label_evidence`.
+
 ## Когда Использовать
 
 Лучшие signals:

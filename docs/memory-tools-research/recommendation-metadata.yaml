@@ -827,7 +827,7 @@ tools:
       default_decision: avoid_by_default
       baseline: rg
       require_baseline_first: true
-      require_match_granularity: skill_and_project_labels
+      require_match_granularity: skill_task_project_labels
       do_not_select_by: [language_only, skill_only, broad_shape_only]
       aggregate:
         rows_total: 300
@@ -1003,7 +1003,313 @@ tools:
           - codegraph serve
           - codegraph serve --mcp
         pre_existing_state: "If .codegraph/ already exists, treat it as user-owned and do not delete or reinitialize it silently."
+proven_label_evidence:
+  - id: codegraph-js-mini-framework-small-microservice-2d6a0d2c-2026-05-27
+    source_evidence: historical-codegraph-screening-gpt54mini-2026-05-27
+    scenario_id: architecture-impact-discovery
+    run_class: accepted_evidence
+    tool_id: codegraph
+    task_scenario: architecture_or_impact_discovery
+    skills: [aif-explore]
+    required_labels: [js, mini, framework, single_repo, none, small_microservice]
+    pairs:
+      total: 2
+      pass_pass: 2
+      useful: 2
+      projects: 1
+    decision: conditional
+    provenance:
+      report: docs/memory-tools-research/ai-tester-token-matrices-screening-codegraph.md
+      generated_at: "2026-05-27T00:00:00.000Z"
+  - id: codegraph-architecture-impact-discovery-architecture_or_impact_discovery-29a93d01-anonymous
+    source_evidence: anonymous-codegraph-openspec-single-20260611
+    scenario_id: architecture-impact-discovery
+    run_class: accepted_evidence
+    tool_id: codegraph
+    task_scenario: architecture_or_impact_discovery
+    skills: [aif-analyze, aif-explore, aif-plan]
+    required_labels: [framework, js, large_framework_app, openspec_native, php, single_repo, standard]
+    pairs:
+      total: 3
+      pass_pass: 3
+      useful: 0
+      projects: 1
+    decision: avoid
+    average_deltas:
+      total_tokens_percent: 78.1
+      input_output_tokens_percent: 72.3
+      duration_percent: 21.2
+      tool_calls_percent: 41
+    provenance:
+      report: .ai-factory/state/ai-tester-tool-evaluations/anonymous-codegraph-openspec-single-20260611/ai-tester-token-matrices.json
+      generated_at: "2026-06-11T16:52:32.289Z"
+  - id: codegraph-multirepo-surface-mapping-multirepo_surface_mapping-428b7cbc-anonymous
+    source_evidence: anonymous-codegraph-openspec-multirepo-20260611
+    scenario_id: multirepo-surface-mapping
+    run_class: accepted_evidence
+    tool_id: codegraph
+    task_scenario: multirepo_surface_mapping
+    skills: [aif-analyze, aif-explore, aif-review]
+    required_labels: [framework, js, monorepo, multirepo, openspec_native, php, standard]
+    pairs:
+      total: 3
+      pass_pass: 3
+      useful: 0
+      projects: 1
+    decision: avoid
+    average_deltas:
+      total_tokens_percent: 309.3
+      input_output_tokens_percent: 275.9
+      duration_percent: 30.2
+      tool_calls_percent: 41.7
+    provenance:
+      report: .ai-factory/state/ai-tester-tool-evaluations/anonymous-codegraph-openspec-multirepo-20260611/ai-tester-token-matrices.json
+      generated_at: "2026-06-11T16:52:49.805Z"
+  - id: codegraph-architecture-impact-discovery-architecture_or_impact_discovery-2030dc20-anonymous
+    source_evidence: anonymous-codegraph-none-single-20260611
+    scenario_id: architecture-impact-discovery
+    run_class: accepted_evidence
+    tool_id: codegraph
+    task_scenario: architecture_or_impact_discovery
+    skills: [aif-analyze, aif-explore, aif-plan]
+    required_labels: [framework, js, large_framework_app, none, php, single_repo, standard]
+    pairs:
+      total: 3
+      pass_pass: 3
+      useful: 0
+      projects: 1
+    decision: avoid
+    average_deltas:
+      total_tokens_percent: 500.4
+      input_output_tokens_percent: 454.2
+      duration_percent: 66
+      tool_calls_percent: 354.4
+    provenance:
+      report: .ai-factory/state/ai-tester-tool-evaluations/anonymous-codegraph-none-single-20260611/ai-tester-token-matrices.json
+      generated_at: "2026-06-11T16:53:01.712Z"
+  - id: graphify-architecture-impact-discovery-architecture_or_impact_discovery-2030dc20-anonymous
+    source_evidence: anonymous-graphify-none-single-20260611
+    scenario_id: architecture-impact-discovery
+    run_class: accepted_evidence
+    tool_id: graphify
+    task_scenario: architecture_or_impact_discovery
+    skills: [aif-analyze, aif-explore, aif-plan]
+    required_labels: [framework, js, large_framework_app, none, php, single_repo, standard]
+    pairs:
+      total: 3
+      pass_pass: 3
+      useful: 0
+      projects: 1
+    decision: avoid
+    average_deltas:
+      total_tokens_percent: -11.5
+      input_output_tokens_percent: -10
+      duration_percent: 10.3
+      tool_calls_percent: 4.3
+    provenance:
+      report: .ai-factory/state/ai-tester-tool-evaluations/anonymous-graphify-none-single-20260611/ai-tester-token-matrices.json
+      generated_at: "2026-06-11T16:53:15.737Z"
+  - id: codegraph-multirepo-surface-mapping-multirepo_surface_mapping-428b7cbc-codegraph
+    source_evidence: codegraph-project-906f08554613-multirepo-analyze-review-20260611t1811z
+    scenario_id: multirepo-surface-mapping
+    run_class: accepted_evidence
+    tool_id: codegraph
+    task_scenario: multirepo_surface_mapping
+    skills: [aif-analyze, aif-review]
+    required_labels: [framework, js, monorepo, multirepo, openspec_native, php, standard]
+    pairs:
+      total: 2
+      pass_pass: 2
+      useful: 0
+      projects: 1
+    decision: avoid
+    average_deltas:
+      total_tokens_percent: 323.1
+      input_output_tokens_percent: 293.5
+      duration_percent: -0.3
+      tool_calls_percent: 122.7
+    provenance:
+      report: .ai-factory/state/ai-tester-tool-evaluations/codegraph-project-906f08554613-multirepo-analyze-review-20260611t1811z/ai-tester-token-matrices.json
+      generated_at: "2026-06-11T18:18:54.912Z"
+  - id: graphify-architecture-impact-discovery-architecture_or_impact_discovery-53c98688-graphify-p
+    source_evidence: graphify-project-8d97432e6d7a-architecture-explore-plan-20260611t1821z
+    scenario_id: architecture-impact-discovery
+    run_class: accepted_evidence
+    tool_id: graphify
+    task_scenario: architecture_or_impact_discovery
+    skills: [aif-explore, aif-plan]
+    required_labels: [framework, js, large_framework_app, legacy_ai_factory_only, php, single_repo, standard]
+    pairs:
+      total: 2
+      pass_pass: 2
+      useful: 0
+      projects: 1
+    decision: avoid
+    average_deltas:
+      total_tokens_percent: 94.7
+      input_output_tokens_percent: 89.5
+      duration_percent: 56.9
+      tool_calls_percent: 477.8
+    provenance:
+      report: .ai-factory/state/ai-tester-tool-evaluations/graphify-project-8d97432e6d7a-architecture-explore-plan-20260611t1821z/ai-tester-token-matrices.json
+      generated_at: "2026-06-11T18:27:36.160Z"
 evidence_runs:
+  - id: live-ai-tester-path-hash-tool-batch-2026-06-11
+    date: "2026-06-11"
+    scope: "Catalog-driven one-shot ai-tester runs across three path-hash local project profiles and four candidate tools."
+    privacy: "Durable metadata uses only project-<sha256(path)> ids, labels, aggregate metrics, and relative report paths; real project names, local roots, temp paths, traces, and snippets are excluded."
+    harness:
+      script: "scripts/memory-tool-ai-tester-evaluate-tool.mjs"
+      matrix_script: "scripts/memory-tool-ai-tester-matrix.mjs"
+      runner_script: "scripts/memory-tool-ai-tester-run-missing.mjs"
+      promotion_script: "scripts/memory-tool-ai-tester-promote-metadata.mjs"
+      baseline: rg
+      model: gpt-5.4-mini
+      profile_id_mode: path-hash
+      windows_runtime_fix: "run-missing prepends a local .runner-bin/which.exe shim so ai-tester Codex preflight can resolve codex on Windows."
+    outcomes:
+      codegraph:
+        run_id: codegraph-project-906f08554613-multirepo-analyze-review-20260611t1811z
+        project_id: project-906f08554613
+        scenario_id: multirepo-surface-mapping
+        task_scenario: multirepo_surface_mapping
+        skills: [aif-analyze, aif-review]
+        labels: [framework, js, monorepo, multirepo, openspec_native, php, standard]
+        rows_executed: 4
+        pass_rows: 4
+        failed_rows: 0
+        pass_pass_pairs: 2
+        useful_pairs: 0
+        promoted_avoid_entries: 1
+        average_pair_deltas:
+          total_tokens_percent: 323.1
+          input_output_tokens_percent: 293.5
+          duration_percent: -0.3
+          tool_calls_percent: 122.7
+        aggregate_deltas:
+          total_tokens_percent: -5.6
+          input_output_tokens_percent: 1
+          duration_percent: -5.3
+          tool_calls_percent: -12
+        caveat: "Aggregate totals were distorted by one negative-policy pair with lower candidate tokens; candidate usefulness remains 0 because CodeGraph was not a positive expected call for these exact labels."
+        recommendation_update: "Add another exact avoid evidence entry for CodeGraph on multirepo OpenSpec framework labels."
+      graphify:
+        run_id: graphify-project-8d97432e6d7a-architecture-explore-plan-20260611t1821z
+        project_id: project-8d97432e6d7a
+        scenario_id: architecture-impact-discovery
+        task_scenario: architecture_or_impact_discovery
+        skills: [aif-explore, aif-plan]
+        labels: [framework, js, large_framework_app, legacy_ai_factory_only, php, single_repo, standard]
+        rows_executed: 4
+        pass_rows: 4
+        failed_rows: 0
+        pass_pass_pairs: 2
+        useful_pairs: 0
+        promoted_avoid_entries: 1
+        average_pair_deltas:
+          total_tokens_percent: 94.7
+          input_output_tokens_percent: 89.5
+          duration_percent: 56.9
+          tool_calls_percent: 477.8
+        aggregate_deltas:
+          total_tokens_percent: 70.7
+          input_output_tokens_percent: 69
+          duration_percent: 59.5
+          tool_calls_percent: 357.1
+        recommendation_update: "Add exact avoid evidence for Graphify on legacy-AI-Factory single-repo large framework labels."
+      context7:
+        run_id: context7-project-9f839f3c998a-version-docs-plan-review-20260611t1830z
+        project_id: project-9f839f3c998a
+        scenario_id: version-sensitive-library-docs
+        task_scenario: version_sensitive_library_docs
+        skills: [aif-plan, aif-review]
+        labels: [framework, js, large_framework_app, openspec_native, php, single_repo, standard]
+        rows_executed: 4
+        pass_rows: 2
+        failed_rows: 2
+        pass_pass_pairs: 0
+        promotion_entries: 0
+        aggregate_deltas:
+          total_tokens_percent: 511.2
+          input_output_tokens_percent: 499.2
+          duration_percent: 317.3
+          tool_calls_percent: 542.9
+        blocker: "Tool-run rows failed assertions because ctx7 was not called after rg; promotion skipped both pairs as pair_not_pass_pass."
+        recommendation_update: "Keep Context7 conditional docs-provider policy, but do not add proven_label_evidence from this run."
+      context-mode:
+        run_id: cm-p8d97432e-out-ae-1851
+        project_id: project-8d97432e6d7a
+        scenario_id: generated-output-compression
+        task_scenario: large_command_output_compression
+        skills: [aif-analyze, aif-explore]
+        labels: [framework, js, large_framework_app, legacy_ai_factory_only, php, single_repo, standard]
+        rows_executed: 4
+        pass_rows: 2
+        failed_rows: 2
+        pass_pass_pairs: 0
+        promotion_entries: 0
+        aggregate_deltas:
+          total_tokens_percent: 487.6
+          input_output_tokens_percent: 449.6
+          duration_percent: 206
+          tool_calls_percent: 675
+        blocker: "One tool-run called only context-mode --help and missed ctx_index/ctx_search; the other did not call context-mode. Focused run is not metadata-eligible."
+        recommendation_update: "Keep context-mode as manual generated-output helper only; no recommendation evidence added."
+  - id: live-ai-tester-anonymous-tool-batch-2026-06-11
+    date: "2026-06-11"
+    scope: "Catalog-driven one-shot ai-tester runs on anonymous local profiles: openspec single-repo framework, openspec multirepo framework, and no-artifact single-repo framework."
+    privacy: "Durable metadata uses only anonymous run ids, labels, aggregate metrics, and relative anonymous runtime report paths; real project names, local roots, temp paths, traces, and snippets are excluded."
+    harness:
+      script: "scripts/memory-tool-ai-tester-evaluate-tool.mjs"
+      promotion_script: "scripts/memory-tool-ai-tester-promote-metadata.mjs"
+      baseline: rg
+      model: gpt-5.4-mini
+      setup_note: "Context7 npm preinitialize currently fails inside ai-tester setup executor on Windows; manual npm install works on the copied fixture."
+    outcomes:
+      codegraph:
+        accepted_evidence_reports: 3
+        rows_executed: 18
+        pass_rows: 18
+        failed_rows: 0
+        promoted_avoid_entries: 3
+        useful_pairs: 0
+        decisions: [avoid]
+        labels_added:
+          - [framework, js, large_framework_app, openspec_native, php, single_repo, standard]
+          - [framework, js, monorepo, multirepo, openspec_native, php, standard]
+          - [framework, js, large_framework_app, none, php, single_repo, standard]
+        recommendation_update: "Broaden exact avoid evidence; do not select CodeGraph for these skill/task/label combinations."
+      graphify:
+        accepted_evidence_reports: 1
+        rows_executed: 6
+        pass_rows: 6
+        failed_rows: 0
+        promoted_avoid_entries: 1
+        useful_pairs: 0
+        average_deltas:
+          total_tokens_percent: -11.5
+          input_output_tokens_percent: -10
+          duration_percent: 10.3
+          tool_calls_percent: 4.3
+        caveat: "Candidate rows were negative policy checks; lower token totals do not count as Graphify usefulness because Graphify was not called."
+        recommendation_update: "Add exact avoid evidence for architecture discovery on no-artifact single-repo framework labels."
+      context7:
+        preinitialize_attempts: 3
+        setup_failed_rows: 18
+        no_preinit_rows_executed: 2
+        no_preinit_pass_rows: 1
+        no_preinit_failed_rows: 1
+        promotion_entries: 0
+        deltas:
+          total_tokens_percent: 106.1
+          input_output_tokens_percent: 122.7
+          duration_percent: 78.4
+          tool_calls_percent: 11.1
+        blocker: "Positive Context7 benchmark is not metadata-ready: preinitialize setup fails under ai-tester on Windows; no-preinit tool_run did not call ctx7."
+        recommendation_update: "Keep Context7 conditional docs-provider policy but do not add proven_label_evidence from this batch."
+      context-mode:
+        dry_run_matrix_cases: 0
+        recommendation_update: "No generated-output-compression fixture matched this batch, so no metrics were added."
   - id: local-anonymous-profiles-2026-05-22
     date: "2026-05-22"
     scope: "13 anonymous local project profiles with .ai-factory/ARCHITECTURE.md, copied to sanitized temp fixtures before testing."

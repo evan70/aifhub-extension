@@ -243,6 +243,26 @@ Labels: `js`, `standard`, `framework`, `monorepo`, `legacy_ai_factory_only`, `mu
 
 Вывод: для `aif-handoff` CodeGraph не подтвердил пользу даже на отдельной задаче `multirepo_surface_mapping`. На этих exact labels `aif-analyze` и `aif-explore` должны выбирать `rg baseline`; CodeGraph не рекомендовать.
 
+## AI Tester Anonymous Tool Evaluations 2026-06-11
+
+Raw artifacts:
+
+- `.ai-factory/state/ai-tester-tool-evaluations/anonymous-codegraph-openspec-single-20260611/ai-tester-token-matrices.json`
+- `.ai-factory/state/ai-tester-tool-evaluations/anonymous-codegraph-openspec-multirepo-20260611/ai-tester-token-matrices.json`
+- `.ai-factory/state/ai-tester-tool-evaluations/anonymous-codegraph-none-single-20260611/ai-tester-token-matrices.json`
+- `.ai-factory/state/ai-tester-tool-evaluations/codegraph-project-906f08554613-multirepo-analyze-review-20260611t1811z/ai-tester-token-matrices.json`
+
+| labels | task | skills | rows | average pair delta | decision |
+|---|---|---|---:|---:|---|
+| `framework`, `js`, `large_framework_app`, `openspec_native`, `php`, `single_repo`, `standard` | `architecture_or_impact_discovery` | `aif-analyze`, `aif-explore`, `aif-plan` | 6 PASS | +78.1% total tokens | avoid |
+| `framework`, `js`, `monorepo`, `multirepo`, `openspec_native`, `php`, `standard` | `multirepo_surface_mapping` | `aif-analyze`, `aif-explore`, `aif-review` | 6 PASS | +309.3% total tokens | avoid |
+| `framework`, `js`, `large_framework_app`, `none`, `php`, `single_repo`, `standard` | `architecture_or_impact_discovery` | `aif-analyze`, `aif-explore`, `aif-plan` | 6 PASS | +500.4% total tokens | avoid |
+| `framework`, `js`, `monorepo`, `multirepo`, `openspec_native`, `php`, `standard` | `multirepo_surface_mapping` | `aif-analyze`, `aif-review` | 4 PASS | +323.1% total tokens | avoid |
+
+Вывод: эти batch runs добавлены в `proven_label_evidence` как exact `avoid` entries. Даже когда отдельная пара выглядела дешевле, полезность не засчитывалась без положительного CodeGraph signal и matching policy.
+
+Hash-id rerun 2026-06-11 подтвердил тот же exact avoid для `project-906f08554613`. В aggregate totals candidate выглядел на 5.6% дешевле из-за одной negative-policy пары, но average pair delta и useful=0 остаются блокирующими для рекомендации.
+
 ## Итоговая Политика
 
 CodeGraph остается `manual_cli_only` и `avoid_by_default`.

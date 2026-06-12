@@ -14,6 +14,7 @@ import {
   isWindowsShellCommandNotFound,
   loadRecommendationMetadata,
   parseRecommendationMetadata,
+  provenLabelAllowsRequest,
   resolveMetadataPath,
   runMemoryToolRecommender
 } from './memory-tool-recommender.mjs';
@@ -77,6 +78,8 @@ describe('recommendation metadata parsing', () => {
     assert.deepEqual(metadata.project_dimensions.repo_shape, ['single_repo', 'monorepo', 'multirepo']);
     assert.deepEqual(metadata.project_dimensions.artifact_mode, ['openspec_native', 'legacy_ai_factory_only', 'none']);
     assert.equal(metadata.benchmark_matrix.ai_tester.result_schema, 'aifhub.memory_tools.ai_tester_matrix.v1');
+    assert.equal(metadata.proven_label_evidence[0].scenario_id, 'architecture-impact-discovery');
+    assert.equal(metadata.proven_label_evidence[0].run_class, 'accepted_evidence');
     assert.deepEqual(metadata.benchmark_matrix.ai_tester.decision_actions, ['recommend', 'conditional', 'avoid', 'forbid']);
     assert.ok(metadata.benchmark_matrix.ai_tester.comparison_metrics.includes('usefulness_vs_rg'));
     assert.equal(metadata.benchmark_matrix.ai_tester.reduced_matrix_policy.default_matrix_size, 'screening');
@@ -229,6 +232,7 @@ describe('recommendation results', () => {
     assert.ok(result.body.protected_artifacts.includes('openspec/specs/**'));
     assert.deepEqual(result.body.project_dimensions.languages, ['php', 'go', 'js', 'python', 'rust', 'multi']);
     assert.equal(result.body.benchmark_matrix.ai_tester.result_schema, 'aifhub.memory_tools.ai_tester_matrix.v1');
+    assert.equal(result.body.proven_label_evidence[0].tool_id, 'codegraph');
     assert.ok(result.body.dimension_signals.includes('mini_go_service'));
     assert.equal(metadata.tools.codegraph.recommendation_action, 'suggest_manual_cli_for_repo_graph_when_enabled_or_explicit');
   });
@@ -438,6 +442,45 @@ describe('recommendation results', () => {
     for (const result of [planResult, reviewResult, compressionForPlan]) {
       assert.equal(result.recommendations.some((item) => item.permission === 'forbidden'), false);
     }
+  });
+
+  it('uses proven label evidence as an exact skill-task-label allow without bypassing command boundaries', async () => {
+    const metadata = parseRecommendationMetadata(makeProvenLabelMetadataYaml());
+    const allowed = await buildRecommendationResult({
+      metadata,
+      projectProfile: {
+        project_shape: 'large_framework_app',
+        languages: ['js'],
+        volume: 'standard',
+        complexity: 'framework',
+        repo_shape: 'single_repo',
+        artifact_mode: 'openspec_native'
+      },
+      taskSignals: ['architecture_or_impact_discovery'],
+      command: 'aif-explore',
+      probeRunner: async () => ({ availability: 'installed', command: 'graphify --version' })
+    });
+    const forbidden = await buildRecommendationResult({
+      metadata,
+      projectProfile: {
+        project_shape: 'large_framework_app',
+        languages: ['js'],
+        volume: 'standard',
+        complexity: 'framework',
+        repo_shape: 'single_repo',
+        artifact_mode: 'openspec_native'
+      },
+      taskSignals: ['architecture_or_impact_discovery'],
+      command: 'aif-implement',
+      probeRunner: async () => ({ availability: 'installed', command: 'graphify --version' })
+    });
+
+    assert.equal(
+      provenLabelAllowsRequest(metadata, 'graphify', allowed.project_profile, ['architecture_or_impact_discovery'], 'aif-explore'),
+      true
+    );
+    assert.ok(allowed.recommendations.find((item) => item.tool_id === 'graphify'));
+    assert.equal(forbidden.recommendations.some((item) => item.tool_id === 'graphify'), false);
   });
 
   it('uses dimension signals without bypassing command-specific permissions', async () => {
@@ -834,6 +877,53 @@ describe('recommendation results', () => {
     assert.equal(withManualNotes.recommendations.some((item) => item.tool_id === 'agent-memory'), true);
   });
 });
+
+function makeProvenLabelMetadataYaml() {
+  return [
+    'schema: aifhub.memory_tools.recommendation.v1',
+    'default_policy:',
+    '  baseline_tool: rg',
+    '  install_policy: explicit_user_opt_in_only',
+    'tools:',
+    '  graphify:',
+    '    display_name: Graphify',
+    '    decision: manual_quality_experiment_only',
+    '    allowed_in: [aif-explore]',
+    '    forbidden_in: [aif-implement]',
+    '    read_scope: explicit_project_path',
+    '    purge_path: delete graphify-out/',
+    '    screening_policy:',
+    '      default_decision: avoid_by_default',
+    '      conditional_cases: []',
+    'skill_usage_matrix:',
+    '  aif-explore:',
+    '    allowed: [rg, graphify]',
+    '  aif-implement:',
+    '    allowed: [rg]',
+    'tool_permissions:',
+    '  graphify:',
+    '    aif-explore: recommend_only',
+    '    aif-implement: forbidden',
+    'task_signals:',
+    '  architecture_or_impact_discovery:',
+    '    conditional: []',
+    'proven_label_evidence:',
+    '  - id: graphify-proven-js-standard',
+    '    source_evidence: synthetic-ai-tester',
+    '    scenario_id: architecture-impact-discovery',
+    '    run_class: accepted_evidence',
+    '    tool_id: graphify',
+    '    task_scenario: architecture_or_impact_discovery',
+    '    skills: [aif-explore, aif-implement]',
+    '    required_labels: [js, standard, framework, single_repo, openspec_native, large_framework_app]',
+    '    pairs:',
+    '      total: 2',
+    '      pass_pass: 2',
+    '      useful: 2',
+    '    decision: conditional',
+    ''
+  ].join('\n');
+}
 
 describe('CLI behavior', () => {
   it('keeps broad architecture recommendation JSON on rg unless an exact tool policy matches', async () => {
