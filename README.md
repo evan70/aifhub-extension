@@ -104,6 +104,8 @@ OpenSpec validation overlay:
 
 `/aif-done` finalizes the OpenSpec lifecycle. It archives the accepted OpenSpec change through the OpenSpec CLI when archive is required and writes final evidence under `.ai-factory/qa/<change-id>/` plus final summaries under `.ai-factory/state/<change-id>/`.
 
+A dirty workspace is blocking by default before `/aif-done`. Inspect with `git status --short`; commit or stash unrelated changes, or rerun `/aif-done <change-id> --record-dirty-state` when the current dirty state should be recorded in final QA evidence before archive.
+
 It does not replace `/aif-commit`. After `/aif-done`, run `/aif-commit` or your normal git workflow to commit implementation changes, OpenSpec archive/spec changes, QA evidence, and final summaries.
 
 ### AI Factory 2.15 Reviewed Baseline
@@ -315,7 +317,7 @@ Switching to AI Factory-only mode updates the legacy path profile and preserves 
 | Ambiguous active change | Pass an explicit `<change-id>` or update `.ai-factory/state/current.yaml`. |
 | Missing or stale generated rules | Regenerate derived rules from OpenSpec specs before relying on rules guidance. |
 | Missing or stale coverage | Rerun `/aif-verify <change-id>` to refresh `.ai-factory/qa/<change-id>/coverage.json` before `/aif-done`. |
-| Dirty working tree before `/aif-done` | Commit, stash, or explicitly allow the dirty state only when the finalizer supports that path. |
+| Dirty working tree before `/aif-done` | Inspect with `git status --short`; commit or stash unrelated changes, or rerun `/aif-done <change-id> --record-dirty-state` to record the dirty workspace in final QA evidence before archive. |
 
 ## Documentation
 

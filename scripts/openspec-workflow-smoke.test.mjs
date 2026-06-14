@@ -507,11 +507,7 @@ describe('OpenSpec workflow smoke: add feature', () => {
       'Scenario B verify.md should include final aif-gate-result block.'
     );
 
-    await writeFile(
-      path.join(rootDir, '.ai-factory', 'qa', changeId, 'verify.md'),
-      passVerifyMarkdown(changeId),
-      'utf8'
-    );
+    await writeFixture(rootDir, `.ai-factory/qa/${changeId}/verify.md`, passVerifyMarkdown(changeId));
     const { finalized, archiveCalls } = await finalizeWithArchive(rootDir, changeId);
 
     assert.equal(finalized.ok, true, 'Scenario B /aif-done should finalize passed verification.');
@@ -556,6 +552,80 @@ describe('OpenSpec workflow smoke: add feature', () => {
       await readText(rootDir, '.ai-factory/rules/generated/openspec-base.md'),
       /Requirement: Accepted OAuth login/,
       'Scenario B post-archive base generated rules should include accepted spec behavior.'
+    );
+  });
+
+  it('blocks dirty done finalization until explicit dirty-state recording is requested', async () => {
+    const rootDir = await createTempRoot();
+    const changeId = 'dirty-done-recovery';
+    const dirtyStatus = ' M README.md\n';
+    const archiveCalls = [];
+
+    await createOpenSpecConfig(rootDir);
+    await createOauthFeatureChange(rootDir, changeId);
+    await syncOpenSpecArtifacts({
+      rootDir,
+      changeId,
+      detectOpenSpec: async () => availableCliDetection(),
+      validateOpenSpecChange: async (id) => validationResult(id),
+      getOpenSpecStatus: async (id) => statusResult(id),
+      timestamp: '2026-05-05T03-00-00-000Z'
+    });
+    await buildVerificationContext({
+      rootDir,
+      changeId,
+      detectOpenSpec: async () => availableCliDetection(),
+      validateOpenSpecChange: async (id) => validationResult(id),
+      getOpenSpecStatus: async (id) => statusResult(id)
+    });
+    await writeFixture(rootDir, `.ai-factory/qa/${changeId}/verify.md`, passVerifyMarkdown(changeId));
+    await writeRulesGateEvidence(rootDir, changeId);
+    await writePassingCoverageEvidence(rootDir, changeId);
+
+    const blocked = await finalizeOpenSpecChange({
+      rootDir,
+      changeId,
+      detectOpenSpec: async () => availableCliDetection(),
+      validateOpenSpecChange: async (id) => validationResult(id),
+      getOpenSpecStatus: async (id) => statusResult(id),
+      gitStatus: async () => ({ exitCode: 0, stdout: dirtyStatus, stderr: '' }),
+      archiveOpenSpecChange: async (requestedChangeId, options) => {
+        archiveCalls.push({ changeId: requestedChangeId, options });
+        return archiveResult(requestedChangeId);
+      }
+    });
+
+    assert.equal(blocked.ok, false, 'Dirty workspace should block /aif-done by default.');
+    assert.equal(blocked.readiness.checks.dirty_workspace, 'fail');
+    assert.equal(
+      blocked.readiness.suggested_next.command,
+      `/aif-done ${changeId} --record-dirty-state`
+    );
+    assert.equal(archiveCalls.length, 0, 'Blocked dirty workspace must not archive.');
+
+    const finalized = await finalizeOpenSpecChange({
+      rootDir,
+      changeId,
+      recordDirtyState: true,
+      skipSpecs: true,
+      detectOpenSpec: async () => availableCliDetection(),
+      validateOpenSpecChange: async (id) => validationResult(id),
+      getOpenSpecStatus: async (id) => statusResult(id),
+      gitStatus: async () => ({ exitCode: 0, stdout: dirtyStatus, stderr: '' }),
+      archiveOpenSpecChange: async (requestedChangeId, options) => {
+        archiveCalls.push({ changeId: requestedChangeId, options });
+        return archiveResult(requestedChangeId);
+      }
+    });
+
+    assert.equal(finalized.ok, true, 'Explicit dirty-state recording should let /aif-done finalize.');
+    assert.equal(finalized.readiness.status, 'warn');
+    assert.equal(finalized.readiness.checks.dirty_workspace, 'warn');
+    assert.equal(finalized.archive.skipSpecs, true);
+    assert.deepEqual(finalized.workingTree.entries, [' M README.md']);
+    assert.deepEqual(
+      archiveCalls.map((call) => [call.changeId, call.options.skipSpecs]),
+      [[changeId, true]]
     );
   });
 

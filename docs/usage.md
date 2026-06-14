@@ -769,6 +769,8 @@ Does not write:
 
 Use `--skip-specs` for docs/tooling-only changes where no accepted spec update is expected. Archive-required finalization needs a compatible OpenSpec CLI when `aifhub.openspec.requireCliForDone` is true. `/aif-done` runs a pre-archive readiness gate and refuses archive on blocking OpenSpec validate, artifact contract, generated rules, rules gate, coverage, verify gate, or dirty workspace failures. The readiness output includes the exact next command to run.
 
+A dirty workspace is blocking by default before archive. Inspect with `git status --short`; commit or stash unrelated changes, or rerun `/aif-done <change-id> --record-dirty-state` when the current dirty state should be recorded in final QA evidence before archive. For docs/tooling-only finalization, preserve both public flags with `/aif-done <change-id> --skip-specs --record-dirty-state`.
+
 If `requireRulesPassForDone` is true and readiness reports missing rules gate evidence, rerun `/aif-rules-check` and persist the final output with `ai-factory aifhub-write-gate-evidence --change add-oauth-login --gate rules --from /tmp/aif-rules-check-output.md`, or save at least the final `aif-gate-result` block to `.ai-factory/qa/<change-id>/rules.md`.
 
 Next steps after `/aif-done`:
@@ -1014,7 +1016,7 @@ See [Codex Plan Mode](codex-plan-mode.md) for question-format guidance.
 | Stale generated rules | Generated rules do not match canonical OpenSpec artifacts. | Regenerate them; do not edit generated rules as source of truth. |
 | Missing or stale coverage | `.ai-factory/qa/<change-id>/coverage.json` is absent or fingerprints no longer match source artifacts. | Rerun `/aif-verify <change-id>` to regenerate coverage before `/aif-done`. |
 | Artifact contract failure | Canonical OpenSpec artifacts, runtime state, QA evidence, or generated rules violate the AIFHub contract. | Fix the reported path or run the suggested command from `artifactContract.suggested_next`. |
-| Dirty working tree before `/aif-done` | Finalization cannot prove archive/summary scope safely. | Commit, stash, or use an explicit supported dirty-state override when available. |
+| Dirty working tree before `/aif-done` | Finalization cannot prove archive/summary scope safely. | Inspect with `git status --short`; commit or stash unrelated changes, or rerun `/aif-done <change-id> --record-dirty-state` to record the dirty workspace in final QA evidence before archive. |
 
 ## Release Smoke Checks
 

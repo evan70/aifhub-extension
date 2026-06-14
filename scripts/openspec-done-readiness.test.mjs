@@ -315,6 +315,50 @@ describe('OpenSpec done readiness gate', () => {
     assert.equal(recorded.warnings[0].code, 'dirty-working-tree-recorded');
   });
 
+  it('suggests explicit dirty-state finalization when dirty workspace blocks archive', async () => {
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir);
+
+    const readiness = await buildOpenSpecDoneReadiness({
+      rootDir,
+      changeId: 'add-oauth',
+      ...passingOptions({
+        gitStatus: async () => ({ exitCode: 0, stdout: ' M README.md\n', stderr: '' })
+      })
+    });
+
+    assert.equal(readiness.status, 'fail', 'dirty_workspace should fail readiness by default');
+    assert.equal(readiness.checks.dirty_workspace, 'fail', 'dirty_workspace check should be the failing check');
+    assert.equal(
+      readiness.suggested_next.command,
+      '/aif-done add-oauth --record-dirty-state',
+      'dirty_workspace should suggest explicit dirty-state finalization'
+    );
+
+    const summary = summarizeOpenSpecDoneReadiness(readiness);
+    assert.match(summary, /Suggested next: \/aif-done add-oauth --record-dirty-state/);
+    assert.match(summary, /git status --short/);
+  });
+
+  it('runs the CLI with explicit dirty-state recording enabled', async () => {
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir);
+
+    const result = await runDoneReadinessCommand(['--change', 'add-oauth', '--record-dirty-state', '--json'], {
+      rootDir,
+      ...passingOptions({
+        gitStatus: async () => ({ exitCode: 0, stdout: ' M README.md\n', stderr: '' })
+      })
+    });
+
+    assert.equal(result.exitCode, 0, 'explicit dirty-state recording should make dirty_workspace non-blocking');
+    const parsed = JSON.parse(result.stdout);
+    assert.equal(parsed.status, 'warn');
+    assert.equal(parsed.blocking, false);
+    assert.equal(parsed.checks.dirty_workspace, 'warn');
+    assert.equal(parsed.diagnostics[0].code, 'dirty-working-tree-recorded');
+  });
+
   it('renders the exact suggested next command and reason', async () => {
     const summary = summarizeOpenSpecDoneReadiness({
       change_id: 'add-oauth',
