@@ -834,26 +834,38 @@ describe('OpenSpec done finalizer API', () => {
     assert.equal(await pathExists(path.join(rootDir, '.ai-factory', 'plans', 'add-oauth')), false);
   });
 
-  it('records dirty state and still writes summaries when explicitly allowed', async () => {
+  it('records dirty state and still writes summaries when explicit recording is requested', async () => {
     const rootDir = await createTempRoot();
     await createOpenSpecChange(rootDir);
     await createRuntimeEvidence(rootDir);
+    const archiveCalls = [];
 
     const result = await finalizeOpenSpecChange({
       rootDir,
       changeId: 'add-oauth',
-      allowDirty: true,
+      recordDirtyState: true,
+      skipSpecs: true,
       detectOpenSpec: async () => availableCliDetection(),
       validateOpenSpecChange: async () => statusResult(),
       gitStatus: async () => ({ exitCode: 0, stdout: ' M README.md\n', stderr: '' }),
       readLatestVerificationEvidence: async () => verificationEvidence(),
       readOpenSpecCoverageMatrix: async () => coverageEvidence(),
-      archiveOpenSpecChange: async () => archiveResult()
+      archiveOpenSpecChange: async (changeId, options) => {
+        archiveCalls.push({ changeId, options });
+        return archiveResult({
+          args: ['archive', 'add-oauth', '--yes', '--skip-specs', '--no-color']
+        });
+      }
     });
 
     assert.equal(result.ok, true);
+    assert.equal(result.readiness.status, 'warn');
+    assert.equal(result.readiness.checks.dirty_workspace, 'warn');
     assert.equal(result.workingTree.dirty, true);
     assert.deepEqual(result.workingTree.entries, [' M README.md']);
+    assert.equal(result.archive.skipSpecs, true);
+    assert.deepEqual(archiveCalls.map((call) => call.changeId), ['add-oauth']);
+    assert.equal(archiveCalls[0].options.skipSpecs, true);
     assert.match(
       await readFile(path.join(rootDir, '.ai-factory', 'qa', 'add-oauth', 'done.md'), 'utf8'),
       /M README\.md/

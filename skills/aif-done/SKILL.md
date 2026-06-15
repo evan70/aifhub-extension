@@ -37,7 +37,8 @@ OpenSpec-native mode finalizes the verified change state through `scripts/opensp
 - If coverage, generated rules, or rules gate evidence is missing, invalid, stale, failed, or warning-only when policy does not allow the warning, stop and suggest the owning command (`/aif-mode sync --change <change-id>`, `/aif-rules-check`, or `/aif-verify <change-id>`).
 - If readiness reports a blocking failure, refuse archive and show `suggested_next.command` and `suggested_next.reason` exactly.
 - Refuse unverified changes; do not accept `Code verification: PENDING` as final verification.
-- Check dirty working tree state before archive and either fail or record it only when explicit dirty-state recording is requested.
+- Dirty workspace state is blocking by default before archive. Inspect with `git status --short`; commit or stash unrelated changes, or rerun the public route `/aif-done <change-id> --record-dirty-state` to record dirty state in final QA evidence before archive.
+- For docs/tooling-only changes that also need explicit dirty-state recording, preserve both flags with `/aif-done <change-id> --skip-specs --record-dirty-state`.
 
 ### Canonical Context
 

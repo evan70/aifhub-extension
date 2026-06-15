@@ -86,7 +86,7 @@ Missing verification evidence suggests:
 
 Doctor also reports `effectivePolicy` from `scripts/openspec-policy.mjs`, including CLI, generated-rules, rules-gate, spec-coverage, and `allowWarnOnDone` settings. Human diagnostics show whether missing or warning evidence is only degraded or blocking under the current policy.
 
-`/aif-done` runs `scripts/openspec-done-readiness.mjs` before archive and writes `.ai-factory/qa/<change-id>/done-readiness.json`. The readiness gate checks OpenSpec validate, OpenSpec status, artifact contract, generated rules freshness, rules gate evidence, coverage, verify gate evidence, and dirty workspace state. Blocking failures refuse archive and include an exact suggested next command, such as `/aif-mode sync --change <change-id>`, `/aif-rules-check`, or `/aif-verify <change-id>`.
+`/aif-done` runs `scripts/openspec-done-readiness.mjs` before archive and writes `.ai-factory/qa/<change-id>/done-readiness.json`. The readiness gate checks OpenSpec validate, OpenSpec status, artifact contract, generated rules freshness, rules gate evidence, coverage, verify gate evidence, and dirty workspace state. Blocking failures refuse archive and include an exact suggested next command, such as `/aif-mode sync --change <change-id>`, `/aif-rules-check`, `/aif-verify <change-id>`, or `/aif-done <change-id> --record-dirty-state`.
 
 When `requireRulesPassForDone` is true, save the final `/aif-rules-check` output, or at least its final `aif-gate-result` block, to `.ai-factory/qa/<change-id>/rules.md` before `/aif-done`:
 
@@ -116,6 +116,8 @@ ai-factory aifhub-done-readiness --change <change-id> --json
 ```
 
 It writes `.ai-factory/qa/<change-id>/done-readiness.json` unless `--no-write` is passed. Exit codes are `0` for `pass` or policy-accepted `warn`, `1` for blocking readiness failure, and `2` for invalid arguments or unresolved changes.
+
+A dirty workspace is blocking by default. Inspect with `git status --short`; commit or stash unrelated changes, or rerun `/aif-done <change-id> --record-dirty-state` when the current dirty state should be recorded in final QA evidence before archive.
 
 Stable JSON fields:
 
@@ -154,7 +156,7 @@ Readiness checks:
 | `rules_gate` | blocks missing, failed, or disallowed warning rules evidence when `requireRulesPassForDone` is true |
 | `coverage` | blocks missing, stale, failed, or disallowed warning coverage when `requireSpecCoverageForDone` is true |
 | `verify_gate` | blocks missing, invalid, failed, or ambiguous final verify gate evidence |
-| `dirty_workspace` | blocks uncommitted changes unless explicit dirty-state recording is enabled |
+| `dirty_workspace` | blocks uncommitted changes unless explicit dirty-state recording is enabled with `/aif-done <change-id> --record-dirty-state`; inspect first with `git status --short` |
 
 Policy is intentionally stricter for done than verify. Verify can run degraded when CLI, generated rules, rules gate, or coverage evidence is unavailable unless the matching verify flag is true. Done requires archive readiness and applies `allowWarnOnDone` before accepting warning-only rules, coverage, or OpenSpec status.
 

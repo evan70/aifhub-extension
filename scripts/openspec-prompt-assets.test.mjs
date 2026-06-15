@@ -799,6 +799,36 @@ describe('OpenSpec-native prompt asset contract', () => {
     }
   });
 
+  it('requires done prompts to expose explicit dirty-state finalization without involving commit', async () => {
+    for (const relativePath of DONE_PROMPT_ASSETS) {
+      const asset = stripFencedBlocks(await readRepoFile(relativePath));
+
+      for (const expected of [
+        '--record-dirty-state',
+        '/aif-done <change-id> --record-dirty-state',
+        'git status --short'
+      ]) {
+        assertIncludes(asset, expected, relativePath);
+      }
+
+      assert.match(
+        asset,
+        /dirty workspace.*blocking|blocking.*dirty workspace|dirty working tree.*blocking|blocking.*dirty working tree/i,
+        `${relativePath} should describe dirty workspace as blocking by default`
+      );
+      assert.match(
+        asset,
+        /record(?:s|ing)? dirty (?:workspace|working tree|state).*QA evidence|QA evidence.*record(?:s|ing)? dirty (?:workspace|working tree|state)/i,
+        `${relativePath} should require dirty state to be recorded in QA evidence`
+      );
+      assert.doesNotMatch(
+        asset,
+        /dirty[^\n]*\/aif-commit[^\n]*(?:archive|finaliz)|(?:archive|finaliz)[^\n]*\/aif-commit[^\n]*dirty/i,
+        `${relativePath} should not route dirty-workspace archive/finalization through /aif-commit`
+      );
+    }
+  });
+
   it('requires done prompts to hand off to sync, commit, and optional evolve without replacing commit', async () => {
     for (const relativePath of DONE_PROMPT_ASSETS) {
       const asset = stripFencedBlocks(await readRepoFile(relativePath));

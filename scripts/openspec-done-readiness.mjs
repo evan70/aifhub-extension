@@ -192,7 +192,8 @@ export async function buildOpenSpecDoneReadiness(options = {}) {
 
   const workingTree = await inspectDirtyWorkspace({
     ...options,
-    rootDir
+    rootDir,
+    changeId: resolved.changeId
   });
   context.workingTree = workingTree.value;
   recordCheck(checks, diagnostics, workingTree);
@@ -291,7 +292,8 @@ export function parseDoneReadinessArgs(argv) {
     ok: true,
     changeId: null,
     json: false,
-    write: true
+    write: true,
+    recordDirtyState: false
   };
 
   for (let index = 0; index < args.length; index += 1) {
@@ -317,6 +319,11 @@ export function parseDoneReadinessArgs(argv) {
       continue;
     }
 
+    if (arg === '--record-dirty-state') {
+      parsed.recordDirtyState = true;
+      continue;
+    }
+
     return invalidArgs(`Unknown option: ${arg}.`);
   }
 
@@ -335,7 +342,8 @@ export async function runDoneReadinessCommand(argv, options = {}) {
 
   const readiness = await buildOpenSpecDoneReadiness({
     ...options,
-    changeId: parsed.changeId ?? options.changeId
+    changeId: parsed.changeId ?? options.changeId,
+    recordDirtyState: parsed.recordDirtyState || options.recordDirtyState
   });
   let output = readiness;
 
@@ -793,11 +801,24 @@ async function inspectDirtyWorkspace(options) {
     code: workingTree.errors?.[0]?.code ?? 'dirty-working-tree',
     message: workingTree.errors?.[0]?.message ?? 'Working tree is not ready for archive.',
     value: workingTree,
-    suggestedNext: {
-      command: 'git status --short',
-      reason: 'commit or stash local changes before /aif-done, or rerun with explicit dirty-state recording'
-    }
+    suggestedNext: dirtyWorkspaceSuggestedNext(options.changeId, options)
   });
+}
+
+function dirtyWorkspaceSuggestedNext(changeId, options = {}) {
+  const commandParts = ['/aif-done'];
+  if (changeId) {
+    commandParts.push(changeId);
+  }
+  if (options.skipSpecs) {
+    commandParts.push('--skip-specs');
+  }
+  commandParts.push('--record-dirty-state');
+
+  return {
+    command: commandParts.join(' '),
+    reason: 'record current dirty workspace entries in final QA evidence before archive; inspect first with git status --short if needed'
+  };
 }
 
 export async function detectWorkingTreeState(options = {}) {

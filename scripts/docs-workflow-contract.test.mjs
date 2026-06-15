@@ -277,6 +277,39 @@ describe('complete OpenSpec workflow documentation contract', () => {
     }
   });
 
+  it('documents explicit dirty-state recording for done readiness dead-end recovery', async () => {
+    const readme = await readRepoFile('README.md');
+    const usage = await readRepoFile('docs/usage.md');
+    const validation = await readRepoFile('docs/openspec-validation.md');
+
+    for (const [label, source] of [
+      ['README.md', readme],
+      ['docs/usage.md', usage],
+      ['docs/openspec-validation.md', validation]
+    ]) {
+      assertIncludes(source, '/aif-done <change-id> --record-dirty-state', label);
+      assertIncludes(source, 'git status --short', label);
+      assertIncludes(source, 'final QA evidence', label);
+      assertIncludes(source, 'dirty workspace', label);
+    }
+
+    assertIncludes(
+      usage,
+      '/aif-done <change-id> --skip-specs --record-dirty-state',
+      'docs/usage.md'
+    );
+    assertNotIncludes(
+      readme,
+      'explicitly allow the dirty state only when the finalizer supports that path',
+      'README.md'
+    );
+    assertNotIncludes(
+      usage,
+      'explicit supported dirty-state override when available',
+      'docs/usage.md'
+    );
+  });
+
   it('documents installed-project helper execution through AIFHub wrappers', async () => {
     const validation = await readRepoFile('docs/openspec-validation.md');
     const handoffProfile = await readRepoFile('docs/handoff-validation-profile.md');

@@ -21,7 +21,7 @@ Reference for the `aif-done` skill and `aifhub-done-finalizer` agents.
 - Missing, invalid, stale, or failed coverage refuses finalization and requires `/aif-verify`.
 - Missing, invalid, stale, failed, or disallowed warning rules gate evidence refuses finalization when policy requires rules pass.
 - `Code verification: PENDING` is ambiguous and must refuse finalization.
-- Dirty working tree state is empty, or explicit dirty-state recording is enabled.
+- Dirty workspace state is empty, or explicit dirty-state recording is enabled through `/aif-done <change-id> --record-dirty-state`.
 
 ### Canonical Context
 
@@ -59,6 +59,8 @@ openspec archive <change-id> --yes --skip-specs --no-color
 ```
 
 `--skip-specs` still writes final QA evidence and final summaries. Missing or unsupported OpenSpec CLI fails when archive is required. `/aif-verify` does not archive.
+
+Dirty workspace state is blocking by default. Inspect with `git status --short`; commit or stash unrelated changes, or rerun `/aif-done <change-id> --record-dirty-state` to record dirty state in final QA evidence before archive. For docs/tooling-only changes, combine the public flags as `/aif-done <change-id> --skip-specs --record-dirty-state`.
 
 OpenSpec-native mode does not use legacy `.ai-factory/specs` archive.
 
