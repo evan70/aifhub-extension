@@ -78,6 +78,6 @@
     "diagnostic_codes": [
       "rules-gate-fail"
     ],
-    "suggested_next": "/aif-rules-check"
+    "suggested_next": "ai-factory aifhub-write-gate-evidence --change fixture-change --gate rules --from <rules-output.md>"
   }
 }

@@ -194,6 +194,22 @@ function generatedRules(overrides = {}) {
   };
 }
 
+function missingRulesGateEvidence() {
+  return {
+    exists: false,
+    ok: false,
+    status: 'missing',
+    path: '.ai-factory/qa/add-oauth/rules.md',
+    gateResult: null,
+    warnings: [],
+    errors: [{
+      code: 'rules-gate-evidence-missing',
+      message: 'Rules gate evidence is missing.',
+      path: '.ai-factory/qa/add-oauth/rules.md'
+    }]
+  };
+}
+
 function passingOptions(overrides = {}) {
   return {
     detectOpenSpec: async () => availableCliDetection(),
@@ -260,6 +276,118 @@ describe('OpenSpec done readiness gate', () => {
     assert.equal(readiness.status, 'fail');
     assert.equal(readiness.checks.generated_rules, 'fail');
     assert.equal(readiness.suggested_next.command, '/aif-mode sync --change add-oauth');
+  });
+
+  it('blocks missing rules_gate evidence with write-gate-evidence remediation', async () => {
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir);
+
+    const readiness = await buildOpenSpecDoneReadiness({
+      rootDir,
+      changeId: 'add-oauth',
+      ...passingOptions({
+        readOpenSpecRulesGateEvidence: async () => missingRulesGateEvidence()
+      })
+    });
+
+    assert.equal(readiness.status, 'fail');
+    assert.equal(readiness.checks.rules_gate, 'fail');
+    assert.equal(
+      readiness.suggested_next.command,
+      'ai-factory aifhub-write-gate-evidence --change add-oauth --gate rules --from <rules-output.md>',
+      'rules_gate should route to the durable write-gate-evidence helper'
+    );
+    assert.match(readiness.suggested_next.reason, /\/aif-rules-check/);
+    assert.match(readiness.suggested_next.reason, /\.ai-factory\/qa\/add-oauth\/rules\.md/);
+  });
+
+  it('blocks disallowed allowWarnOnDone.rules warnings with write-gate-evidence remediation', async () => {
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir);
+
+    const readiness = await buildOpenSpecDoneReadiness({
+      rootDir,
+      changeId: 'add-oauth',
+      ...passingOptions({
+        readOpenSpecRulesGateEvidence: async () => rulesGateEvidence('warn')
+      })
+    });
+
+    assert.equal(readiness.status, 'fail');
+    assert.equal(readiness.checks.rules_gate, 'fail');
+    assert.equal(
+      readiness.suggested_next.command,
+      'ai-factory aifhub-write-gate-evidence --change add-oauth --gate rules --from <rules-output.md>',
+      'allowWarnOnDone.rules=false should still route rules_gate to durable evidence persistence'
+    );
+    assert.match(readiness.suggested_next.reason, /\/aif-rules-check/);
+  });
+
+  it('renders rules_gate write-gate-evidence remediation in human output', async () => {
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir);
+
+    const readiness = await buildOpenSpecDoneReadiness({
+      rootDir,
+      changeId: 'add-oauth',
+      ...passingOptions({
+        readOpenSpecRulesGateEvidence: async () => missingRulesGateEvidence()
+      })
+    });
+    const summary = summarizeOpenSpecDoneReadiness(readiness);
+
+    assert.match(
+      summary,
+      /Suggested next: ai-factory aifhub-write-gate-evidence --change add-oauth --gate rules --from <rules-output\.md>/,
+      summary
+    );
+    assert.match(summary, /\/aif-rules-check/, summary);
+    assert.match(summary, /final .*rules.* output/i, summary);
+  });
+
+  it('keeps suggested_next priority for generated_rules, rules_gate, and coverage blockers', async () => {
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir);
+
+    const rulesAndCoverage = await buildOpenSpecDoneReadiness({
+      rootDir,
+      changeId: 'add-oauth',
+      ...passingOptions({
+        readOpenSpecRulesGateEvidence: async () => missingRulesGateEvidence(),
+        readOpenSpecCoverageMatrix: async () => coverageEvidence({ status: 'fail' })
+      })
+    });
+
+    assert.equal(rulesAndCoverage.checks.rules_gate, 'fail');
+    assert.equal(rulesAndCoverage.checks.coverage, 'fail');
+    assert.equal(
+      rulesAndCoverage.suggested_next.command,
+      'ai-factory aifhub-write-gate-evidence --change add-oauth --gate rules --from <rules-output.md>',
+      'rules_gate should have priority over coverage blockers'
+    );
+
+    const generatedRulesAndRules = await buildOpenSpecDoneReadiness({
+      rootDir,
+      changeId: 'add-oauth',
+      ...passingOptions({
+        collectGeneratedRules: async () => generatedRules({
+          warnings: [{
+            code: 'generated-rules-stale',
+            message: 'Generated rules are stale.',
+            path: '.ai-factory/rules/generated/openspec-merged-add-oauth.md'
+          }]
+        }),
+        readOpenSpecRulesGateEvidence: async () => missingRulesGateEvidence()
+      })
+    });
+
+    assert.equal(generatedRulesAndRules.checks.generated_rules, 'fail');
+    assert.equal(generatedRulesAndRules.checks.rules_gate, 'fail');
+    assert.equal(
+      generatedRulesAndRules.suggested_next.command,
+      '/aif-mode sync --change add-oauth',
+      'generated_rules should keep priority over rules_gate blockers'
+    );
   });
 
   it('requires artifact contract pass instead of accepting warnings', async () => {

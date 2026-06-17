@@ -34,7 +34,7 @@ OpenSpec-native mode finalizes the verified change state through `scripts/opensp
 - Always run the pre-archive readiness gate through `scripts/openspec-done-readiness.mjs` before archive and persist `.ai-factory/qa/<change-id>/done-readiness.json`.
 - If verification has not run or verdict is `fail`, stop and suggest `/aif-verify` or `/aif-fix`.
 - If the verify gate result is missing, invalid, or `fail`, stop and suggest rerunning `/aif-verify <change-id>` or `/aif-fix <change-id>`.
-- If coverage, generated rules, or rules gate evidence is missing, invalid, stale, failed, or warning-only when policy does not allow the warning, stop and suggest the owning command (`/aif-mode sync --change <change-id>`, `/aif-rules-check`, or `/aif-verify <change-id>`).
+- If coverage, generated rules, or rules gate evidence is missing, invalid, stale, failed, or warning-only when policy does not allow the warning, stop on the readiness result and show its `suggested_next.command` and `suggested_next.reason` exactly. For rules gate blockers, the command may be the installed durable evidence writer, not `/aif-rules-check` alone.
 - If readiness reports a blocking failure, refuse archive and show `suggested_next.command` and `suggested_next.reason` exactly.
 - Refuse unverified changes; do not accept `Code verification: PENDING` as final verification.
 - Dirty workspace state is blocking by default before archive. Inspect with `git status --short`; commit or stash unrelated changes, or rerun the public route `/aif-done <change-id> --record-dirty-state` to record dirty state in final QA evidence before archive.

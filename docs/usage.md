@@ -771,7 +771,7 @@ Use `--skip-specs` for docs/tooling-only changes where no accepted spec update i
 
 A dirty workspace is blocking by default before archive. Inspect with `git status --short`; commit or stash unrelated changes, or rerun `/aif-done <change-id> --record-dirty-state` when the current dirty state should be recorded in final QA evidence before archive. For docs/tooling-only finalization, preserve both public flags with `/aif-done <change-id> --skip-specs --record-dirty-state`.
 
-If `requireRulesPassForDone` is true and readiness reports missing rules gate evidence, rerun `/aif-rules-check` and persist the final output with `ai-factory aifhub-write-gate-evidence --change add-oauth-login --gate rules --from /tmp/aif-rules-check-output.md`, or save at least the final `aif-gate-result` block to `.ai-factory/qa/<change-id>/rules.md`.
+If `requireRulesPassForDone` is true and readiness reports missing rules gate evidence, `suggested_next.command` points to `ai-factory aifhub-write-gate-evidence --change add-oauth-login --gate rules --from <rules-output.md>`. The accompanying reason tells you to rerun `/aif-rules-check` first and persist its final output, or at least the final `aif-gate-result` block, to `.ai-factory/qa/<change-id>/rules.md`.
 
 Next steps after `/aif-done`:
 
