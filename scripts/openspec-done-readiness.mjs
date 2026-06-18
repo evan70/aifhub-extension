@@ -589,6 +589,7 @@ async function inspectRulesGate(changeId, options) {
   const acceptedWarn = status === 'warn' && allowWarn;
   const blocking = acceptedWarn ? false : required;
   const error = rulesGate?.errors?.[0];
+  const evidencePath = rulesGate?.path ?? toPosix(path.join(DEFAULT_QA_DIR, changeId, 'rules.md'));
   return checkResult({
     check: 'rules_gate',
     level: blocking ? 'fail' : 'warn',
@@ -599,11 +600,17 @@ async function inspectRulesGate(changeId, options) {
       : error?.message ?? `Rules gate evidence is ${status}.`,
     path: rulesGate?.path,
     value: rulesGate,
-    suggestedNext: {
-      command: '/aif-rules-check',
-      reason: 'rules gate evidence must pass before done finalization'
-    }
+    suggestedNext: createRulesGateSuggestedNext(changeId, evidencePath)
   });
+}
+
+function createRulesGateSuggestedNext(changeId, evidencePath) {
+  const rulesEvidencePath = toPosix(evidencePath ?? path.join(DEFAULT_QA_DIR, changeId, 'rules.md'));
+
+  return {
+    command: `ai-factory aifhub-write-gate-evidence --change ${changeId} --gate rules --from <rules-output.md>`,
+    reason: `Run /aif-rules-check, save its final rules output, then persist it to ${rulesEvidencePath} before /aif-done.`
+  };
 }
 
 async function inspectCoverage(changeId, options) {

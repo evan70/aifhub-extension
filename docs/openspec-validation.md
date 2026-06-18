@@ -86,7 +86,7 @@ Missing verification evidence suggests:
 
 Doctor also reports `effectivePolicy` from `scripts/openspec-policy.mjs`, including CLI, generated-rules, rules-gate, spec-coverage, and `allowWarnOnDone` settings. Human diagnostics show whether missing or warning evidence is only degraded or blocking under the current policy.
 
-`/aif-done` runs `scripts/openspec-done-readiness.mjs` before archive and writes `.ai-factory/qa/<change-id>/done-readiness.json`. The readiness gate checks OpenSpec validate, OpenSpec status, artifact contract, generated rules freshness, rules gate evidence, coverage, verify gate evidence, and dirty workspace state. Blocking failures refuse archive and include an exact suggested next command, such as `/aif-mode sync --change <change-id>`, `/aif-rules-check`, `/aif-verify <change-id>`, or `/aif-done <change-id> --record-dirty-state`.
+`/aif-done` runs `scripts/openspec-done-readiness.mjs` before archive and writes `.ai-factory/qa/<change-id>/done-readiness.json`. The readiness gate checks OpenSpec validate, OpenSpec status, artifact contract, generated rules freshness, rules gate evidence, coverage, verify gate evidence, and dirty workspace state. Blocking failures refuse archive and include an exact suggested next command, such as `/aif-mode sync --change <change-id>`, `ai-factory aifhub-write-gate-evidence --change <change-id> --gate rules --from <rules-output.md>`, `/aif-verify <change-id>`, or `/aif-done <change-id> --record-dirty-state`.
 
 When `requireRulesPassForDone` is true, save the final `/aif-rules-check` output, or at least its final `aif-gate-result` block, to `.ai-factory/qa/<change-id>/rules.md` before `/aif-done`:
 
